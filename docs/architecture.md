@@ -95,3 +95,31 @@ to `build/shaders/<configuration>/`.
 - CMake presets pin the Visual Studio generator, x64 platform, C++23 mode, and
   static MSVC runtime selection.
 - `.superpowers/sdd/task-01-report.md` records the observed RED/GREEN sequence.
+
+## Unified atmosphere foundation
+
+`AtmosphereInput` is a stateless ten-field POD: three bounded directional/day
+coordinates and seven `[0,1]` weather/cloud/fog/aurora controls.
+`EvaluateAtmosphere` validates every field before calculating a candidate
+`AtmosphereOutput`; it assigns that candidate once, so invalid input preserves
+the caller's output bit-for-bit.
+
+The reference combines a bounded symmetric Rayleigh phase, a clamped
+forward-asymmetric Henyey–Greenstein-style Mie phase, conservative horizon air
+mass, Beer–Lambert cloud/fog transmittance, and pre-exposed aurora. All
+below-horizon view cosines use the same `0.05` horizon fallback.
+
+Coupling is explicit and single-pass:
+
+```text
+attenuation = cloud_transmittance * fog_transmittance
+aurora_radiance = intrinsic_aurora * attenuation
+composite_radiance = sky_radiance * attenuation + aurora_radiance
+```
+
+`TruthAtmosphereCore.fxh` mirrors those constants and formulas. The enabled
+effect path adds the composite to sampled scene-linear color before exposure;
+the disabled macro retains the original scene path. CTest compiles both with
+exact x64 FXC `fx_5_0` and asserts their generated objects differ.
+
+`.superpowers/sdd/task-02-report.md` records the CPU and FXC RED/GREEN evidence.

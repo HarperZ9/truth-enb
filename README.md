@@ -18,6 +18,10 @@ depend on recovered or peer shader source.
   black and reaches display white only at the declared linear white point.
 - `TruthColorCore.fxh`: original shader-side exposure and filmic helpers.
 - `enbeffect.fx`: a standalone Effects 11 fixture compiled as `fx_5_0`.
+- `AtmosphereInput` / `AtmosphereOutput`: a validated analytic sky, cloud,
+  fog, and aurora reference with single-pass cloud/fog coupling.
+- `TruthAtmosphereCore.fxh`: the original shader mirror, compiled in live
+  atmosphere-enabled and atmosphere-disabled permutations.
 
 ## Toolchain
 
@@ -40,6 +44,14 @@ ctest --preset vs2026-x64-debug --output-on-failure --no-tests=error
 The C++ assertion executable and the FXC object/listing are generated only
 beneath `build/`. The shader CTest fails if the exact compiler is missing, the
 effect does not compile as `fx_5_0`, or either expected output is empty.
+
+The enabled effect adds unified atmosphere composite radiance to scene-linear
+color before exposure. Aurora is pre-exposed and attenuated exactly once:
+
+```text
+aurora = intrinsic_aurora * cloud_transmittance * fog_transmittance
+composite = sky * cloud_transmittance * fog_transmittance + aurora
+```
 
 ## Input contract
 

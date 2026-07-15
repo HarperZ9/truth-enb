@@ -1,6 +1,13 @@
 cmake_minimum_required(VERSION 3.28)
 
-foreach(required_variable IN ITEMS TRUTH_FXC TRUTH_SHADER TRUTH_INCLUDE TRUTH_OUTPUT TRUTH_LISTING)
+foreach(required_variable IN ITEMS
+    TRUTH_FXC
+    TRUTH_SHADER
+    TRUTH_REQUIRED_SOURCE
+    TRUTH_INCLUDE
+    TRUTH_DEFINE
+    TRUTH_OUTPUT
+    TRUTH_LISTING)
   if(NOT DEFINED ${required_variable} OR "${${required_variable}}" STREQUAL "")
     message(FATAL_ERROR "Missing required variable: ${required_variable}")
   endif()
@@ -12,6 +19,10 @@ endif()
 
 if(NOT EXISTS "${TRUTH_SHADER}")
   message(FATAL_ERROR "Truth effect source is absent: ${TRUTH_SHADER}")
+endif()
+
+if(NOT EXISTS "${TRUTH_REQUIRED_SOURCE}")
+  message(FATAL_ERROR "Required Truth shader source is absent: ${TRUTH_REQUIRED_SOURCE}")
 endif()
 
 if(NOT IS_DIRECTORY "${TRUTH_INCLUDE}")
@@ -26,6 +37,7 @@ execute_process(
     /nologo
     /T fx_5_0
     /I "${TRUTH_INCLUDE}"
+    "/D${TRUTH_DEFINE}"
     /Fo "${TRUTH_OUTPUT}"
     /Fc "${TRUTH_LISTING}"
     "${TRUTH_SHADER}"
@@ -54,5 +66,6 @@ endforeach()
 
 message(STATUS "FXC compiler: ${TRUTH_FXC}")
 message(STATUS "FXC target: fx_5_0")
+message(STATUS "FXC define: ${TRUTH_DEFINE}")
 message(STATUS "FXC object: ${TRUTH_OUTPUT}")
 message(STATUS "FXC listing: ${TRUTH_LISTING}")

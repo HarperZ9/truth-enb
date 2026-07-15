@@ -1,4 +1,9 @@
 #include "truth/TruthColorCore.fxh"
+#include "truth/TruthAtmosphereCore.fxh"
+
+#ifndef TRUTH_ENABLE_ATMOSPHERE
+#define TRUTH_ENABLE_ATMOSPHERE 1
+#endif
 
 Texture2D TruthSceneTexture : register(t0);
 
@@ -18,6 +23,21 @@ cbuffer TruthFrameParameters : register(b0)
     float TruthExposureEv;
     float TruthUseTargetExposure;
     float2 TruthFramePadding;
+};
+
+cbuffer TruthAtmosphereParameters : register(b1)
+{
+    float TruthViewZenithCosine;
+    float TruthViewSunCosine;
+    float TruthSunElevation;
+    float TruthWeatherDensity;
+    float TruthCloudCoverage;
+    float TruthCloudDensity;
+    float TruthFogDensity;
+    float TruthAuroraActivity;
+    float TruthAuroraMask;
+    float TruthNightFactor;
+    float2 TruthAtmospherePadding;
 };
 
 struct TruthVertexInput
@@ -54,7 +74,25 @@ float4 TruthPixelMain(TruthVertexOutput input) : SV_Target0
                                       target_exposure_ev,
                                       saturate(TruthUseTargetExposure));
     float4 scene_color = TruthSceneTexture.Sample(TruthSceneSampler, input.texcoord);
-    float3 exposed_color = TruthApplyExposure(scene_color.rgb, selected_exposure_ev);
+    float3 linear_color = scene_color.rgb;
+
+#if TRUTH_ENABLE_ATMOSPHERE
+    TruthUnifiedAtmosphereInput atmosphere_input;
+    atmosphere_input.view_zenith_cosine = clamp(TruthViewZenithCosine, -1.0, 1.0);
+    atmosphere_input.view_sun_cosine = clamp(TruthViewSunCosine, -1.0, 1.0);
+    atmosphere_input.sun_elevation = clamp(TruthSunElevation, -1.0, 1.0);
+    atmosphere_input.weather_density = saturate(TruthWeatherDensity);
+    atmosphere_input.cloud_coverage = saturate(TruthCloudCoverage);
+    atmosphere_input.cloud_density = saturate(TruthCloudDensity);
+    atmosphere_input.fog_density = saturate(TruthFogDensity);
+    atmosphere_input.aurora_activity = saturate(TruthAuroraActivity);
+    atmosphere_input.aurora_mask = saturate(TruthAuroraMask);
+    atmosphere_input.night_factor = saturate(TruthNightFactor);
+    TruthUnifiedAtmosphereOutput atmosphere_output = TruthEvaluateAtmosphere(atmosphere_input);
+    linear_color += atmosphere_output.composite_radiance;
+#endif
+
+    float3 exposed_color = TruthApplyExposure(linear_color, selected_exposure_ev);
     return float4(TruthFilmicToneCurve3(exposed_color), scene_color.a);
 }
 

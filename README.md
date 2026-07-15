@@ -24,9 +24,14 @@ depend on recovered or peer shader source.
   atmosphere-enabled and atmosphere-disabled permutations.
 - `SkyFieldInput` / `SkyFieldOutput`: a deterministic, texture-free procedural
   cloud body/detail erosion field and night-only aurora curtain reference.
-- `TruthSkyFields.fxh`: the shader mirror; its generated cloud density and
-  aurora mask feed the unified atmosphere before exposure, with a macro-off
-  direct-control fallback.
+- `TruthSkyFields.fxh`: the shader mirror; its generated cloud density, detail,
+  and intrinsic aurora radiance feed cloud lighting before exposure, with a
+  macro-off direct-control fallback.
+- `CloudLightingInput` / `CloudLightingOutput`: bounded cloud optical depth,
+  direct and ambient scattering, self-shadow, powder response, weather tint,
+  and one explicit sky/cloud/aurora composition path.
+- `TruthCloudLighting.fxh`: the original shader mirror that lights procedural
+  cloud fields and carries their generated aurora color into the final image.
 
 ## Toolchain
 
@@ -51,12 +56,19 @@ beneath `build/`. The shader CTest fails if the exact compiler is missing, the
 effect does not compile as `fx_5_0`, or either expected output is empty.
 
 The enabled effect adds unified atmosphere composite radiance to scene-linear
-color before exposure. Aurora is pre-exposed and attenuated exactly once:
+color before exposure. The sky and precomputed procedural aurora are attenuated
+once, while fog attenuates cloud in-scatter once:
 
 ```text
-aurora = intrinsic_aurora * cloud_transmittance * fog_transmittance
-composite = sky * cloud_transmittance * fog_transmittance + aurora
+attenuation = cloud_transmittance * fog_transmittance
+aurora = procedural_intrinsic_aurora * attenuation
+composite = sky * attenuation + cloud_radiance * fog_transmittance + aurora
 ```
+
+When procedural sky is disabled, the same lighting path consumes the direct
+cloud-density and aurora controls. Zero cloud density is an exact identity:
+cloud optical depth is `0`, cloud transmittance is `1`, and cloud radiance is
+exactly black.
 
 Procedural sky animation uses normalized phase `[0,1]`; both endpoints map to
 the same exact field state. The field has no cloud or aurora texture inputs.

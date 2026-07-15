@@ -31,6 +31,12 @@ if(DEFINED TRUTH_REQUIRED_SOURCE_2
   message(FATAL_ERROR "Second required Truth shader source is absent: ${TRUTH_REQUIRED_SOURCE_2}")
 endif()
 
+if(DEFINED TRUTH_REQUIRED_SOURCE_3
+    AND NOT "${TRUTH_REQUIRED_SOURCE_3}" STREQUAL ""
+    AND NOT EXISTS "${TRUTH_REQUIRED_SOURCE_3}")
+  message(FATAL_ERROR "Third required Truth shader source is absent: ${TRUTH_REQUIRED_SOURCE_3}")
+endif()
+
 if(NOT IS_DIRECTORY "${TRUTH_INCLUDE}")
   message(FATAL_ERROR "Truth shader include directory is absent: ${TRUTH_INCLUDE}")
 endif()

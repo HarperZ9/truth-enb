@@ -139,7 +139,39 @@ Daylight (`night_factor == 0`) writes exact positive zero for both aurora mask
 and intrinsic radiance.
 
 `TruthSkyFields.fxh` mirrors the texture-free field. In the enabled effect it
-derives a normalized view ray from screen position, supplies generated cloud
-density and aurora mask to `TruthEvaluateAtmosphere`, and adds the resulting
-composite before exposure. `TRUTH_ENABLE_PROCEDURAL_SKY=0` retains the direct
-cloud-density and aurora-mask inputs as an explicit fallback.
+derives a normalized view ray from screen position and supplies generated cloud
+density, detail erosion, and intrinsic aurora radiance to cloud lighting before
+exposure. `TRUTH_ENABLE_PROCEDURAL_SKY=0` retains the direct cloud-density and
+aurora-mask inputs as an explicit fallback.
+
+## Procedural cloud lighting
+
+`EvaluateCloudLighting` consumes clear-sky radiance, the composed procedural
+cloud density/detail field, precomputed aurora radiance, sun/view coordinates,
+weather, night state, and fog transmittance. It validates the complete input,
+calculates into a local candidate, bounds every intermediate/output, and
+commits once. Rejection therefore preserves the caller's output bit-for-bit.
+
+Cloud extinction uses bounded path length and Beer-Lambert transmittance. A
+bounded forward phase and detail-aware silver-lining term feed direct sunlight;
+self-shadowing controls that light through the body. Powder response raises a
+bounded multiple-scattering floor. Day, night, and weather tints then color the
+resulting in-scatter. Zero density is handled explicitly as optical depth `0`,
+transmittance `1`, and black cloud radiance.
+
+Composition has one energy path:
+
+```text
+attenuation = cloud_transmittance * fog_transmittance
+aurora = procedural_intrinsic_aurora * attenuation
+composite = sky * attenuation + cloud_radiance * fog_transmittance + aurora
+```
+
+The procedural aurora already contains its activity, curtain, night, and hue
+modulation; cloud lighting does not reconstruct or rescale that color. It only
+forces exact black when daylight is complete or the declared night factor is
+zero, then applies cloud/fog attenuation once. `TruthCloudLighting.fxh` mirrors
+the CPU formulas. The effect routes `SkyFieldOutput::aurora_intrinsic_radiance`
+directly into it, while `TRUTH_ENABLE_PROCEDURAL_SKY=0` synthesizes the prior
+direct-control aurora as an explicit fallback. FXC compiles all four atmosphere
+and procedural-sky macro combinations as `fx_5_0`.

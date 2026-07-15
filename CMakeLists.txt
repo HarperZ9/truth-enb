@@ -52,6 +52,36 @@ if(MSVC)
   )
 endif()
 
+if(WIN32)
+  add_library(truth_reference_renderer_core STATIC
+    src/render/ReferenceRenderer.cpp
+  )
+  target_compile_features(truth_reference_renderer_core PUBLIC cxx_std_23)
+  target_include_directories(truth_reference_renderer_core PUBLIC include)
+  target_link_libraries(truth_reference_renderer_core PUBLIC
+    bcrypt
+    d3d11
+    d3dcompiler
+  )
+  set_property(TARGET truth_reference_renderer_core PROPERTY VS_GLOBAL_VcpkgApplocalDeps false)
+
+  add_executable(truth_reference_renderer
+    tools/TruthReferenceRenderer.cpp
+  )
+  target_compile_features(truth_reference_renderer PRIVATE cxx_std_23)
+  target_link_libraries(truth_reference_renderer PRIVATE truth_reference_renderer_core)
+  set_property(TARGET truth_reference_renderer PROPERTY VS_GLOBAL_VcpkgApplocalDeps false)
+
+  if(MSVC)
+    target_compile_options(truth_reference_renderer_core PRIVATE
+      /W4 /WX /permissive- /EHsc /utf-8
+    )
+    target_compile_options(truth_reference_renderer PRIVATE
+      /W4 /WX /permissive- /EHsc /utf-8
+    )
+  endif()
+endif()
+
 if(BUILD_TESTING)
   add_executable(truth_master_look_tests
     tests/MasterLookTests.cpp
@@ -111,6 +141,33 @@ if(BUILD_TESTING)
   endif()
 
   add_test(NAME truth_cloud_lighting_cpp COMMAND truth_cloud_lighting_tests)
+
+  if(WIN32)
+    add_executable(truth_reference_renderer_tests
+      tests/ReferenceRendererTests.cpp
+    )
+    target_compile_features(truth_reference_renderer_tests PRIVATE cxx_std_23)
+    target_link_libraries(truth_reference_renderer_tests PRIVATE
+      truth_reference_renderer_core
+    )
+    set_property(TARGET truth_reference_renderer_tests PROPERTY VS_GLOBAL_VcpkgApplocalDeps false)
+
+    if(MSVC)
+      target_compile_options(truth_reference_renderer_tests PRIVATE
+        /W4 /WX /permissive- /EHsc /utf-8
+      )
+    endif()
+
+    add_test(
+      NAME truth_reference_renderer_warp
+      COMMAND truth_reference_renderer_tests
+        "${CMAKE_CURRENT_SOURCE_DIR}/shaders/truth/TruthReferenceSky.hlsl"
+        "${CMAKE_CURRENT_BINARY_DIR}/references/$<CONFIG>"
+    )
+    set_tests_properties(truth_reference_renderer_warp PROPERTIES
+      LABELS "gpu;warp;shader"
+    )
+  endif()
 
   set(TRUTH_FXC_EXECUTABLE
     "C:/Program Files (x86)/Windows Kits/10/bin/10.0.26100.0/x64/fxc.exe"

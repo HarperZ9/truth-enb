@@ -55,6 +55,19 @@ The C++ assertion executable and the FXC object/listing are generated only
 beneath `build/`. The shader CTest fails if the exact compiler is missing, the
 effect does not compile as `fx_5_0`, or either expected output is empty.
 
+After building, generate the four deterministic Direct3D 11 WARP reference
+captures with one command:
+
+```powershell
+.\build\Debug\truth_reference_renderer.exe .\shaders\truth\TruthReferenceSky.hlsl .\build\references\Debug
+```
+
+This runs the original atmosphere, procedural sky fields, cloud lighting, and
+tone curve as `vs_5_0` / `ps_5_0`, reads an offscreen RGBA8 target back from
+WARP, and writes `day`, `dusk`, `clear-night-aurora`, and `storm` as binary PPM
+files. Captures, shader objects, and executables remain under ignored build
+paths.
+
 The enabled effect adds unified atmosphere composite radiance to scene-linear
 color before exposure. The sky and precomputed procedural aurora are attenuated
 once, while fog attenuates cloud in-scatter once:

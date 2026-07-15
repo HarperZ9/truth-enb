@@ -65,6 +65,20 @@ if(MSVC)
   )
 endif()
 
+add_library(truth_aurora_curtain STATIC
+  src/render/AuroraCurtain.cpp
+)
+target_compile_features(truth_aurora_curtain PUBLIC cxx_std_23)
+target_include_directories(truth_aurora_curtain PUBLIC include)
+
+if(MSVC)
+  target_compile_options(truth_aurora_curtain PRIVATE
+    /W4 /WX /permissive- /EHsc /utf-8
+  )
+endif()
+
+target_link_libraries(truth_sky_fields PUBLIC truth_aurora_curtain)
+
 if(WIN32)
   add_library(truth_reference_renderer_core STATIC
     src/render/ReferenceRenderer.cpp
@@ -170,6 +184,21 @@ if(BUILD_TESTING)
 
   add_test(NAME truth_cloud_volume_cpp COMMAND truth_cloud_volume_tests)
 
+  add_executable(truth_aurora_curtain_tests
+    tests/AuroraCurtainTests.cpp
+  )
+  target_compile_features(truth_aurora_curtain_tests PRIVATE cxx_std_23)
+  target_link_libraries(truth_aurora_curtain_tests PRIVATE truth_aurora_curtain)
+  set_property(TARGET truth_aurora_curtain_tests PROPERTY VS_GLOBAL_VcpkgApplocalDeps false)
+
+  if(MSVC)
+    target_compile_options(truth_aurora_curtain_tests PRIVATE
+      /W4 /WX /permissive- /EHsc /utf-8
+    )
+  endif()
+
+  add_test(NAME truth_aurora_curtain_cpp COMMAND truth_aurora_curtain_tests)
+
   if(WIN32)
     add_executable(truth_reference_renderer_tests
       tests/ReferenceRendererTests.cpp
@@ -212,6 +241,7 @@ if(BUILD_TESTING)
         "-DTRUTH_REQUIRED_SOURCE=${CMAKE_CURRENT_SOURCE_DIR}/shaders/truth/TruthAtmosphereCore.fxh"
         "-DTRUTH_REQUIRED_SOURCE_2=${CMAKE_CURRENT_SOURCE_DIR}/shaders/truth/TruthSkyFields.fxh"
         "-DTRUTH_REQUIRED_SOURCE_3=${CMAKE_CURRENT_SOURCE_DIR}/shaders/truth/TruthCloudLighting.fxh"
+        "-DTRUTH_REQUIRED_SOURCE_4=${CMAKE_CURRENT_SOURCE_DIR}/shaders/truth/TruthAuroraCurtain.fxh"
         "-DTRUTH_INCLUDE=${CMAKE_CURRENT_SOURCE_DIR}/shaders/truth"
         "-DTRUTH_DEFINE=TRUTH_ENABLE_ATMOSPHERE=${atmosphere_macro_value}"
         "-DTRUTH_SECOND_DEFINE=TRUTH_ENABLE_PROCEDURAL_SKY=${procedural_sky_macro_value}"
@@ -266,6 +296,37 @@ if(BUILD_TESTING)
     truth_cloud_volume_fxc_quality_3 1 3 TruthCloudQuality3
   )
 
+  function(add_truth_aurora_permutation
+      test_name quality_macro_value artifact_name)
+    add_test(
+      NAME "${test_name}"
+      COMMAND "${CMAKE_COMMAND}"
+        "-DTRUTH_FXC=${TRUTH_FXC_EXECUTABLE}"
+        "-DTRUTH_SHADER=${CMAKE_CURRENT_SOURCE_DIR}/shaders/truth/TruthReferenceSky.hlsl"
+        "-DTRUTH_REQUIRED_SOURCE=${CMAKE_CURRENT_SOURCE_DIR}/shaders/truth/TruthAuroraCurtain.fxh"
+        "-DTRUTH_INCLUDE=${CMAKE_CURRENT_SOURCE_DIR}/shaders/truth"
+        "-DTRUTH_DEFINE=TRUTH_AURORA_QUALITY=${quality_macro_value}"
+        "-DTRUTH_SECOND_DEFINE=TRUTH_ENABLE_CLOUD_VOLUME=1"
+        "-DTRUTH_OUTPUT=${CMAKE_CURRENT_BINARY_DIR}/shaders/$<CONFIG>/${artifact_name}.cso"
+        "-DTRUTH_LISTING=${CMAKE_CURRENT_BINARY_DIR}/shaders/$<CONFIG>/${artifact_name}.asm"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/CompileTruthReferencePixelShader.cmake"
+    )
+    set_tests_properties("${test_name}" PROPERTIES LABELS "shader;fxc;aurora")
+  endfunction()
+
+  add_truth_aurora_permutation(
+    truth_aurora_fxc_fallback 0 TruthAuroraFallback
+  )
+  add_truth_aurora_permutation(
+    truth_aurora_fxc_quality_1 1 TruthAuroraQuality1
+  )
+  add_truth_aurora_permutation(
+    truth_aurora_fxc_quality_2 2 TruthAuroraQuality2
+  )
+  add_truth_aurora_permutation(
+    truth_aurora_fxc_quality_3 3 TruthAuroraQuality3
+  )
+
   add_test(
     NAME truth_shader_atmosphere_permutations_distinct
     COMMAND "${CMAKE_COMMAND}" -E compare_files
@@ -311,6 +372,30 @@ if(BUILD_TESTING)
   set_tests_properties(truth_cloud_volume_quality_tiers_are_distinct PROPERTIES
     DEPENDS "truth_cloud_volume_fxc_quality_1;truth_cloud_volume_fxc_quality_3"
     LABELS "shader;fxc;cloud-volume"
+    WILL_FAIL TRUE
+  )
+
+  add_test(
+    NAME truth_aurora_fallback_is_distinct
+    COMMAND "${CMAKE_COMMAND}" -E compare_files
+      "${CMAKE_CURRENT_BINARY_DIR}/shaders/$<CONFIG>/TruthAuroraFallback.cso"
+      "${CMAKE_CURRENT_BINARY_DIR}/shaders/$<CONFIG>/TruthAuroraQuality2.cso"
+  )
+  set_tests_properties(truth_aurora_fallback_is_distinct PROPERTIES
+    DEPENDS "truth_aurora_fxc_fallback;truth_aurora_fxc_quality_2"
+    LABELS "shader;fxc;aurora"
+    WILL_FAIL TRUE
+  )
+
+  add_test(
+    NAME truth_aurora_quality_tiers_are_distinct
+    COMMAND "${CMAKE_COMMAND}" -E compare_files
+      "${CMAKE_CURRENT_BINARY_DIR}/shaders/$<CONFIG>/TruthAuroraQuality1.cso"
+      "${CMAKE_CURRENT_BINARY_DIR}/shaders/$<CONFIG>/TruthAuroraQuality3.cso"
+  )
+  set_tests_properties(truth_aurora_quality_tiers_are_distinct PROPERTIES
+    DEPENDS "truth_aurora_fxc_quality_1;truth_aurora_fxc_quality_3"
+    LABELS "shader;fxc;aurora"
     WILL_FAIL TRUE
   )
 endif()

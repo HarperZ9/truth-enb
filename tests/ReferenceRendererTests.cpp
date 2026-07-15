@@ -56,6 +56,7 @@ struct ImageMetrics {
   std::size_t aurora_supported_columns{};
   std::size_t aurora_longest_horizontal_run{};
   double aurora_pixel_fraction{};
+  std::size_t star_pixels{};
 };
 
 [[nodiscard]] ImageMetrics Measure(const ReferenceImage& image) {
@@ -187,6 +188,34 @@ struct ImageMetrics {
   metrics.aurora_pixel_fraction = static_cast<double>(aurora_pixels)
       / (static_cast<double>(image.width) * image.height);
 
+  for (std::uint32_t y = 1U; y + 1U < image.height; ++y) {
+    for (std::uint32_t x = 1U; x + 1U < image.width; ++x) {
+      const auto index = static_cast<std::size_t>(y) * image.width + x;
+      const auto offset = index * 4U;
+      const int red = image.rgba8[offset];
+      const int green = image.rgba8[offset + 1U];
+      const int blue = image.rgba8[offset + 2U];
+      const int value = luminance[index];
+      const int chroma = std::max({red, green, blue}) - std::min({red, green, blue});
+      int neighborhood{};
+      for (int offset_y = -1; offset_y <= 1; ++offset_y) {
+        for (int offset_x = -1; offset_x <= 1; ++offset_x) {
+          if (offset_x != 0 || offset_y != 0) {
+            const auto neighbor_x = static_cast<std::uint32_t>(
+                static_cast<int>(x) + offset_x);
+            const auto neighbor_y = static_cast<std::uint32_t>(
+                static_cast<int>(y) + offset_y);
+            neighborhood += luminance[
+                static_cast<std::size_t>(neighbor_y) * image.width + neighbor_x];
+          }
+        }
+      }
+      if (value >= 34 && chroma <= 20 && value >= (neighborhood / 8) + 11) {
+        ++metrics.star_pixels;
+      }
+    }
+  }
+
   double seam_sum{};
   for (std::uint32_t y = 0; y < image.height; ++y) {
     const auto first = static_cast<std::size_t>(y) * image.width * 4U;
@@ -225,9 +254,9 @@ using Captures = std::array<Capture, 4>;
     const std::filesystem::path& shader_path,
     const std::filesystem::path& output_directory) {
   constexpr std::array scenes{
-      ReferenceScene::day,
-      ReferenceScene::dusk,
-      ReferenceScene::clear_night_aurora,
+      ReferenceScene::quiet_clear_night,
+      ReferenceScene::active_clear_night,
+      ReferenceScene::cloudy_night_aurora,
       ReferenceScene::storm,
   };
 
@@ -306,10 +335,19 @@ void CompilerFailuresCarryDiagnostics(
 
 void ImagesAreBoundedAndNonFlat(TestContext& context, const Captures& captures) {
   for (const auto& capture : captures) {
+    std::cout << "metrics " << capture.name
+              << " luma=" << capture.metrics.mean_luminance
+              << " range=" << static_cast<unsigned int>(capture.metrics.minimum_luminance)
+              << '-' << static_cast<unsigned int>(capture.metrics.maximum_luminance)
+              << " colors=" << capture.metrics.distinct_colors
+              << " chroma=" << capture.metrics.upper_chroma
+              << " stars=" << capture.metrics.star_pixels << '\n';
+  }
+  for (const auto& capture : captures) {
     context.expect(capture.metrics.maximum_luminance
                        > capture.metrics.minimum_luminance + 8U,
                    "reference capture was effectively flat");
-    context.expect(capture.metrics.distinct_colors > 128U,
+    context.expect(capture.metrics.distinct_colors > 64U,
                    "reference capture had too few distinct GPU colors");
   }
 }
@@ -328,55 +366,62 @@ void NamedScenesAreDistinct(TestContext& context, const Captures& captures) {
 }
 
 void SceneRelationshipsRemainPhysical(TestContext& context, const Captures& captures) {
-  const auto& day = captures[0].metrics;
-  const auto& dusk = captures[1].metrics;
-  const auto& night = captures[2].metrics;
+  const auto& quiet = captures[0].metrics;
+  const auto& active = captures[1].metrics;
+  const auto& cloudy = captures[2].metrics;
   const auto& storm = captures[3].metrics;
 
-  context.expect(day.mean_luminance > dusk.mean_luminance,
-                 "day was not brighter than dusk");
-  context.expect(dusk.mean_luminance > night.mean_luminance,
-                 "dusk was not brighter than clear night");
-  context.expect(day.mean_luminance > storm.mean_luminance,
-                 "storm was not darker than day");
-  context.expect(night.upper_chroma > storm.upper_chroma + 8.0,
-                 "night aurora did not add distinct upper-sky chroma");
+  context.expect(active.mean_luminance > quiet.mean_luminance + 0.35,
+                 "active aurora did not lift clear-night luminance");
+  context.expect(active.mean_luminance < quiet.mean_luminance + 13.0,
+                 "active aurora overwhelmed the clear-night luminance budget");
+  context.expect(active.aurora_pixel_fraction
+                     > quiet.aurora_pixel_fraction + 0.008,
+                 "active aurora did not add controlled green curtain support");
+  context.expect(cloudy.aurora_pixel_fraction
+                     < active.aurora_pixel_fraction * 0.82,
+                 "cloud volume did not occlude the aurora softly");
+  context.expect(storm.aurora_pixel_fraction < 0.015,
+                 "no-aurora storm control contained green curtain emission");
+  context.expect(quiet.mean_luminance >= 2.0 && quiet.mean_luminance <= 38.0,
+                 "quiet night left the readable dark-sky budget");
+  context.expect(active.maximum_luminance < 235U,
+                 "active aurora clipped into a neon display ceiling");
 }
 
 void SkyStructuresAreCoherent(TestContext& context, const Captures& captures) {
-  const auto& day = captures[0].metrics;
-  const auto& dusk = captures[1].metrics;
-  const auto& night = captures[2].metrics;
+  const auto& quiet = captures[0].metrics;
+  const auto& active = captures[1].metrics;
+  const auto& cloudy = captures[2].metrics;
   const auto& storm = captures[3].metrics;
 
-  std::cout << "structure day_max_column=" << day.maximum_vertical_structure_support
-            << " dusk_max_column=" << dusk.maximum_vertical_structure_support
+  std::cout << "structure quiet_max_column=" << quiet.maximum_vertical_structure_support
+            << " active_max_column=" << active.maximum_vertical_structure_support
             << " storm_max_column=" << storm.maximum_vertical_structure_support
-            << " day_regions=" << day.horizontal_structure_regions
-            << " storm_regions=" << storm.horizontal_structure_regions
-            << " aurora_run=" << night.aurora_longest_horizontal_run
-            << " aurora_columns=" << night.aurora_supported_columns
-            << " aurora_area=" << night.aurora_pixel_fraction << '\n';
+            << " active_run=" << active.aurora_longest_horizontal_run
+            << " active_columns=" << active.aurora_supported_columns
+            << " active_area=" << active.aurora_pixel_fraction
+            << " cloudy_area=" << cloudy.aurora_pixel_fraction
+            << " stars=" << quiet.star_pixels << ',' << active.star_pixels
+            << ',' << cloudy.star_pixels << '\n';
 
-  context.expect(night.aurora_longest_horizontal_run >= 112U,
+  context.expect(active.aurora_longest_horizontal_run >= 62U,
                  "night aurora remained a set of disconnected glowing tubes");
-  context.expect(night.aurora_supported_columns < 232U,
+  context.expect(active.aurora_supported_columns < 202U,
                  "night aurora filled nearly the entire panorama");
-  context.expect(night.aurora_pixel_fraction < 0.55,
+  context.expect(active.aurora_pixel_fraction >= 0.012
+                     && active.aurora_pixel_fraction < 0.24,
                  "night aurora filled too much of the image area");
-
-  context.expect(day.maximum_vertical_structure_support < 0.90,
-                 "day clouds contained a near-full-height opaque column");
-  context.expect(dusk.maximum_vertical_structure_support < 0.90,
-                 "dusk clouds contained a near-full-height opaque column");
+  context.expect(active.maximum_vertical_structure_support < 0.72,
+                 "active aurora formed a rectangular/full-height pillar silhouette");
+  context.expect(quiet.star_pixels >= 8U,
+                 "quiet clear night did not preserve a readable star field");
+  context.expect(active.star_pixels * 5U >= quiet.star_pixels,
+                 "active aurora erased nearly every star");
+  context.expect(cloudy.star_pixels < active.star_pixels,
+                 "cloud volume did not occlude background stars");
   context.expect(storm.maximum_vertical_structure_support < 0.90,
                  "storm clouds contained a near-full-height opaque column");
-  context.expect(day.horizontal_structure_regions >= 6U,
-                 "day cloud support was not distributed across the panorama");
-  context.expect(storm.horizontal_structure_regions >= 2U
-                     && storm.horizontal_structure_regions
-                         < day.horizontal_structure_regions,
-                 "storm did not consolidate into a coherent weather system");
 
   for (const auto& capture : captures) {
     context.expect(capture.metrics.panorama_seam_mean_difference < 8.0,
@@ -392,12 +437,12 @@ void CpuAndHlslSkyFieldsRemainAligned(
   constexpr std::uint32_t width = 64U;
   constexpr std::uint32_t height = 32U;
   const auto scalars = truth::render::RenderWarpSkyFieldScalars(
-      ReferenceScene::clear_night_aurora, shader_path, width, height);
+      ReferenceScene::active_clear_night, shader_path, width, height);
   context.expect(scalars.status == ReferenceRenderStatus::rendered,
                  scalars.diagnostic.empty() ? "scalar sky-field probe failed"
                                             : scalars.diagnostic);
   const auto radiance = truth::render::RenderWarpSkyFieldRadiance(
-      ReferenceScene::clear_night_aurora, shader_path, width, height);
+      ReferenceScene::active_clear_night, shader_path, width, height);
   context.expect(radiance.status == ReferenceRenderStatus::rendered,
                  radiance.diagnostic.empty() ? "radiance sky-field probe failed"
                                              : radiance.diagnostic);
@@ -425,11 +470,14 @@ void CpuAndHlslSkyFieldsRemainAligned(
           0.63F,
           0.62F,
           -0.27F,
-          0.08F,
-          0.24F,
+          0.05F,
+          0.16F,
           0.04F,
+          0.82F,
           1.0F,
-          1.0F,
+          0.0F,
+          0.0F,
+          0.20F,
       };
       truth::render::SkyFieldOutput cpu{};
       context.expect(

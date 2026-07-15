@@ -51,6 +51,8 @@ cbuffer TruthSkyFieldParameters : register(b2)
     float TruthSkyPhase;
     float2 TruthSkyWind;
     float TruthSkyProjectionScale;
+    float3 TruthSkyCameraPosition;
+    float TruthSkyFieldPadding;
 };
 
 struct TruthVertexInput
@@ -111,6 +113,7 @@ float4 TruthPixelMain(TruthVertexOutput input) : SV_Target0
     sky_field_input.weather_density = saturate(TruthWeatherDensity);
     sky_field_input.aurora_activity = saturate(TruthAuroraActivity);
     sky_field_input.night_factor = saturate(TruthNightFactor);
+    sky_field_input.camera_position = TruthSkyCameraPosition;
     TruthSkyFieldOutput sky_field_output = TruthEvaluateSkyFields(sky_field_input);
     float resolved_cloud_density = sky_field_output.cloud_density;
     float resolved_cloud_detail_erosion = sky_field_output.cloud_detail_erosion;

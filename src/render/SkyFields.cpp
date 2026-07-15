@@ -1,4 +1,5 @@
 #include "truth/render/SkyFields.hpp"
+#include "truth/render/AuroraCurtain.hpp"
 #include "truth/render/detail/SkyFieldNoise.hpp"
 
 #include <algorithm>
@@ -94,6 +95,30 @@ inline constexpr float kCloudErosionScale = 0.22F;
   }
   if (!InRange(input.night_factor, kSkyFieldMinimumControl, kSkyFieldMaximumControl)) {
     return SkyFieldDiagnostic::night_factor_out_of_range;
+  }
+  if (!std::isfinite(input.camera_x)) {
+    return SkyFieldDiagnostic::camera_x_non_finite;
+  }
+  if (!InRange(input.camera_x,
+               kAuroraMinimumCameraCoordinate,
+               kAuroraMaximumCameraCoordinate)) {
+    return SkyFieldDiagnostic::camera_x_out_of_range;
+  }
+  if (!std::isfinite(input.camera_y)) {
+    return SkyFieldDiagnostic::camera_y_non_finite;
+  }
+  if (!InRange(input.camera_y,
+               kAuroraMinimumCameraCoordinate,
+               kAuroraMaximumCameraCoordinate)) {
+    return SkyFieldDiagnostic::camera_y_out_of_range;
+  }
+  if (!std::isfinite(input.camera_z)) {
+    return SkyFieldDiagnostic::camera_z_non_finite;
+  }
+  if (!InRange(input.camera_z,
+               kAuroraMinimumCameraCoordinate,
+               kAuroraMaximumCameraCoordinate)) {
+    return SkyFieldDiagnostic::camera_z_out_of_range;
   }
   return SkyFieldDiagnostic::none;
 }
@@ -276,80 +301,35 @@ SkyFieldEvaluation EvaluateSkyFields(
   candidate.cloud_detail_erosion = detail_erosion;
   candidate.cloud_density = composed_cloud;
 
-  if (input.night_factor == 0.0F) {
-    candidate.aurora_mask = 0.0F;
-    candidate.aurora_intrinsic_radiance = {0.0F, 0.0F, 0.0F};
-  } else {
-    const float horizontal_length = std::max(
-        std::sqrt((input.view_x * input.view_x) + (input.view_y * input.view_y)),
-        0.001F);
-    const float side = input.view_x / horizontal_length;
-    const float forward = input.view_y / horizontal_length;
-    const float arc_gate = SmoothStep(-0.42F, 0.02F, forward);
-    const float fold_noise = Noise({
-        (2.25F * side) + (0.42F * loop_offset.x) + 4.8F,
-        (1.65F * forward) + (0.42F * loop_offset.y) - 7.2F,
-        1.4F + (0.55F * loop_offset.z),
-    });
-    const float curtain_center = 0.70F
-        + (0.085F * std::sin((2.8F * side) + (0.7F * forward)
-                              + (0.55F * phase_sine)))
-        + (0.052F * std::sin((6.3F * side) - (1.1F * forward)
-                              - (0.45F * phase_cosine)))
-        + (0.055F * (fold_noise - 0.5F));
-    const float lower_edge = curtain_center - 0.37F - (0.035F * fold_noise);
-    const float upper_edge = curtain_center + 0.22F + (0.020F * fold_noise);
-    const float lower_falloff = SmoothStep(lower_edge,
-                                           curtain_center - 0.045F,
-                                           input.view_z);
-    const float upper_falloff = 1.0F - SmoothStep(curtain_center + 0.045F,
-                                                  upper_edge,
-                                                  input.view_z);
-    const float ray_primary = Noise({
-        (8.4F * side) + loop_offset.x + 10.7F,
-        (8.4F * forward) + loop_offset.y - 3.9F,
-        2.6F + loop_offset.z,
-    });
-    const float ray_fine = Noise({
-        (17.2F * side) + (1.7F * loop_offset.x) - 6.1F,
-        (17.2F * forward) + (1.7F * loop_offset.y) + 12.4F,
-        -4.3F + (1.3F * loop_offset.z),
-    });
-    const float vertical_rays = 0.48F
-        + (0.52F * ((0.68F * ray_primary) + (0.32F * ray_fine)));
-    const float folded_sheet = 0.72F
-        + (0.28F * (1.0F - std::fabs((2.0F * fold_noise) - 1.0F)));
-    candidate.aurora_mask = std::clamp(
-        arc_gate
-            * lower_falloff
-            * upper_falloff
-            * vertical_rays
-            * folded_sheet
-            * input.night_factor,
-        0.0F,
-        1.0F);
-
-    if (input.aurora_activity == 0.0F || candidate.aurora_mask == 0.0F) {
-      candidate.aurora_intrinsic_radiance = {0.0F, 0.0F, 0.0F};
-    } else {
-      const float upper_fringe = SmoothStep(curtain_center - 0.10F,
-                                             curtain_center + 0.22F,
-                                             input.view_z);
-      const float fringe_blend = 0.68F * upper_fringe;
-      const float altitude_gain = 0.39F
-          + (0.81F * SmoothStep(curtain_center - 0.16F,
-                                curtain_center + 0.12F,
-                                input.view_z));
-      const float strength = candidate.aurora_mask
-          * input.aurora_activity
-          * altitude_gain;
-      candidate.aurora_intrinsic_radiance = {
-          strength * LinearInterpolate(0.07F, 0.28F, fringe_blend),
-          strength * LinearInterpolate(0.82F, 0.42F, fringe_blend),
-          strength * LinearInterpolate(0.32F, 0.78F, fringe_blend),
-      };
-    }
+  AuroraCurtainOutput aurora{};
+  const AuroraCurtainInput aurora_input{
+      input.camera_x,
+      input.camera_y,
+      input.camera_z,
+      input.view_x,
+      input.view_y,
+      input.view_z,
+      input.phase,
+      input.wind_x,
+      input.wind_y,
+      input.aurora_activity,
+      input.night_factor,
+      AuroraQuality::balanced,
+  };
+  const AuroraCurtainEvaluation aurora_evaluation =
+      EvaluateAuroraCurtain(aurora_input, aurora);
+  if (aurora_evaluation.status != AuroraCurtainStatus::evaluated) {
+    return Reject(AuroraCurtainDiagnostic::calculation_non_finite
+                      == aurora_evaluation.diagnostic
+                  ? SkyFieldDiagnostic::calculation_non_finite
+                  : SkyFieldDiagnostic::calculation_out_of_range);
   }
+  candidate.aurora_mask = aurora.mask;
+  candidate.aurora_intrinsic_radiance = {
+      aurora.intrinsic_radiance.r,
+      aurora.intrinsic_radiance.g,
+      aurora.intrinsic_radiance.b,
+  };
 
   if (!std::isfinite(candidate.cloud_body)
       || !std::isfinite(candidate.cloud_detail_erosion)

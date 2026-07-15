@@ -1,6 +1,8 @@
 #ifndef TRUTH_SKY_FIELDS_FXH
 #define TRUTH_SKY_FIELDS_FXH
 
+#include "TruthAuroraCurtain.fxh"
+
 static const float TruthSkyPi = 3.14159265358979323846;
 static const float TruthSkyTwoPi = 2.0 * TruthSkyPi;
 static const float TruthSkyCloudErosionScale = 0.22;
@@ -15,6 +17,7 @@ struct TruthSkyFieldInput
     float weather_density;
     float aurora_activity;
     float night_factor;
+    float3 camera_position;
 };
 
 struct TruthSkyFieldOutput
@@ -151,81 +154,16 @@ TruthSkyFieldOutput TruthEvaluateSkyFields(TruthSkyFieldInput input)
     output.cloud_density = saturate(
         max(occupied_body - detail_erosion, 0.0) * input.cloud_density * weather_scale);
 
-    if (input.night_factor == 0.0)
-    {
-        output.aurora_mask = 0.0;
-        output.aurora_intrinsic_radiance = float3(0.0, 0.0, 0.0);
-        return output;
-    }
-
-    float horizontal_length = max(length(input.view_direction.xy), 0.001);
-    float side = input.view_direction.x / horizontal_length;
-    float forward = input.view_direction.y / horizontal_length;
-    float arc_gate = TruthSkySmoothStep(-0.42, 0.02, forward);
-    float fold_noise = TruthSkyValueNoise3D(float3(
-        (2.25 * side) + (0.42 * loop_offset.x) + 4.8,
-        (1.65 * forward) + (0.42 * loop_offset.y) - 7.2,
-        1.4 + (0.55 * loop_offset.z)));
-    float curtain_center = 0.70
-        + (0.085 * sin((2.8 * side) + (0.7 * forward)
-                       + (0.55 * phase_sine)))
-        + (0.052 * sin((6.3 * side) - (1.1 * forward)
-                       - (0.45 * phase_cosine)))
-        + (0.055 * (fold_noise - 0.5));
-    float lower_edge = curtain_center - 0.37 - (0.035 * fold_noise);
-    float upper_edge = curtain_center + 0.22 + (0.020 * fold_noise);
-    float lower_falloff = TruthSkySmoothStep(
-        lower_edge,
-        curtain_center - 0.045,
-        input.view_direction.z);
-    float upper_falloff = 1.0 - TruthSkySmoothStep(
-        curtain_center + 0.045,
-        upper_edge,
-        input.view_direction.z);
-    float ray_primary = TruthSkyValueNoise3D(float3(
-        (8.4 * side) + loop_offset.x + 10.7,
-        (8.4 * forward) + loop_offset.y - 3.9,
-        2.6 + loop_offset.z));
-    float ray_fine = TruthSkyValueNoise3D(float3(
-        (17.2 * side) + (1.7 * loop_offset.x) - 6.1,
-        (17.2 * forward) + (1.7 * loop_offset.y) + 12.4,
-        -4.3 + (1.3 * loop_offset.z)));
-    float vertical_rays = 0.48
-        + (0.52 * ((0.68 * ray_primary) + (0.32 * ray_fine)));
-    float folded_sheet = 0.72
-        + (0.28 * (1.0 - abs((2.0 * fold_noise) - 1.0)));
-    output.aurora_mask = saturate(
-        arc_gate
-        * lower_falloff
-        * upper_falloff
-        * vertical_rays
-        * folded_sheet
-        * input.night_factor);
-
-    if (input.aurora_activity == 0.0 || output.aurora_mask == 0.0)
-    {
-        output.aurora_intrinsic_radiance = float3(0.0, 0.0, 0.0);
-    }
-    else
-    {
-        float upper_fringe = TruthSkySmoothStep(
-            curtain_center - 0.10,
-            curtain_center + 0.22,
-            input.view_direction.z);
-        float fringe_blend = 0.68 * upper_fringe;
-        float altitude_gain = 0.39
-            + (0.81 * TruthSkySmoothStep(
-                curtain_center - 0.16,
-                curtain_center + 0.12,
-                input.view_direction.z));
-        float3 color = lerp(float3(0.07, 0.82, 0.32),
-                            float3(0.28, 0.42, 0.78),
-                            fringe_blend);
-        output.aurora_intrinsic_radiance = color
-            * output.aurora_mask
-            * input.aurora_activity
-            * altitude_gain;
-    }
+    TruthAuroraCurtainInput aurora_input;
+    aurora_input.camera_position = input.camera_position;
+    aurora_input.view_direction = input.view_direction;
+    aurora_input.phase = input.phase;
+    aurora_input.wind = input.wind;
+    aurora_input.activity = input.aurora_activity;
+    aurora_input.night_factor = input.night_factor;
+    TruthAuroraCurtainOutput aurora = TruthEvaluateAuroraCurtain(aurora_input);
+    output.aurora_mask = aurora.mask;
+    output.aurora_intrinsic_radiance = aurora.intrinsic_radiance;
     return output;
 }
 

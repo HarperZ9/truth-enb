@@ -32,6 +32,9 @@ struct SkyFieldInput {
   float weather_density;
   float aurora_activity;
   float night_factor;
+  float camera_x;
+  float camera_y;
+  float camera_z;
 };
 
 struct SkyFieldOutput {
@@ -72,6 +75,12 @@ enum class SkyFieldDiagnostic : std::uint32_t {
   aurora_activity_out_of_range = 201U,
   night_factor_non_finite = 210U,
   night_factor_out_of_range = 211U,
+  camera_x_non_finite = 220U,
+  camera_x_out_of_range = 221U,
+  camera_y_non_finite = 230U,
+  camera_y_out_of_range = 231U,
+  camera_z_non_finite = 240U,
+  camera_z_out_of_range = 241U,
   calculation_non_finite = 300U,
   calculation_out_of_range = 301U,
 };

@@ -60,9 +60,15 @@ static_assert(sizeof(SceneParameters) == 64U);
     case ReferenceScene::dusk:
       return {0.015F, 0.18F, 0.42F, 0.58F, 0.035F, 0.18F, 0.34F,
               0.37F, 1.30F, -0.52F, {0.0F, 0.0F}, 0.0F, 0.0F, 0.20F, 0.58F};
-    case ReferenceScene::clear_night_aurora:
-      return {-0.34F, 0.04F, 0.08F, 0.24F, 0.008F, 1.0F, 1.0F,
-              0.63F, 1.55F, 0.12F, {0.0F, 0.0F}, 0.0F, 0.0F, 0.20F, 0.64F};
+    case ReferenceScene::quiet_clear_night:
+      return {-0.34F, 0.04F, 0.05F, 0.16F, 0.008F, 0.18F, 1.0F,
+              0.63F, 1.42F, 0.12F, {0.0F, 0.0F}, 0.0F, 0.0F, 0.20F, 0.64F};
+    case ReferenceScene::active_clear_night:
+      return {-0.34F, 0.04F, 0.05F, 0.16F, 0.008F, 0.82F, 1.0F,
+              0.63F, 1.42F, 0.12F, {0.0F, 0.0F}, 0.0F, 0.0F, 0.20F, 0.64F};
+    case ReferenceScene::cloudy_night_aurora:
+      return {-0.34F, 0.48F, 0.72F, 0.80F, 0.018F, 0.82F, 1.0F,
+              0.63F, 1.30F, 0.12F, {0.0F, 0.0F}, 0.0F, 0.0F, 0.20F, 0.72F};
     case ReferenceScene::storm:
       return {0.18F, 0.88F, 0.52F, 0.96F, 0.065F, 0.0F, 0.04F,
               0.42F, 0.88F, 0.74F, {0.0F, 0.0F}, 0.0F, 0.0F, 0.20F, 0.88F};
@@ -252,8 +258,12 @@ std::string_view ReferenceSceneName(const ReferenceScene scene) noexcept {
       return "day";
     case ReferenceScene::dusk:
       return "dusk";
-    case ReferenceScene::clear_night_aurora:
-      return "clear-night-aurora";
+    case ReferenceScene::quiet_clear_night:
+      return "quiet-clear-night";
+    case ReferenceScene::active_clear_night:
+      return "active-clear-night";
+    case ReferenceScene::cloudy_night_aurora:
+      return "cloudy-night-aurora";
     case ReferenceScene::storm:
       return "storm";
     case ReferenceScene::translated_day_probe:

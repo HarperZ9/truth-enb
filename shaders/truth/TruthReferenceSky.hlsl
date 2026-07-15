@@ -60,6 +60,7 @@ TruthSkyFieldOutput TruthReferenceEvaluateSkyField(float2 texcoord)
     field_input.weather_density = TruthReferenceWeatherDensity;
     field_input.aurora_activity = TruthReferenceAuroraActivity;
     field_input.night_factor = TruthReferenceNightFactor;
+    field_input.camera_position = TruthReferenceCameraPosition;
     return TruthEvaluateSkyFields(field_input);
 }
 
@@ -98,6 +99,35 @@ TruthCloudVolumeOutput TruthReferenceEvaluateCloudVolume(
     volume_input.pixel_coordinate = uint2(input.position.xy);
     volume_input.jitter_frame = 0u;
     return TruthEvaluateCloudVolume(volume_input);
+}
+
+float3 TruthReferenceStarRadiance(float3 view_direction, float night_factor)
+{
+    float star_visibility = TruthAuroraSmoothStep(0.55, 0.92, night_factor);
+    float3 primary_position = view_direction * 64.0;
+    int3 primary_cell = int3(floor(primary_position));
+    float3 primary_local = frac(primary_position) - 0.5;
+    float primary_hash = TruthSkyLatticeHash3D(primary_cell);
+    float primary_core = TruthAuroraSmoothStep(0.30, 0.035, length(primary_local));
+    float primary_gate = TruthAuroraSmoothStep(0.982, 0.998, primary_hash);
+
+    float3 secondary_position = view_direction * 109.0;
+    int3 secondary_cell = int3(floor(secondary_position));
+    float3 secondary_local = frac(secondary_position) - 0.5;
+    float secondary_hash = TruthAuroraLatticeHash3D(secondary_cell + int3(17, -9, 23));
+    float secondary_core = TruthAuroraSmoothStep(0.25, 0.025, length(secondary_local));
+    float secondary_gate = TruthAuroraSmoothStep(0.991, 0.9995, secondary_hash);
+
+    float primary = primary_core * primary_gate;
+    float secondary = secondary_core * secondary_gate;
+    float color_hash = TruthAuroraLatticeHash3D(primary_cell + int3(-5, 31, 11));
+    float3 star_color = lerp(
+        float3(0.78, 0.86, 1.00),
+        float3(1.00, 0.91, 0.76),
+        color_hash);
+    return star_visibility
+        * ((0.105 * primary * star_color)
+           + (0.060 * secondary * float3(0.76, 0.84, 1.00)));
 }
 
 float4 TruthSkyFieldScalarProbePixelMain(
@@ -162,6 +192,7 @@ float4 TruthReferencePixelMain(TruthReferenceVertexOutput input) : SV_Target0
     field_input.weather_density = TruthReferenceWeatherDensity;
     field_input.aurora_activity = TruthReferenceAuroraActivity;
     field_input.night_factor = TruthReferenceNightFactor;
+    field_input.camera_position = TruthReferenceCameraPosition;
     TruthSkyFieldOutput field_output = TruthEvaluateSkyFields(field_input);
 
     TruthUnifiedAtmosphereInput atmosphere_input;
@@ -179,6 +210,7 @@ float4 TruthReferencePixelMain(TruthReferenceVertexOutput input) : SV_Target0
         TruthEvaluateAtmosphere(atmosphere_input);
 
     float3 composite_radiance;
+    float background_transmittance;
 #if TRUTH_ENABLE_CLOUD_VOLUME
     TruthCloudVolumeOutput volume_output = TruthReferenceEvaluateCloudVolume(input);
     float combined_transmittance = volume_output.transmittance
@@ -186,6 +218,7 @@ float4 TruthReferencePixelMain(TruthReferenceVertexOutput input) : SV_Target0
     composite_radiance = (atmosphere_output.sky_radiance * combined_transmittance)
         + (volume_output.radiance * atmosphere_output.fog_transmittance)
         + (field_output.aurora_intrinsic_radiance * combined_transmittance);
+    background_transmittance = combined_transmittance;
 #else
     TruthCloudLightingInput lighting_input;
     lighting_input.sky_radiance = atmosphere_output.sky_radiance;
@@ -200,7 +233,20 @@ float4 TruthReferencePixelMain(TruthReferenceVertexOutput input) : SV_Target0
     lighting_input.fog_transmittance = atmosphere_output.fog_transmittance;
     TruthCloudLightingOutput lighting_output = TruthEvaluateCloudLighting(lighting_input);
     composite_radiance = lighting_output.composite_radiance;
+    background_transmittance = lighting_output.cloud_transmittance
+        * atmosphere_output.fog_transmittance;
 #endif
+
+    float aurora_luminance = dot(
+        field_output.aurora_intrinsic_radiance,
+        float3(0.2126, 0.7152, 0.0722));
+    float aurora_star_preservation = 1.0
+        - (0.72 * TruthAuroraSmoothStep(0.025, 0.15, aurora_luminance));
+    composite_radiance += TruthReferenceStarRadiance(
+        view_direction,
+        TruthReferenceNightFactor)
+        * background_transmittance
+        * aurora_star_preservation;
 
     float3 exposed = TruthApplyExposure(
         composite_radiance,

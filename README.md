@@ -24,10 +24,18 @@ depend on recovered or peer shader source.
   atmosphere-enabled and atmosphere-disabled permutations.
 - `SkyFieldInput` / `SkyFieldOutput`: a deterministic, seamless 3D
   direction-space cloud field with domain-warped body/detail erosion and a
-  night-only folded aurora-curtain reference.
+  night-only world-space aurora-curtain reference.
 - `TruthSkyFields.fxh`: the shader mirror; its generated cloud density, detail,
   and intrinsic aurora radiance feed cloud lighting before exposure, with a
   macro-off direct-control fallback.
+- `AuroraCurtainInput` / `AuroraCurtainOutput`: an original bounded emission
+  integral that factors a normalized height-dependent energy-deposition
+  profile from a horizontally varying electron-flux curtain. The lower
+  green/blue band and higher, broader red band are deliberately expressed in
+  Skyrim-scale coordinates rather than asserted as literal kilometers.
+- `TruthAuroraCurtain.fxh`: the CPU-mirrored world-space shader with broad
+  warped arcs, fine ray structure, exact looped motion, camera parallax, a
+  bounded view-path gain, and fixed `1/4/7/10` fallback/quality sample budgets.
 - `CloudLightingInput` / `CloudLightingOutput`: bounded cloud optical depth,
   direct and ambient scattering, self-shadow, powder response, weather tint,
   and one explicit sky/cloud/aurora composition path.
@@ -74,18 +82,24 @@ captures with one command:
 
 This runs the original atmosphere, true cloud volume, procedural aurora, and
 tone curve as `vs_5_0` / `ps_5_0`, reads an offscreen RGBA8 target back from
-WARP, and writes `day`, `dusk`, `clear-night-aurora`, and `storm` as binary PPM
-files. It reports the cold shader-compile time separately from the cached
-per-frame render/readback time. The WARP suite also checks panorama topology,
-camera-translation parallax, darker-core/lit-edge structure, deterministic
-readback, and bounded CPU/HLSL parity for both sky fields and the raymarched
-volume. Captures, shader objects, and executables remain under ignored build
-paths.
+WARP, and writes `quiet-clear-night`, `active-clear-night`,
+`cloudy-night-aurora`, and `storm` as binary PPM files. It reports the cold
+shader-compile time separately from cached per-frame render/readback time. The
+WARP suite also checks panorama topology, camera-translation parallax,
+darker-core/lit-edge structure, deterministic readback, bounded CPU/HLSL
+parity, aurora luminance/color budgets, star preservation, and cloud
+extinction. Captures, shader objects, and executables remain under ignored
+build paths.
 
 `TRUTH_CLOUD_VOLUME_QUALITY` selects fixed `primary/light` sample budgets of
 `16/4`, `20/5`, or `24/6`. All three tiers are compiled in CI-style CTests.
 `TRUTH_ENABLE_CLOUD_VOLUME=0` retains the bounded procedural cloud-lighting
 fallback and is compiled as a separate, bytecode-distinct permutation.
+
+`TRUTH_AURORA_QUALITY` selects fixed curtain integration budgets of `1`, `4`,
+`7`, or `10` samples. The one-sample path is the explicit fallback; all four
+paths compile with strict FXC warnings-as-errors and their fallback/quality
+objects are asserted distinct.
 
 The enabled effect adds unified atmosphere composite radiance to scene-linear
 color before exposure. The sky and precomputed procedural aurora are attenuated
@@ -104,6 +118,9 @@ exactly black.
 
 Procedural sky animation uses normalized phase `[0,1]`; both endpoints map to
 the same exact field state. The field has no cloud or aurora texture inputs.
+The aurora follows the emissive factorization described by Lawlor and Genetti's
+[primary GPU-rendering paper](https://lawlor.cs.uaf.edu/~olawlor/papers/2010/aurora/lawlor_aurora_2010.pdf),
+but its code, fields, coefficients, tests, and assets are original Truth work.
 
 ## Input contract
 

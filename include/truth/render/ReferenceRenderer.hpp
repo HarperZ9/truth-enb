@@ -11,9 +11,12 @@ namespace truth::render {
 enum class ReferenceScene : std::uint8_t {
   day = 0,
   dusk = 1,
-  clear_night_aurora = 2,
-  storm = 3,
-  translated_day_probe = 4,
+  quiet_clear_night = 2,
+  active_clear_night = 3,
+  clear_night_aurora = active_clear_night,
+  cloudy_night_aurora = 4,
+  storm = 5,
+  translated_day_probe = 6,
 };
 
 enum class ReferenceRenderStatus : std::uint8_t {

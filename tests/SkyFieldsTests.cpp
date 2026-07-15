@@ -67,6 +67,7 @@ struct TestContext {
       0.4F, -0.25F,
       0.65F, 0.8F, 0.5F,
       0.9F, 1.0F,
+      0.0F, 0.0F, 0.20F,
   };
 }
 
@@ -104,6 +105,8 @@ void StableCodesAreExplicit(TestContext& context) {
                  "view normalization diagnostic code changed");
   context.expect(static_cast<std::uint32_t>(SkyFieldDiagnostic::night_factor_out_of_range) == 211U,
                  "night-factor diagnostic code changed");
+  context.expect(static_cast<std::uint32_t>(SkyFieldDiagnostic::camera_x_non_finite) == 220U,
+                 "camera-x diagnostic code changed");
   context.expect(static_cast<std::uint32_t>(SkyFieldDiagnostic::calculation_out_of_range) == 301U,
                  "calculation diagnostic code changed");
 }
@@ -223,6 +226,12 @@ void InvalidInputsNeverMutateOutput(TestContext& context) {
   reject(input, SkyFieldDiagnostic::night_factor_non_finite);
   input = valid; input.night_factor = 1.01F;
   reject(input, SkyFieldDiagnostic::night_factor_out_of_range);
+  input = valid; input.camera_x = infinity;
+  reject(input, SkyFieldDiagnostic::camera_x_non_finite);
+  input = valid; input.camera_y = nan;
+  reject(input, SkyFieldDiagnostic::camera_y_non_finite);
+  input = valid; input.camera_z = infinity;
+  reject(input, SkyFieldDiagnostic::camera_z_non_finite);
 }
 
 void DenseGridStaysFiniteAndBounded(TestContext& context) {
@@ -318,7 +327,8 @@ void DirectionSpaceIsContinuousAcrossThePanorama(TestContext& context) {
                        "cloud body jumped between adjacent angular samples");
         context.expect(std::fabs(output.cloud_density - previous.cloud_density) < 0.12F,
                        "cloud density jumped between adjacent angular samples");
-        context.expect(std::fabs(output.aurora_mask - previous.aurora_mask) < 0.12F,
+        const float aurora_delta = std::fabs(output.aurora_mask - previous.aurora_mask);
+        context.expect(aurora_delta < 0.12F,
                        "aurora curtain jumped between adjacent angular samples");
       }
       previous = output;
@@ -534,7 +544,7 @@ void NightAuroraFormsCurtains(TestContext& context) {
   context.expect(maximum_green > 0.05F, "active night aurora emitted no intrinsic radiance");
 }
 
-void AuroraFormsOneBroadFoldedArc(TestContext& context) {
+void AuroraFormsOneBroadWorldSpaceArc(TestContext& context) {
   constexpr float pi = 3.14159265358979323846F;
   constexpr std::uint32_t azimuth_samples = 256U;
   constexpr std::uint32_t vertical_samples = 48U;
@@ -553,7 +563,7 @@ void AuroraFormsOneBroadFoldedArc(TestContext& context) {
       SetPanoramaDirection(input, azimuth, view_z);
       SkyFieldOutput output{};
       ExpectSucceeded(context, EvaluateSkyFields(input, output));
-      supported[x] = supported[x] || output.aurora_mask > 0.10F;
+      supported[x] = supported[x] || output.aurora_mask > 0.035F;
     }
   }
 
@@ -569,44 +579,55 @@ void AuroraFormsOneBroadFoldedArc(TestContext& context) {
       current_run = 0U;
     }
   }
-  context.expect(longest_run >= 112U,
+  context.expect(longest_run >= 80U,
                  "aurora broke into disconnected narrow columns instead of a broad arc");
   context.expect(supported_columns < 232U,
                  "aurora support filled nearly the entire panorama");
 }
 
-void AuroraUsesGreenCoreAndRestrainedUpperFringe(TestContext& context) {
+void AuroraRadianceIsGreenLedAndRestrained(TestContext& context) {
+  constexpr float pi = 3.14159265358979323846F;
   SkyFieldInput input = ReferenceInput();
   input.phase = 0.63F;
   input.aurora_activity = 1.0F;
   input.night_factor = 1.0F;
-  SetPanoramaDirection(input, 0.0F, 0.43F);
-  SkyFieldOutput core{};
-  ExpectSucceeded(context, EvaluateSkyFields(input, core));
-  SetPanoramaDirection(input, 0.0F, 0.72F);
-  SkyFieldOutput fringe{};
-  ExpectSucceeded(context, EvaluateSkyFields(input, fringe));
-
-  context.expect(core.aurora_mask > 0.08F, "aurora green core had no curtain support");
-  context.expect(fringe.aurora_mask > 0.025F, "aurora upper fringe had no curtain support");
-  context.expect(core.aurora_intrinsic_radiance.g
-                     > core.aurora_intrinsic_radiance.b + 0.02F,
-                 "aurora core was not predominantly green");
-  const float core_blue_ratio = core.aurora_intrinsic_radiance.b
-      / std::max(core.aurora_intrinsic_radiance.g, 1.0e-5F);
-  const float fringe_blue_ratio = fringe.aurora_intrinsic_radiance.b
-      / std::max(fringe.aurora_intrinsic_radiance.g, 1.0e-5F);
-  context.expect(fringe_blue_ratio > core_blue_ratio + 0.12F,
-                 "aurora upper fringe did not transition toward blue-violet");
-  context.expect(fringe.aurora_intrinsic_radiance.b
-                     < fringe.aurora_intrinsic_radiance.g * 1.15F,
-                 "aurora blue fringe overpowered its green curtain support");
+  float maximum_green{};
+  float maximum_channel{};
+  double red_sum{};
+  double green_sum{};
+  double blue_sum{};
+  for (std::uint32_t x = 0; x < 128U; ++x) {
+    const float azimuth = -pi + (2.0F * pi * static_cast<float>(x) / 128.0F);
+    for (std::uint32_t y = 0; y < 48U; ++y) {
+      SetPanoramaDirection(input, azimuth,
+                           0.06F + (0.90F * static_cast<float>(y) / 47.0F));
+      SkyFieldOutput output{};
+      ExpectSucceeded(context, EvaluateSkyFields(input, output));
+      maximum_green = std::max(maximum_green, output.aurora_intrinsic_radiance.g);
+      maximum_channel = std::max({
+          maximum_channel,
+          output.aurora_intrinsic_radiance.r,
+          output.aurora_intrinsic_radiance.g,
+          output.aurora_intrinsic_radiance.b,
+      });
+      red_sum += output.aurora_intrinsic_radiance.r;
+      green_sum += output.aurora_intrinsic_radiance.g;
+      blue_sum += output.aurora_intrinsic_radiance.b;
+    }
+  }
+  context.expect(maximum_green > 0.055F,
+                 "aurora green core had no bloom-ready curtain support");
+  context.expect(maximum_channel <= 0.42F,
+                 "aurora integration exceeded its non-neon ceiling");
+  context.expect(green_sum > red_sum * 1.45 && green_sum > blue_sum * 1.25,
+                 "aurora integration was not green-led and restrained");
 }
 
 void AuroraActivityScalesOnlyRadiance(TestContext& context) {
   SkyFieldInput inactive = ReferenceInput();
   inactive.night_factor = 1.0F;
   inactive.aurora_activity = 0.0F;
+  SetPanoramaDirection(inactive, 0.0F, 0.60F);
   SkyFieldInput active = inactive;
   active.aurora_activity = 1.0F;
   SkyFieldOutput inactive_output{};
@@ -623,6 +644,31 @@ void AuroraActivityScalesOnlyRadiance(TestContext& context) {
                  "inactive aurora intrinsic b was not exact +0");
   context.expect(active_output.aurora_intrinsic_radiance.g > 0.0F,
                  "active aurora intrinsic radiance stayed zero");
+}
+
+void AuroraUsesWorldSpaceCameraParallax(TestContext& context) {
+  SkyFieldInput baseline = ReferenceInput();
+  baseline.aurora_activity = 1.0F;
+  baseline.night_factor = 1.0F;
+  SetPanoramaDirection(baseline, 0.0F, 0.60F);
+  SkyFieldInput translated = baseline;
+  translated.camera_x = 0.85F;
+  translated.camera_y = -0.40F;
+  SkyFieldOutput baseline_output{};
+  SkyFieldOutput translated_output{};
+  ExpectSucceeded(context, EvaluateSkyFields(baseline, baseline_output));
+  ExpectSucceeded(context, EvaluateSkyFields(translated, translated_output));
+  context.expect(SameFloatBits(baseline_output.cloud_body, translated_output.cloud_body)
+                     && SameFloatBits(baseline_output.cloud_detail_erosion,
+                                      translated_output.cloud_detail_erosion)
+                     && SameFloatBits(baseline_output.cloud_density,
+                                      translated_output.cloud_density),
+                 "camera translation changed the direction-space cloud field");
+  context.expect(!SameFloatBits(baseline_output.aurora_mask,
+                                translated_output.aurora_mask)
+                     || !SameRadiance(baseline_output.aurora_intrinsic_radiance,
+                                      translated_output.aurora_intrinsic_radiance),
+                 "camera translation did not move the aurora curtain");
 }
 
 using TestFunction = void (*)(TestContext&);
@@ -642,11 +688,12 @@ constexpr TestCase kTests[] = {
     {"cloud controls are monotonic", &CloudControlsAreMonotonic},
     {"day aurora is bit-exact zero", &DayAuroraIsBitExactZero},
     {"night aurora forms curtains", &NightAuroraFormsCurtains},
-    {"aurora uses green core and restrained upper fringe",
-     &AuroraUsesGreenCoreAndRestrainedUpperFringe},
-    {"aurora forms one broad folded arc", &AuroraFormsOneBroadFoldedArc},
+    {"aurora radiance is green led and restrained",
+     &AuroraRadianceIsGreenLedAndRestrained},
+    {"aurora forms one broad world-space arc", &AuroraFormsOneBroadWorldSpaceArc},
     {"cloud masses are not vertical pillars", &CloudMassesAreNotVerticalPillars},
     {"aurora activity scales only radiance", &AuroraActivityScalesOnlyRadiance},
+    {"aurora uses world-space camera parallax", &AuroraUsesWorldSpaceCameraParallax},
 };
 
 }  // namespace

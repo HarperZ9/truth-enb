@@ -127,10 +127,11 @@ exact x64 FXC `fx_5_0` and asserts their generated objects differ.
 ## Procedural sky fields
 
 `SkyFieldInput` is a validated POD containing a normalized view direction,
-looped phase, bounded wind, cloud/weather controls, aurora activity, and night
-factor. `EvaluateSkyFields` commits once after producing bounded low-frequency
-cloud body, independent detail erosion, composed density, curtain mask, and
-intrinsic aurora radiance. Invalid input preserves the caller's output.
+looped phase, bounded wind, cloud/weather controls, aurora activity, night
+factor, and camera position. `EvaluateSkyFields` commits once after producing
+bounded low-frequency cloud body, independent detail erosion, composed density,
+curtain mask, and intrinsic aurora radiance. Invalid input preserves the
+caller's output.
 
 Phase `1.0` is canonically evaluated as phase `0.0`; the sinusoidal wind orbit
 is therefore exactly loopable. Coverage, density, and weather only scale or
@@ -143,6 +144,30 @@ derives a normalized view ray from screen position and supplies generated cloud
 density, detail erosion, and intrinsic aurora radiance to cloud lighting before
 exposure. `TRUTH_ENABLE_PROCEDURAL_SKY=0` retains the direct cloud-density and
 aurora-mask inputs as an explicit fallback.
+
+## Procedural aurora curtain
+
+The aurora is an emissive volume integral rather than a screen-space band. Its
+source term is factored into a normalized height-dependent deposition profile
+and a horizontal electron-flux field. Green and blue share a lower peak; red is
+higher, broader, and driven by a lower-frequency persistent flux. The physical
+ordering follows the Lawlor–Genetti rendering formulation while all distances
+remain explicit Skyrim-scale artist coordinates.
+
+Each view ray intersects the bounded auroral height slab. The evaluator samples
+world positions along that path, applies a domain-warped curved sheet plus
+coarse/fine filament flux, multiplies it by the per-channel deposition profile,
+and accumulates bounded intrinsic radiance. View-angle path length is capped;
+horizon visibility is softened; phase follows an exact sinusoidal loop; camera
+translation moves the world-space sheet without altering direction-space
+clouds. CPU and HLSL use fixed `1/4/7/10` sample budgets and expose the same
+fallback, low, balanced, and high tiers.
+
+Cloud and fog attenuation remain outside the intrinsic aurora evaluator so the
+existing single-composition rule applies them exactly once. The WARP witness
+adds a stable direction-space star field behind that same transmittance, making
+star preservation and soft cloud occlusion measurable without introducing a
+runtime asset or dependency.
 
 ## Procedural cloud lighting
 

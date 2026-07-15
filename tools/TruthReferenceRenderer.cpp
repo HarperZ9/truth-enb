@@ -36,9 +36,9 @@ int main(int argc, char** argv) {
   const std::filesystem::path shader_path{argv[1]};
   const std::filesystem::path output_directory{argv[2]};
   constexpr std::array scenes{
-      truth::render::ReferenceScene::day,
-      truth::render::ReferenceScene::dusk,
-      truth::render::ReferenceScene::clear_night_aurora,
+      truth::render::ReferenceScene::quiet_clear_night,
+      truth::render::ReferenceScene::active_clear_night,
+      truth::render::ReferenceScene::cloudy_night_aurora,
       truth::render::ReferenceScene::storm,
   };
 

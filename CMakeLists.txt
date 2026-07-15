@@ -149,6 +149,7 @@ if(BUILD_TESTING)
     target_compile_features(truth_reference_renderer_tests PRIVATE cxx_std_23)
     target_link_libraries(truth_reference_renderer_tests PRIVATE
       truth_reference_renderer_core
+      truth_sky_fields
     )
     set_property(TARGET truth_reference_renderer_tests PROPERTY VS_GLOBAL_VcpkgApplocalDeps false)
 

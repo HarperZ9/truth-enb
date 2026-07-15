@@ -36,11 +36,54 @@ TruthReferenceVertexOutput TruthReferenceVertexMain(uint vertex_id : SV_VertexID
     return output;
 }
 
+TruthSkyFieldOutput TruthReferenceEvaluateSkyField(float2 texcoord)
+{
+    float vertical = saturate(1.0 - texcoord.y);
+    float elevation = lerp(0.035, (0.5 * TruthSkyPi) - 0.035, vertical);
+    float view_z = sin(elevation);
+    float view_radius = cos(elevation);
+    float azimuth = ((texcoord.x * 2.0) - 1.0) * TruthSkyPi;
+    float3 view_direction = normalize(float3(
+        sin(azimuth) * view_radius,
+        cos(azimuth) * view_radius,
+        view_z));
+
+    TruthSkyFieldInput field_input;
+    field_input.view_direction = view_direction;
+    field_input.phase = TruthReferencePhase;
+    field_input.wind = float2(0.62, -0.27);
+    field_input.cloud_coverage = TruthReferenceCloudCoverage;
+    field_input.cloud_density = TruthReferenceCloudDensity;
+    field_input.weather_density = TruthReferenceWeatherDensity;
+    field_input.aurora_activity = TruthReferenceAuroraActivity;
+    field_input.night_factor = TruthReferenceNightFactor;
+    return TruthEvaluateSkyFields(field_input);
+}
+
+float4 TruthSkyFieldScalarProbePixelMain(
+    TruthReferenceVertexOutput input) : SV_Target0
+{
+    TruthSkyFieldOutput field_output = TruthReferenceEvaluateSkyField(input.texcoord);
+    return float4(
+        field_output.cloud_body,
+        field_output.cloud_detail_erosion,
+        field_output.cloud_density,
+        field_output.aurora_mask);
+}
+
+float4 TruthSkyFieldRadianceProbePixelMain(
+    TruthReferenceVertexOutput input) : SV_Target0
+{
+    TruthSkyFieldOutput field_output = TruthReferenceEvaluateSkyField(input.texcoord);
+    return float4(field_output.aurora_intrinsic_radiance, 1.0);
+}
+
 float4 TruthReferencePixelMain(TruthReferenceVertexOutput input) : SV_Target0
 {
     float vertical = saturate(1.0 - input.texcoord.y);
-    float view_z = lerp(0.035, 0.999, vertical);
-    float view_radius = sqrt(max(1.0 - (view_z * view_z), 0.0));
+    float elevation = lerp(0.035, (0.5 * TruthSkyPi) - 0.035, vertical);
+    float view_z = sin(elevation);
+    float view_radius = cos(elevation);
     float azimuth = ((input.texcoord.x * 2.0) - 1.0) * TruthSkyPi;
     float3 view_direction = normalize(float3(
         sin(azimuth) * view_radius,

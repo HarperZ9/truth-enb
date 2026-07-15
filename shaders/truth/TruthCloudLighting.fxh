@@ -118,7 +118,7 @@ TruthCloudLightingOutput TruthEvaluateCloudLighting(TruthCloudLightingInput inpu
     output.ambient_scattering = saturate(ambient_base + output.multiple_scattering);
 
     float3 night_tint = float3(0.18, 0.28, 0.52);
-    float3 day_tint = float3(1.00, 0.92, 0.78);
+    float3 day_tint = float3(1.00, 0.97, 0.92);
     float3 base_tint = lerp(night_tint, day_tint, daylight);
     output.cloud_tint = base_tint * lerp(
         float3(1.0, 1.0, 1.0),

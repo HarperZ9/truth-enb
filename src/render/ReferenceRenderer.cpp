@@ -227,11 +227,12 @@ std::string_view ReferenceSceneName(const ReferenceScene scene) noexcept {
   return {};
 }
 
-ReferenceRenderResult RenderWarpReference(
+[[nodiscard]] ReferenceRenderResult RenderWarpPass(
     const ReferenceScene scene,
     const std::filesystem::path& shader_path,
     const std::uint32_t width,
-    const std::uint32_t height) noexcept {
+    const std::uint32_t height,
+    const char* const pixel_entry) noexcept {
   try {
     if (ReferenceSceneName(scene).empty()) {
       return Fail(ReferenceRenderStatus::invalid_request, "unknown reference scene");
@@ -249,7 +250,7 @@ ReferenceRenderResult RenderWarpReference(
                        vertex_bytecode, diagnostic)) {
       return Fail(ReferenceRenderStatus::shader_compile_failed, std::move(diagnostic));
     }
-    if (!CompileShader(shader_path, "TruthReferencePixelMain", "ps_5_0",
+    if (!CompileShader(shader_path, pixel_entry, "ps_5_0",
                        pixel_bytecode, diagnostic)) {
       return Fail(ReferenceRenderStatus::shader_compile_failed, std::move(diagnostic));
     }
@@ -400,6 +401,33 @@ ReferenceRenderResult RenderWarpReference(
     return Fail(ReferenceRenderStatus::gpu_failed,
                 "WARP renderer encountered an unknown exception");
   }
+}
+
+ReferenceRenderResult RenderWarpReference(
+    const ReferenceScene scene,
+    const std::filesystem::path& shader_path,
+    const std::uint32_t width,
+    const std::uint32_t height) noexcept {
+  return RenderWarpPass(
+      scene, shader_path, width, height, "TruthReferencePixelMain");
+}
+
+ReferenceRenderResult RenderWarpSkyFieldScalars(
+    const ReferenceScene scene,
+    const std::filesystem::path& shader_path,
+    const std::uint32_t width,
+    const std::uint32_t height) noexcept {
+  return RenderWarpPass(
+      scene, shader_path, width, height, "TruthSkyFieldScalarProbePixelMain");
+}
+
+ReferenceRenderResult RenderWarpSkyFieldRadiance(
+    const ReferenceScene scene,
+    const std::filesystem::path& shader_path,
+    const std::uint32_t width,
+    const std::uint32_t height) noexcept {
+  return RenderWarpPass(
+      scene, shader_path, width, height, "TruthSkyFieldRadianceProbePixelMain");
 }
 
 bool WriteBinaryPpm(

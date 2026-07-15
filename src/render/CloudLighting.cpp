@@ -259,7 +259,7 @@ CloudLightingEvaluation EvaluateCloudLighting(
                                             1.0F);
 
   const RgbRadiance night_tint{0.18F, 0.28F, 0.52F};
-  const RgbRadiance day_tint{1.00F, 0.92F, 0.78F};
+  const RgbRadiance day_tint{1.00F, 0.97F, 0.92F};
   const RgbRadiance base_tint{
       LinearInterpolate(night_tint.r, day_tint.r, daylight),
       LinearInterpolate(night_tint.g, day_tint.g, daylight),

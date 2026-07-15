@@ -1,6 +1,8 @@
 #include "truth/render/SkyFields.hpp"
+#include "truth/render/detail/SkyFieldNoise.hpp"
 
 #include <algorithm>
+#include <array>
 #include <bit>
 #include <cmath>
 #include <cstdint>
@@ -68,6 +70,16 @@ struct TestContext {
   };
 }
 
+void SetPanoramaDirection(
+    SkyFieldInput& input,
+    const float azimuth,
+    const float view_z) noexcept {
+  const float radial = std::sqrt(std::max(0.0F, 1.0F - (view_z * view_z)));
+  input.view_x = std::sin(azimuth) * radial;
+  input.view_y = std::cos(azimuth) * radial;
+  input.view_z = view_z;
+}
+
 void ExpectSucceeded(TestContext& context, const SkyFieldEvaluation evaluation) {
   context.expect(evaluation.status == SkyFieldStatus::evaluated, "sky-field evaluation was rejected");
   context.expect(evaluation.diagnostic == SkyFieldDiagnostic::none,
@@ -103,6 +115,47 @@ void EvaluationIsBitDeterministic(TestContext& context) {
   ExpectSucceeded(context, EvaluateSkyFields(input, first));
   ExpectSucceeded(context, EvaluateSkyFields(input, second));
   context.expect(SameOutput(first, second), "identical sky-field inputs changed output bits");
+}
+
+void ThreeDimensionalNoiseIsStable(TestContext& context) {
+  using truth::render::detail::SkyFieldLatticeHash3D;
+  using truth::render::detail::SkyFieldValueNoise3D;
+
+  context.expect(
+      std::bit_cast<std::uint32_t>(SkyFieldLatticeHash3D(0, 0, 0)) == 0x3F7CE553U,
+      "3D lattice origin hash changed");
+  context.expect(
+      std::bit_cast<std::uint32_t>(SkyFieldLatticeHash3D(1, 2, 3)) == 0x3F4F072DU,
+      "3D positive lattice hash changed");
+  context.expect(
+      std::bit_cast<std::uint32_t>(SkyFieldLatticeHash3D(-7, 11, -13)) == 0x3EED6977U,
+      "3D signed lattice hash changed");
+
+  constexpr std::array samples{
+      std::array{0.25F, 0.5F, 0.75F},
+      std::array{-1.125F, 2.25F, -3.5F},
+      std::array{7.75F, -4.125F, 9.625F},
+  };
+  for (const auto& sample : samples) {
+    const float first = SkyFieldValueNoise3D(sample[0], sample[1], sample[2]);
+    const float second = SkyFieldValueNoise3D(sample[0], sample[1], sample[2]);
+    context.expect(SameFloatBits(first, second), "3D value noise changed output bits");
+    context.expect(std::isfinite(first) && first >= 0.0F && first <= 1.0F,
+                   "3D value noise left [0,1]");
+  }
+
+  context.expect(std::fabs(SkyFieldValueNoise3D(0.25F, 0.5F, 0.75F)
+                           - 0.444160044F) < 1.0e-6F,
+                 "3D value-noise reference sample changed");
+  context.expect(std::fabs(SkyFieldValueNoise3D(-1.125F, 2.25F, -3.5F)
+                           - 0.733151674F) < 1.0e-6F,
+                 "3D signed value-noise reference sample changed");
+
+  constexpr float epsilon = 1.0e-4F;
+  const float before = SkyFieldValueNoise3D(1.0F - epsilon, -2.25F, 0.625F);
+  const float after = SkyFieldValueNoise3D(1.0F + epsilon, -2.25F, 0.625F);
+  context.expect(std::fabs(before - after) < 2.0e-4F,
+                 "3D value noise was discontinuous across a lattice boundary");
 }
 
 void InvalidInputsNeverMutateOutput(TestContext& context) {
@@ -238,6 +291,138 @@ void PhaseWrapHasAnExactSeam(TestContext& context) {
                  "aurora field was discontinuous around the phase seam");
 }
 
+void DirectionSpaceIsContinuousAcrossThePanorama(TestContext& context) {
+  constexpr float pi = 3.14159265358979323846F;
+  constexpr std::uint32_t azimuth_samples = 512U;
+  SkyFieldInput input = ReferenceInput();
+  input.cloud_coverage = 0.68F;
+  input.cloud_density = 0.9F;
+  input.weather_density = 0.55F;
+  input.aurora_activity = 1.0F;
+  input.night_factor = 1.0F;
+
+  for (const float view_z : {0.08F, 0.32F, 0.62F, 0.88F}) {
+    SkyFieldOutput previous{};
+    SkyFieldOutput first{};
+    for (std::uint32_t index = 0; index <= azimuth_samples; ++index) {
+      const float azimuth = -pi
+          + (2.0F * pi * static_cast<float>(index)
+             / static_cast<float>(azimuth_samples));
+      SetPanoramaDirection(input, azimuth, view_z);
+      SkyFieldOutput output{};
+      ExpectSucceeded(context, EvaluateSkyFields(input, output));
+      if (index == 0U) {
+        first = output;
+      } else {
+        context.expect(std::fabs(output.cloud_body - previous.cloud_body) < 0.08F,
+                       "cloud body jumped between adjacent angular samples");
+        context.expect(std::fabs(output.cloud_density - previous.cloud_density) < 0.12F,
+                       "cloud density jumped between adjacent angular samples");
+        context.expect(std::fabs(output.aurora_mask - previous.aurora_mask) < 0.12F,
+                       "aurora curtain jumped between adjacent angular samples");
+      }
+      previous = output;
+    }
+    context.expect(std::fabs(previous.cloud_body - first.cloud_body) < 1.0e-5F,
+                   "cloud body opened at the panorama seam");
+    context.expect(std::fabs(previous.cloud_density - first.cloud_density) < 1.0e-5F,
+                   "cloud density opened at the panorama seam");
+    context.expect(std::fabs(previous.aurora_mask - first.aurora_mask) < 1.0e-5F,
+                   "aurora curtain opened at the panorama seam");
+  }
+}
+
+[[nodiscard]] float MeanCloudDensity(SkyFieldInput input) {
+  constexpr float pi = 3.14159265358979323846F;
+  constexpr std::uint32_t azimuth_samples = 96U;
+  constexpr std::uint32_t vertical_samples = 32U;
+  float sum{};
+  for (std::uint32_t y = 0; y < vertical_samples; ++y) {
+    const float view_z = 0.05F + (0.92F * static_cast<float>(y)
+                                  / static_cast<float>(vertical_samples - 1U));
+    for (std::uint32_t x = 0; x < azimuth_samples; ++x) {
+      const float azimuth = -pi
+          + (2.0F * pi * static_cast<float>(x)
+             / static_cast<float>(azimuth_samples));
+      SetPanoramaDirection(input, azimuth, view_z);
+      SkyFieldOutput output{};
+      if (EvaluateSkyFields(input, output).status != SkyFieldStatus::evaluated) {
+        throw TestFailure{"cloud response sample was rejected"};
+      }
+      sum += output.cloud_density;
+    }
+  }
+  return sum / static_cast<float>(azimuth_samples * vertical_samples);
+}
+
+void CoverageAndWeatherChangeSkyScale(TestContext& context) {
+  SkyFieldInput input = ReferenceInput();
+  input.cloud_density = 0.9F;
+  input.weather_density = 0.45F;
+  input.cloud_coverage = 0.25F;
+  const float sparse = MeanCloudDensity(input);
+  input.cloud_coverage = 0.75F;
+  const float covered = MeanCloudDensity(input);
+  context.expect(covered > sparse + 0.12F,
+                 "cloud coverage did not add broad sky support");
+
+  input.cloud_coverage = 0.62F;
+  input.weather_density = 0.0F;
+  const float clear_weather = MeanCloudDensity(input);
+  input.weather_density = 1.0F;
+  const float dense_weather = MeanCloudDensity(input);
+  context.expect(dense_weather > clear_weather + 0.06F,
+                 "weather density did not deepen the cloud field");
+}
+
+void CloudMassesAreNotVerticalPillars(TestContext& context) {
+  constexpr float pi = 3.14159265358979323846F;
+  constexpr std::uint32_t azimuth_samples = 256U;
+  constexpr std::uint32_t vertical_samples = 64U;
+  SkyFieldInput input = ReferenceInput();
+  input.phase = 0.18F;
+  input.cloud_coverage = 0.36F;
+  input.cloud_density = 0.62F;
+  input.weather_density = 0.08F;
+  std::uint32_t supported_regions{};
+  float maximum_column_support{};
+  for (std::uint32_t region = 0; region < 8U; ++region) {
+    std::uint32_t region_cloud_samples{};
+    for (std::uint32_t x = region * 32U; x < (region + 1U) * 32U; ++x) {
+      std::uint32_t column_cloud_samples{};
+      const float azimuth = -pi
+          + (2.0F * pi * static_cast<float>(x)
+             / static_cast<float>(azimuth_samples));
+      for (std::uint32_t y = 0; y < vertical_samples; ++y) {
+        const float elevation = 0.035F
+            + (((0.5F * pi) - 0.07F) * static_cast<float>(y)
+               / static_cast<float>(vertical_samples - 1U));
+        const float view_z = std::sin(elevation);
+        SetPanoramaDirection(input, azimuth, view_z);
+        SkyFieldOutput output{};
+        ExpectSucceeded(context, EvaluateSkyFields(input, output));
+        if (output.cloud_density > 0.14F) {
+          ++column_cloud_samples;
+          ++region_cloud_samples;
+        }
+      }
+      maximum_column_support = std::max(
+          maximum_column_support,
+          static_cast<float>(column_cloud_samples)
+              / static_cast<float>(vertical_samples));
+    }
+    if (region_cloud_samples > 48U) {
+      ++supported_regions;
+    }
+  }
+  std::cout << "cloud structure max_column_support=" << maximum_column_support
+            << " supported_regions=" << supported_regions << '\n';
+  context.expect(maximum_column_support < 0.90F,
+                 "cloud support collapsed into a near-full-height column");
+  context.expect(supported_regions >= 4U,
+                 "cloud support did not reach multiple horizontal sky regions");
+}
+
 void CloudFieldHasBodyAndDetailVariation(TestContext& context) {
   constexpr float pi = 3.14159265358979323846F;
   SkyFieldInput input = ReferenceInput();
@@ -349,6 +534,75 @@ void NightAuroraFormsCurtains(TestContext& context) {
   context.expect(maximum_green > 0.05F, "active night aurora emitted no intrinsic radiance");
 }
 
+void AuroraFormsOneBroadFoldedArc(TestContext& context) {
+  constexpr float pi = 3.14159265358979323846F;
+  constexpr std::uint32_t azimuth_samples = 256U;
+  constexpr std::uint32_t vertical_samples = 48U;
+  SkyFieldInput input = ReferenceInput();
+  input.phase = 0.63F;
+  input.aurora_activity = 1.0F;
+  input.night_factor = 1.0F;
+  std::array<bool, azimuth_samples> supported{};
+  for (std::uint32_t x = 0; x < azimuth_samples; ++x) {
+    const float azimuth = -pi
+        + (2.0F * pi * static_cast<float>(x)
+           / static_cast<float>(azimuth_samples));
+    for (std::uint32_t y = 0; y < vertical_samples; ++y) {
+      const float view_z = 0.08F + (0.84F * static_cast<float>(y)
+                                    / static_cast<float>(vertical_samples - 1U));
+      SetPanoramaDirection(input, azimuth, view_z);
+      SkyFieldOutput output{};
+      ExpectSucceeded(context, EvaluateSkyFields(input, output));
+      supported[x] = supported[x] || output.aurora_mask > 0.10F;
+    }
+  }
+
+  std::uint32_t supported_columns{};
+  std::uint32_t longest_run{};
+  std::uint32_t current_run{};
+  for (std::uint32_t index = 0; index < azimuth_samples; ++index) {
+    if (supported[index]) {
+      ++supported_columns;
+      ++current_run;
+      longest_run = std::max(longest_run, current_run);
+    } else {
+      current_run = 0U;
+    }
+  }
+  context.expect(longest_run >= 112U,
+                 "aurora broke into disconnected narrow columns instead of a broad arc");
+  context.expect(supported_columns < 232U,
+                 "aurora support filled nearly the entire panorama");
+}
+
+void AuroraUsesGreenCoreAndRestrainedUpperFringe(TestContext& context) {
+  SkyFieldInput input = ReferenceInput();
+  input.phase = 0.63F;
+  input.aurora_activity = 1.0F;
+  input.night_factor = 1.0F;
+  SetPanoramaDirection(input, 0.0F, 0.43F);
+  SkyFieldOutput core{};
+  ExpectSucceeded(context, EvaluateSkyFields(input, core));
+  SetPanoramaDirection(input, 0.0F, 0.72F);
+  SkyFieldOutput fringe{};
+  ExpectSucceeded(context, EvaluateSkyFields(input, fringe));
+
+  context.expect(core.aurora_mask > 0.08F, "aurora green core had no curtain support");
+  context.expect(fringe.aurora_mask > 0.025F, "aurora upper fringe had no curtain support");
+  context.expect(core.aurora_intrinsic_radiance.g
+                     > core.aurora_intrinsic_radiance.b + 0.02F,
+                 "aurora core was not predominantly green");
+  const float core_blue_ratio = core.aurora_intrinsic_radiance.b
+      / std::max(core.aurora_intrinsic_radiance.g, 1.0e-5F);
+  const float fringe_blue_ratio = fringe.aurora_intrinsic_radiance.b
+      / std::max(fringe.aurora_intrinsic_radiance.g, 1.0e-5F);
+  context.expect(fringe_blue_ratio > core_blue_ratio + 0.12F,
+                 "aurora upper fringe did not transition toward blue-violet");
+  context.expect(fringe.aurora_intrinsic_radiance.b
+                     < fringe.aurora_intrinsic_radiance.g * 1.15F,
+                 "aurora blue fringe overpowered its green curtain support");
+}
+
 void AuroraActivityScalesOnlyRadiance(TestContext& context) {
   SkyFieldInput inactive = ReferenceInput();
   inactive.night_factor = 1.0F;
@@ -377,13 +631,21 @@ struct TestCase { std::string_view name; TestFunction function; };
 constexpr TestCase kTests[] = {
     {"stable codes are explicit", &StableCodesAreExplicit},
     {"evaluation is bit deterministic", &EvaluationIsBitDeterministic},
+    {"three-dimensional noise is stable", &ThreeDimensionalNoiseIsStable},
     {"invalid inputs never mutate output", &InvalidInputsNeverMutateOutput},
     {"dense grid stays finite and bounded", &DenseGridStaysFiniteAndBounded},
     {"phase wrap has an exact seam", &PhaseWrapHasAnExactSeam},
+    {"direction space is continuous across the panorama",
+     &DirectionSpaceIsContinuousAcrossThePanorama},
+    {"coverage and weather change sky scale", &CoverageAndWeatherChangeSkyScale},
     {"cloud field has body and detail variation", &CloudFieldHasBodyAndDetailVariation},
     {"cloud controls are monotonic", &CloudControlsAreMonotonic},
     {"day aurora is bit-exact zero", &DayAuroraIsBitExactZero},
     {"night aurora forms curtains", &NightAuroraFormsCurtains},
+    {"aurora uses green core and restrained upper fringe",
+     &AuroraUsesGreenCoreAndRestrainedUpperFringe},
+    {"aurora forms one broad folded arc", &AuroraFormsOneBroadFoldedArc},
+    {"cloud masses are not vertical pillars", &CloudMassesAreNotVerticalPillars},
     {"aurora activity scales only radiance", &AuroraActivityScalesOnlyRadiance},
 };
 

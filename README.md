@@ -22,8 +22,9 @@ depend on recovered or peer shader source.
   fog, and aurora reference with single-pass cloud/fog coupling.
 - `TruthAtmosphereCore.fxh`: the original shader mirror, compiled in live
   atmosphere-enabled and atmosphere-disabled permutations.
-- `SkyFieldInput` / `SkyFieldOutput`: a deterministic, texture-free procedural
-  cloud body/detail erosion field and night-only aurora curtain reference.
+- `SkyFieldInput` / `SkyFieldOutput`: a deterministic, seamless 3D
+  direction-space cloud field with domain-warped body/detail erosion and a
+  night-only folded aurora-curtain reference.
 - `TruthSkyFields.fxh`: the shader mirror; its generated cloud density, detail,
   and intrinsic aurora radiance feed cloud lighting before exposure, with a
   macro-off direct-control fallback.
@@ -65,8 +66,9 @@ captures with one command:
 This runs the original atmosphere, procedural sky fields, cloud lighting, and
 tone curve as `vs_5_0` / `ps_5_0`, reads an offscreen RGBA8 target back from
 WARP, and writes `day`, `dusk`, `clear-night-aurora`, and `storm` as binary PPM
-files. Captures, shader objects, and executables remain under ignored build
-paths.
+files. The WARP suite also checks panorama topology and samples the CPU/HLSL
+sky-field mirrors for bounded parity. Captures, shader objects, and executables
+remain under ignored build paths.
 
 The enabled effect adds unified atmosphere composite radiance to scene-linear
 color before exposure. The sky and precomputed procedural aurora are attenuated

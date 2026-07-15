@@ -9,6 +9,7 @@
 #include "truth/render/ReferenceRenderer.hpp"
 
 #include <array>
+#include <chrono>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
@@ -16,6 +17,7 @@
 #include <fstream>
 #include <iomanip>
 #include <limits>
+#include <mutex>
 #include <sstream>
 #include <string>
 #include <system_error>
@@ -42,24 +44,31 @@ struct alignas(16) SceneParameters {
   float exposure_ev;
   float sun_azimuth;
   float padding[2];
+  float camera_x;
+  float camera_y;
+  float camera_z;
+  float cloud_type;
 };
 
-static_assert(sizeof(SceneParameters) == 48U);
+static_assert(sizeof(SceneParameters) == 64U);
 
 [[nodiscard]] SceneParameters ParametersFor(const ReferenceScene scene) noexcept {
   switch (scene) {
     case ReferenceScene::day:
       return {0.55F, 0.08F, 0.36F, 0.62F, 0.015F, 0.0F, 0.0F,
-              0.18F, 1.00F, 0.28F, {0.0F, 0.0F}};
+              0.18F, 1.00F, 0.28F, {0.0F, 0.0F}, 0.0F, 0.0F, 0.20F, 0.42F};
     case ReferenceScene::dusk:
       return {0.015F, 0.18F, 0.42F, 0.58F, 0.035F, 0.18F, 0.34F,
-              0.37F, 1.30F, -0.52F, {0.0F, 0.0F}};
+              0.37F, 1.30F, -0.52F, {0.0F, 0.0F}, 0.0F, 0.0F, 0.20F, 0.58F};
     case ReferenceScene::clear_night_aurora:
-      return {-0.34F, 0.04F, 0.17F, 0.44F, 0.008F, 1.0F, 1.0F,
-              0.63F, 1.55F, 0.12F, {0.0F, 0.0F}};
+      return {-0.34F, 0.04F, 0.08F, 0.24F, 0.008F, 1.0F, 1.0F,
+              0.63F, 1.55F, 0.12F, {0.0F, 0.0F}, 0.0F, 0.0F, 0.20F, 0.64F};
     case ReferenceScene::storm:
-      return {0.18F, 0.88F, 0.68F, 0.98F, 0.16F, 0.0F, 0.04F,
-              0.42F, 0.80F, 0.74F, {0.0F, 0.0F}};
+      return {0.18F, 0.88F, 0.52F, 0.96F, 0.065F, 0.0F, 0.04F,
+              0.42F, 0.88F, 0.74F, {0.0F, 0.0F}, 0.0F, 0.0F, 0.20F, 0.88F};
+    case ReferenceScene::translated_day_probe:
+      return {0.55F, 0.08F, 0.36F, 0.62F, 0.015F, 0.0F, 0.0F,
+              0.18F, 1.00F, 0.28F, {0.0F, 0.0F}, 0.65F, -0.35F, 0.20F, 0.42F};
   }
   return {};
 }
@@ -77,13 +86,35 @@ static_assert(sizeof(SceneParameters) == 48U);
     const char* target,
     ComPtr<ID3DBlob>& bytecode,
     std::string& diagnostic) {
+  struct CacheEntry {
+    std::filesystem::path path;
+    std::string entry_point;
+    std::string target;
+    ComPtr<ID3DBlob> bytecode;
+  };
+  static std::mutex cache_mutex;
+  static std::vector<CacheEntry> cache;
+
+  const auto normalized_path = std::filesystem::absolute(shader_path).lexically_normal();
+  {
+    const std::scoped_lock lock{cache_mutex};
+    for (const auto& entry : cache) {
+      if (entry.path == normalized_path
+          && entry.entry_point == entry_point
+          && entry.target == target) {
+        bytecode = entry.bytecode;
+        return true;
+      }
+    }
+  }
+
   ComPtr<ID3DBlob> errors;
   constexpr UINT flags = D3DCOMPILE_ENABLE_STRICTNESS
       | D3DCOMPILE_WARNINGS_ARE_ERRORS
       | D3DCOMPILE_IEEE_STRICTNESS
-      | D3DCOMPILE_OPTIMIZATION_LEVEL3;
+      | D3DCOMPILE_OPTIMIZATION_LEVEL1;
   const HRESULT result = D3DCompileFromFile(
-      shader_path.c_str(),
+      normalized_path.c_str(),
       nullptr,
       D3D_COMPILE_STANDARD_FILE_INCLUDE,
       entry_point,
@@ -93,6 +124,8 @@ static_assert(sizeof(SceneParameters) == 48U);
       &bytecode,
       &errors);
   if (SUCCEEDED(result)) {
+    const std::scoped_lock lock{cache_mutex};
+    cache.push_back({normalized_path, entry_point, target, bytecode});
     return true;
   }
 
@@ -223,6 +256,8 @@ std::string_view ReferenceSceneName(const ReferenceScene scene) noexcept {
       return "clear-night-aurora";
     case ReferenceScene::storm:
       return "storm";
+    case ReferenceScene::translated_day_probe:
+      return "translated-day-probe";
   }
   return {};
 }
@@ -234,6 +269,7 @@ std::string_view ReferenceSceneName(const ReferenceScene scene) noexcept {
     const std::uint32_t height,
     const char* const pixel_entry) noexcept {
   try {
+    const auto start_time = std::chrono::steady_clock::now();
     if (ReferenceSceneName(scene).empty()) {
       return Fail(ReferenceRenderStatus::invalid_request, "unknown reference scene");
     }
@@ -254,6 +290,8 @@ std::string_view ReferenceSceneName(const ReferenceScene scene) noexcept {
                        pixel_bytecode, diagnostic)) {
       return Fail(ReferenceRenderStatus::shader_compile_failed, std::move(diagnostic));
     }
+    const auto shader_compile_end_time = std::chrono::steady_clock::now();
+    const auto render_start_time = shader_compile_end_time;
 
     ComPtr<ID3D11Device> device;
     ComPtr<ID3D11DeviceContext> context;
@@ -393,6 +431,13 @@ std::string_view ReferenceSceneName(const ReferenceScene scene) noexcept {
     result.status = ReferenceRenderStatus::rendered;
     result.image = std::move(image);
     result.sha256_hex = hash;
+    const auto end_time = std::chrono::steady_clock::now();
+    result.shader_compile_milliseconds = std::chrono::duration<double, std::milli>(
+        shader_compile_end_time - start_time).count();
+    result.render_milliseconds = std::chrono::duration<double, std::milli>(
+        end_time - render_start_time).count();
+    result.elapsed_milliseconds = std::chrono::duration<double, std::milli>(
+        end_time - start_time).count();
     return result;
   } catch (const std::exception& exception) {
     return Fail(ReferenceRenderStatus::gpu_failed,
@@ -428,6 +473,24 @@ ReferenceRenderResult RenderWarpSkyFieldRadiance(
     const std::uint32_t height) noexcept {
   return RenderWarpPass(
       scene, shader_path, width, height, "TruthSkyFieldRadianceProbePixelMain");
+}
+
+ReferenceRenderResult RenderWarpCloudVolumeScalars(
+    const ReferenceScene scene,
+    const std::filesystem::path& shader_path,
+    const std::uint32_t width,
+    const std::uint32_t height) noexcept {
+  return RenderWarpPass(
+      scene, shader_path, width, height, "TruthCloudVolumeScalarProbePixelMain");
+}
+
+ReferenceRenderResult RenderWarpCloudVolumeRadiance(
+    const ReferenceScene scene,
+    const std::filesystem::path& shader_path,
+    const std::uint32_t width,
+    const std::uint32_t height) noexcept {
+  return RenderWarpPass(
+      scene, shader_path, width, height, "TruthCloudVolumeRadianceProbePixelMain");
 }
 
 bool WriteBinaryPpm(

@@ -32,7 +32,16 @@ depend on recovered or peer shader source.
   direct and ambient scattering, self-shadow, powder response, weather tint,
   and one explicit sky/cloud/aurora composition path.
 - `TruthCloudLighting.fxh`: the original shader mirror that lights procedural
-  cloud fields and carries their generated aurora color into the final image.
+  cloud fields and carries their generated aurora color into the fallback
+  image path.
+- `CloudVolumeInput` / `CloudVolumeOutput`: an analytic height-slab raymarch
+  with world-space 3D fBm, low-frequency weather/type fields, cellular
+  erosion, stratus/cumulus/anvil profiles, Beer-Lambert extinction, bounded
+  Henyey-Greenstein phase, sun self-shadowing, powder/silver response, and
+  weather/night scattering tints.
+- `TruthCloudVolume.fxh`: the CPU-mirrored `ps_5_0` implementation with
+  deterministic interleaved jitter, early transmittance termination,
+  distance-aware night detail LOD, and fixed performance budgets.
 
 ## Toolchain
 
@@ -63,12 +72,20 @@ captures with one command:
 .\build\Debug\truth_reference_renderer.exe .\shaders\truth\TruthReferenceSky.hlsl .\build\references\Debug
 ```
 
-This runs the original atmosphere, procedural sky fields, cloud lighting, and
+This runs the original atmosphere, true cloud volume, procedural aurora, and
 tone curve as `vs_5_0` / `ps_5_0`, reads an offscreen RGBA8 target back from
 WARP, and writes `day`, `dusk`, `clear-night-aurora`, and `storm` as binary PPM
-files. The WARP suite also checks panorama topology and samples the CPU/HLSL
-sky-field mirrors for bounded parity. Captures, shader objects, and executables
-remain under ignored build paths.
+files. It reports the cold shader-compile time separately from the cached
+per-frame render/readback time. The WARP suite also checks panorama topology,
+camera-translation parallax, darker-core/lit-edge structure, deterministic
+readback, and bounded CPU/HLSL parity for both sky fields and the raymarched
+volume. Captures, shader objects, and executables remain under ignored build
+paths.
+
+`TRUTH_CLOUD_VOLUME_QUALITY` selects fixed `primary/light` sample budgets of
+`16/4`, `20/5`, or `24/6`. All three tiers are compiled in CI-style CTests.
+`TRUTH_ENABLE_CLOUD_VOLUME=0` retains the bounded procedural cloud-lighting
+fallback and is compiled as a separate, bytecode-distinct permutation.
 
 The enabled effect adds unified atmosphere composite radiance to scene-linear
 color before exposure. The sky and precomputed procedural aurora are attenuated

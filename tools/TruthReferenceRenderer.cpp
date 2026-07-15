@@ -57,7 +57,10 @@ int main(int argc, char** argv) {
       return 1;
     }
     std::cout << name << " sha256=" << result.sha256_hex << " path="
-              << output_path.string() << '\n';
+              << output_path.string() << " compile_ms="
+              << result.shader_compile_milliseconds << " render_ms="
+              << result.render_milliseconds << " elapsed_ms="
+              << result.elapsed_milliseconds << '\n';
   }
   return 0;
 }

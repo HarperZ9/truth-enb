@@ -2,6 +2,7 @@
 #include "TruthAtmosphereCore.fxh"
 #include "TruthSkyFields.fxh"
 #include "TruthCloudLighting.fxh"
+#include "TruthCloudVolume.fxh"
 
 cbuffer TruthReferenceSceneParameters : register(b0)
 {
@@ -16,6 +17,8 @@ cbuffer TruthReferenceSceneParameters : register(b0)
     float TruthReferenceExposureEv;
     float TruthReferenceSunAzimuth;
     float2 TruthReferencePadding;
+    float3 TruthReferenceCameraPosition;
+    float TruthReferenceCloudType;
 };
 
 struct TruthReferenceVertexOutput
@@ -60,6 +63,43 @@ TruthSkyFieldOutput TruthReferenceEvaluateSkyField(float2 texcoord)
     return TruthEvaluateSkyFields(field_input);
 }
 
+TruthCloudVolumeOutput TruthReferenceEvaluateCloudVolume(
+    TruthReferenceVertexOutput input)
+{
+    float vertical = saturate(1.0 - input.texcoord.y);
+    float elevation = lerp(0.035, (0.5 * TruthSkyPi) - 0.035, vertical);
+    float view_z = sin(elevation);
+    float view_radius = cos(elevation);
+    float azimuth = ((input.texcoord.x * 2.0) - 1.0) * TruthSkyPi;
+    float3 view_direction = normalize(float3(
+        sin(azimuth) * view_radius,
+        cos(azimuth) * view_radius,
+        view_z));
+    float sun_radius = cos(TruthReferenceSunElevation);
+    float3 sun_direction = normalize(float3(
+        sin(TruthReferenceSunAzimuth) * sun_radius,
+        cos(TruthReferenceSunAzimuth) * sun_radius,
+        sin(TruthReferenceSunElevation)));
+
+    TruthCloudVolumeInput volume_input;
+    volume_input.camera_position = TruthReferenceCameraPosition;
+    volume_input.view_direction = view_direction;
+    volume_input.sun_direction = sun_direction;
+    volume_input.cloud_base_height = 1.20;
+    volume_input.cloud_top_height = 3.80;
+    volume_input.max_distance = 60.0;
+    volume_input.phase = TruthReferencePhase;
+    volume_input.wind = float2(0.62, -0.27);
+    volume_input.cloud_coverage = TruthReferenceCloudCoverage;
+    volume_input.cloud_density = TruthReferenceCloudDensity;
+    volume_input.weather_density = TruthReferenceWeatherDensity;
+    volume_input.cloud_type = TruthReferenceCloudType;
+    volume_input.night_factor = TruthReferenceNightFactor;
+    volume_input.pixel_coordinate = uint2(input.position.xy);
+    volume_input.jitter_frame = 0u;
+    return TruthEvaluateCloudVolume(volume_input);
+}
+
 float4 TruthSkyFieldScalarProbePixelMain(
     TruthReferenceVertexOutput input) : SV_Target0
 {
@@ -76,6 +116,24 @@ float4 TruthSkyFieldRadianceProbePixelMain(
 {
     TruthSkyFieldOutput field_output = TruthReferenceEvaluateSkyField(input.texcoord);
     return float4(field_output.aurora_intrinsic_radiance, 1.0);
+}
+
+float4 TruthCloudVolumeScalarProbePixelMain(
+    TruthReferenceVertexOutput input) : SV_Target0
+{
+    TruthCloudVolumeOutput volume = TruthReferenceEvaluateCloudVolume(input);
+    return float4(
+        volume.transmittance,
+        saturate(volume.optical_depth / 8.0),
+        float(volume.primary_steps) / 24.0,
+        float(volume.light_samples) / 144.0);
+}
+
+float4 TruthCloudVolumeRadianceProbePixelMain(
+    TruthReferenceVertexOutput input) : SV_Target0
+{
+    TruthCloudVolumeOutput volume = TruthReferenceEvaluateCloudVolume(input);
+    return float4(saturate(volume.radiance), 1.0);
 }
 
 float4 TruthReferencePixelMain(TruthReferenceVertexOutput input) : SV_Target0
@@ -120,6 +178,15 @@ float4 TruthReferencePixelMain(TruthReferenceVertexOutput input) : SV_Target0
     TruthUnifiedAtmosphereOutput atmosphere_output =
         TruthEvaluateAtmosphere(atmosphere_input);
 
+    float3 composite_radiance;
+#if TRUTH_ENABLE_CLOUD_VOLUME
+    TruthCloudVolumeOutput volume_output = TruthReferenceEvaluateCloudVolume(input);
+    float combined_transmittance = volume_output.transmittance
+        * atmosphere_output.fog_transmittance;
+    composite_radiance = (atmosphere_output.sky_radiance * combined_transmittance)
+        + (volume_output.radiance * atmosphere_output.fog_transmittance)
+        + (field_output.aurora_intrinsic_radiance * combined_transmittance);
+#else
     TruthCloudLightingInput lighting_input;
     lighting_input.sky_radiance = atmosphere_output.sky_radiance;
     lighting_input.aurora_intrinsic_radiance = field_output.aurora_intrinsic_radiance;
@@ -132,9 +199,11 @@ float4 TruthReferencePixelMain(TruthReferenceVertexOutput input) : SV_Target0
     lighting_input.night_factor = TruthReferenceNightFactor;
     lighting_input.fog_transmittance = atmosphere_output.fog_transmittance;
     TruthCloudLightingOutput lighting_output = TruthEvaluateCloudLighting(lighting_input);
+    composite_radiance = lighting_output.composite_radiance;
+#endif
 
     float3 exposed = TruthApplyExposure(
-        lighting_output.composite_radiance,
+        composite_radiance,
         TruthReferenceExposureEv);
     return float4(saturate(TruthFilmicToneCurve3(exposed)), 1.0);
 }

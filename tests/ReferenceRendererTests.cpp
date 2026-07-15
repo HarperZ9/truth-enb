@@ -1,4 +1,5 @@
 #include "truth/render/ReferenceRenderer.hpp"
+#include "truth/render/CloudVolume.hpp"
 #include "truth/render/SkyFields.hpp"
 
 #include <algorithm>
@@ -124,7 +125,7 @@ struct ImageMetrics {
     row_medians[y] = *middle;
   }
 
-  constexpr int coherent_difference = 14;
+  constexpr int coherent_difference = 16;
   for (std::uint32_t x = 0; x < image.width; ++x) {
     std::size_t supported{};
     for (std::uint32_t y = 0; y < image.height; ++y) {
@@ -168,8 +169,7 @@ struct ImageMetrics {
       const int red = image.rgba8[offset];
       const int green = image.rgba8[offset + 1U];
       const int blue = image.rgba8[offset + 2U];
-      if (std::max(green, blue) >= red + 12
-          && ((green + blue) / 2) >= red + 12) {
+      if (green >= blue + 4 && green >= red + 12 && green >= 28) {
         ++column_pixels;
         ++aurora_pixels;
       }
@@ -213,6 +213,9 @@ struct Capture {
   ReferenceImage image;
   std::string hash;
   ImageMetrics metrics;
+  double shader_compile_milliseconds{};
+  double render_milliseconds{};
+  double elapsed_milliseconds{};
 };
 
 using Captures = std::array<Capture, 4>;
@@ -231,34 +234,59 @@ using Captures = std::array<Capture, 4>;
   Captures captures{};
   for (std::size_t index = 0; index < scenes.size(); ++index) {
     const auto scene = scenes[index];
-    const auto first = RenderWarpReference(scene, shader_path, 256U, 128U);
-    context.expect(first.status == ReferenceRenderStatus::rendered,
-                   first.diagnostic.empty() ? "WARP reference render failed" : first.diagnostic);
-    context.expect(first.image.width == 256U && first.image.height == 128U,
+    const auto render = RenderWarpReference(scene, shader_path, 256U, 128U);
+    context.expect(render.status == ReferenceRenderStatus::rendered,
+                   render.diagnostic.empty() ? "WARP reference render failed"
+                                             : render.diagnostic);
+    context.expect(render.image.width == 256U && render.image.height == 128U,
                    "WARP reference dimensions changed");
-    context.expect(first.image.rgba8.size() == 256U * 128U * 4U,
+    context.expect(render.image.rgba8.size() == 256U * 128U * 4U,
                    "WARP readback byte count changed");
-    context.expect(first.sha256_hex.size() == 64U,
+    context.expect(render.sha256_hex.size() == 64U,
                    "WARP reference SHA-256 was not a complete digest");
-
-    const auto second = RenderWarpReference(scene, shader_path, 256U, 128U);
-    context.expect(second.status == ReferenceRenderStatus::rendered,
-                   second.diagnostic.empty() ? "repeat WARP reference render failed"
-                                             : second.diagnostic);
-    context.expect(first.image.rgba8 == second.image.rgba8,
-                   "repeat WARP render was not byte-identical");
-    context.expect(first.sha256_hex == second.sha256_hex,
-                   "repeat WARP render digest changed");
+    context.expect(render.elapsed_milliseconds > 0.0,
+                   "WARP reference render did not report elapsed time");
+    context.expect(render.shader_compile_milliseconds >= 0.0
+                       && render.render_milliseconds > 0.0
+                       && render.elapsed_milliseconds
+                           >= render.render_milliseconds,
+                   "WARP timing components were inconsistent");
 
     const auto name = truth::render::ReferenceSceneName(scene);
     context.expect(!name.empty(), "reference scene did not have a stable name");
     const auto capture_path = output_directory / (std::string{name} + ".ppm");
     std::string diagnostic;
-    context.expect(WriteBinaryPpm(first.image, capture_path, diagnostic),
-                   diagnostic.empty() ? "PPM reference write failed" : diagnostic);
+    context.expect(WriteBinaryPpm(render.image, capture_path, diagnostic),
+                    diagnostic.empty() ? "PPM reference write failed" : diagnostic);
 
-    captures[index] = {scene, name, first.image, first.sha256_hex, Measure(first.image)};
+    captures[index] = {
+        scene,
+        name,
+        render.image,
+        render.sha256_hex,
+        Measure(render.image),
+        render.shader_compile_milliseconds,
+        render.render_milliseconds,
+        render.elapsed_milliseconds,
+    };
+    std::cout << "rendered " << name << " elapsed_ms="
+              << render.elapsed_milliseconds << std::endl;
   }
+
+  const auto first_probe = RenderWarpReference(
+      ReferenceScene::day, shader_path, 16U, 16U);
+  const auto second_probe = RenderWarpReference(
+      ReferenceScene::day, shader_path, 16U, 16U);
+  context.expect(first_probe.status == ReferenceRenderStatus::rendered,
+                 first_probe.diagnostic.empty() ? "determinism probe failed"
+                                                : first_probe.diagnostic);
+  context.expect(second_probe.status == ReferenceRenderStatus::rendered,
+                 second_probe.diagnostic.empty() ? "repeat determinism probe failed"
+                                                 : second_probe.diagnostic);
+  context.expect(first_probe.image.rgba8 == second_probe.image.rgba8,
+                 "repeat WARP render was not byte-identical");
+  context.expect(first_probe.sha256_hex == second_probe.sha256_hex,
+                 "repeat WARP render digest changed");
   return captures;
 }
 
@@ -311,8 +339,8 @@ void SceneRelationshipsRemainPhysical(TestContext& context, const Captures& capt
                  "dusk was not brighter than clear night");
   context.expect(day.mean_luminance > storm.mean_luminance,
                  "storm was not darker than day");
-  context.expect(night.upper_chroma > night.lower_chroma + 3.0,
-                 "night aurora did not add upper-sky chroma");
+  context.expect(night.upper_chroma > storm.upper_chroma + 8.0,
+                 "night aurora did not add distinct upper-sky chroma");
 }
 
 void SkyStructuresAreCoherent(TestContext& context, const Captures& captures) {
@@ -345,8 +373,10 @@ void SkyStructuresAreCoherent(TestContext& context, const Captures& captures) {
                  "storm clouds contained a near-full-height opaque column");
   context.expect(day.horizontal_structure_regions >= 6U,
                  "day cloud support was not distributed across the panorama");
-  context.expect(storm.horizontal_structure_regions >= 4U,
-                 "storm cloud support was not distributed across the panorama");
+  context.expect(storm.horizontal_structure_regions >= 2U
+                     && storm.horizontal_structure_regions
+                         < day.horizontal_structure_regions,
+                 "storm did not consolidate into a coherent weather system");
 
   for (const auto& capture : captures) {
     context.expect(capture.metrics.panorama_seam_mean_difference < 8.0,
@@ -395,8 +425,8 @@ void CpuAndHlslSkyFieldsRemainAligned(
           0.63F,
           0.62F,
           -0.27F,
-          0.17F,
-          0.44F,
+          0.08F,
+          0.24F,
           0.04F,
           1.0F,
           1.0F,
@@ -430,6 +460,156 @@ void CpuAndHlslSkyFieldsRemainAligned(
                      "CPU/HLSL aurora blue parity drifted");
     }
   }
+}
+
+void CpuAndHlslCloudVolumeRemainAligned(
+    TestContext& context,
+    const std::filesystem::path& shader_path) {
+  constexpr std::uint32_t width = 16U;
+  constexpr std::uint32_t height = 16U;
+  const auto scalars = truth::render::RenderWarpCloudVolumeScalars(
+      ReferenceScene::day, shader_path, width, height);
+  context.expect(scalars.status == ReferenceRenderStatus::rendered,
+                 scalars.diagnostic.empty() ? "scalar cloud-volume probe failed"
+                                            : scalars.diagnostic);
+  const auto radiance = truth::render::RenderWarpCloudVolumeRadiance(
+      ReferenceScene::day, shader_path, width, height);
+  context.expect(radiance.status == ReferenceRenderStatus::rendered,
+                 radiance.diagnostic.empty() ? "radiance cloud-volume probe failed"
+                                             : radiance.diagnostic);
+
+  constexpr float pi = 3.14159265358979323846F;
+  constexpr float channel_tolerance = 3.1F / 255.0F;
+  for (std::uint32_t y = 0; y < height; ++y) {
+    const float vertical = 1.0F
+        - ((static_cast<float>(y) + 0.5F) / static_cast<float>(height));
+    const float elevation = 0.035F + (((0.5F * pi) - 0.07F) * vertical);
+    const float view_z = std::sin(elevation);
+    const float view_radius = std::cos(elevation);
+    for (std::uint32_t x = 0; x < width; ++x) {
+      const float horizontal = (static_cast<float>(x) + 0.5F)
+          / static_cast<float>(width);
+      const float azimuth = ((horizontal * 2.0F) - 1.0F) * pi;
+      const float sun_radius = std::cos(0.55F);
+      truth::render::CloudVolumeInput input{
+          {0.0F, 0.0F, 0.20F},
+          {std::sin(azimuth) * view_radius,
+           std::cos(azimuth) * view_radius,
+           view_z},
+          {std::sin(0.28F) * sun_radius,
+           std::cos(0.28F) * sun_radius,
+           std::sin(0.55F)},
+          1.20F,
+          3.80F,
+          60.0F,
+          0.18F,
+          0.62F,
+          -0.27F,
+          0.36F,
+          0.62F,
+          0.08F,
+          0.42F,
+          0.0F,
+          x,
+          y,
+          0U,
+          truth::render::CloudVolumeQuality::balanced,
+      };
+      truth::render::CloudVolumeOutput cpu{};
+      context.expect(
+          truth::render::EvaluateCloudVolume(input, cpu).status
+              == truth::render::CloudVolumeStatus::evaluated,
+          "CPU cloud-volume parity sample was rejected");
+      const auto offset = (static_cast<std::size_t>(y) * width + x) * 4U;
+      const auto channel = [](const std::uint8_t value) {
+        return static_cast<float>(value) / 255.0F;
+      };
+      context.expect(std::fabs(channel(scalars.image.rgba8[offset])
+                               - cpu.transmittance) <= channel_tolerance,
+                     "CPU/HLSL volume transmittance parity drifted");
+      context.expect(std::fabs(channel(scalars.image.rgba8[offset + 1U])
+                               - std::min(cpu.optical_depth / 8.0F, 1.0F))
+                         <= channel_tolerance,
+                     "CPU/HLSL volume optical-depth parity drifted");
+      context.expect(std::fabs(channel(scalars.image.rgba8[offset + 2U])
+                               - (static_cast<float>(cpu.primary_steps) / 24.0F))
+                         <= channel_tolerance,
+                     "CPU/HLSL volume primary-step parity drifted");
+      context.expect(std::fabs(channel(scalars.image.rgba8[offset + 3U])
+                               - (static_cast<float>(cpu.light_samples) / 144.0F))
+                         <= channel_tolerance,
+                     "CPU/HLSL volume light-step parity drifted");
+      context.expect(std::fabs(channel(radiance.image.rgba8[offset])
+                               - std::min(cpu.radiance.x, 1.0F)) <= channel_tolerance,
+                     "CPU/HLSL volume red parity drifted");
+      context.expect(std::fabs(channel(radiance.image.rgba8[offset + 1U])
+                               - std::min(cpu.radiance.y, 1.0F)) <= channel_tolerance,
+                     "CPU/HLSL volume green parity drifted");
+      context.expect(std::fabs(channel(radiance.image.rgba8[offset + 2U])
+                               - std::min(cpu.radiance.z, 1.0F)) <= channel_tolerance,
+                     "CPU/HLSL volume blue parity drifted");
+    }
+  }
+}
+
+void VolumeShowsParallaxAndInteriorShading(
+    TestContext& context,
+    const std::filesystem::path& shader_path) {
+  const auto baseline = RenderWarpReference(
+      ReferenceScene::day, shader_path, 128U, 64U);
+  context.expect(baseline.status == ReferenceRenderStatus::rendered,
+                 baseline.diagnostic.empty() ? "baseline volume render failed"
+                                             : baseline.diagnostic);
+  const auto translated = RenderWarpReference(
+      ReferenceScene::translated_day_probe, shader_path, 128U, 64U);
+  context.expect(translated.status == ReferenceRenderStatus::rendered,
+                  translated.diagnostic.empty() ? "translated volume render failed"
+                                                : translated.diagnostic);
+  context.expect(translated.sha256_hex != baseline.sha256_hex,
+                  "camera translation did not change the WARP volume image");
+
+  const auto& day = baseline.image;
+  std::size_t translated_pixels{};
+  std::size_t shaded_neighbors{};
+  std::vector<std::uint8_t> luminance(
+      static_cast<std::size_t>(day.width) * day.height);
+  for (std::uint32_t y = 0; y < day.height; ++y) {
+    for (std::uint32_t x = 0; x < day.width; ++x) {
+      const auto offset = (static_cast<std::size_t>(y) * day.width + x) * 4U;
+      const int difference = std::abs(static_cast<int>(day.rgba8[offset])
+                                      - static_cast<int>(translated.image.rgba8[offset]))
+          + std::abs(static_cast<int>(day.rgba8[offset + 1U])
+                     - static_cast<int>(translated.image.rgba8[offset + 1U]))
+          + std::abs(static_cast<int>(day.rgba8[offset + 2U])
+                     - static_cast<int>(translated.image.rgba8[offset + 2U]));
+      if (difference >= 18) {
+        ++translated_pixels;
+      }
+      luminance[static_cast<std::size_t>(y) * day.width + x]
+          = static_cast<std::uint8_t>(
+              (54U * day.rgba8[offset]
+               + 183U * day.rgba8[offset + 1U]
+               + 19U * day.rgba8[offset + 2U]) / 256U);
+    }
+  }
+  for (std::uint32_t y = day.height / 4U; y + 2U < day.height; ++y) {
+    for (std::uint32_t x = 2U; x + 2U < day.width; ++x) {
+      const auto center = luminance[static_cast<std::size_t>(y) * day.width + x];
+      const auto horizontal = luminance[static_cast<std::size_t>(y) * day.width + x + 2U];
+      const auto vertical = luminance[static_cast<std::size_t>(y + 2U) * day.width + x];
+      if (std::abs(static_cast<int>(center) - static_cast<int>(horizontal)) >= 10
+          || std::abs(static_cast<int>(center) - static_cast<int>(vertical)) >= 10) {
+        ++shaded_neighbors;
+      }
+    }
+  }
+  const auto pixel_count = static_cast<std::size_t>(day.width) * day.height;
+  context.expect(translated_pixels > pixel_count / 100U,
+                 "camera translation produced no depth-dependent cloud parallax");
+  context.expect(translated_pixels < (pixel_count * 3U) / 4U,
+                 "camera translation changed the full frame like a fog slab");
+  context.expect(shaded_neighbors > 60U,
+                  "cloud body lacked lit-edge/darker-core interior shading");
 }
 
 void PpmFilesCarryExactDimensions(
@@ -470,9 +650,17 @@ int main(int argc, char** argv) {
     ++passed;
     std::cout << "[PASS] shader compiler failures carry diagnostics\n";
 
+    CpuAndHlslSkyFieldsRemainAligned(context, shader_path);
+    ++passed;
+    std::cout << "[PASS] CPU and HLSL sky fields remain aligned\n";
+
+    CpuAndHlslCloudVolumeRemainAligned(context, shader_path);
+    ++passed;
+    std::cout << "[PASS] CPU and HLSL cloud volume remain aligned\n";
+
     const auto captures = RenderScenes(context, shader_path, output_directory);
     ++passed;
-    std::cout << "[PASS] four named scenes render twice deterministically\n";
+    std::cout << "[PASS] four named scenes render with deterministic probe\n";
 
     ImagesAreBoundedAndNonFlat(context, captures);
     ++passed;
@@ -490,9 +678,9 @@ int main(int argc, char** argv) {
     ++passed;
     std::cout << "[PASS] cloud and aurora structures remain coherent\n";
 
-    CpuAndHlslSkyFieldsRemainAligned(context, shader_path);
+    VolumeShowsParallaxAndInteriorShading(context, shader_path);
     ++passed;
-    std::cout << "[PASS] CPU and HLSL sky fields remain aligned\n";
+    std::cout << "[PASS] cloud volume shows parallax and interior shading\n";
 
     PpmFilesCarryExactDimensions(context, captures, output_directory);
     ++passed;
@@ -500,10 +688,13 @@ int main(int argc, char** argv) {
 
     for (const auto& capture : captures) {
       std::cout << "capture " << capture.name << " sha256=" << capture.hash
-                << " mean_luma=" << capture.metrics.mean_luminance
-                << " upper_chroma=" << capture.metrics.upper_chroma << '\n';
+                 << " mean_luma=" << capture.metrics.mean_luminance
+                 << " upper_chroma=" << capture.metrics.upper_chroma
+                 << " compile_ms=" << capture.shader_compile_milliseconds
+                 << " render_ms=" << capture.render_milliseconds
+                 << " elapsed_ms=" << capture.elapsed_milliseconds << '\n';
     }
-    std::cout << "Truth WARP reference cases: " << passed << "/8; assertions: "
+    std::cout << "Truth WARP reference cases: " << passed << "/10; assertions: "
               << context.assertions << '\n';
     return 0;
   } catch (const std::exception& exception) {

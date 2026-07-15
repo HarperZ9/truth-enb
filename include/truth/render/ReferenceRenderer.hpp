@@ -13,6 +13,7 @@ enum class ReferenceScene : std::uint8_t {
   dusk = 1,
   clear_night_aurora = 2,
   storm = 3,
+  translated_day_probe = 4,
 };
 
 enum class ReferenceRenderStatus : std::uint8_t {
@@ -35,6 +36,9 @@ struct ReferenceRenderResult {
   std::string diagnostic;
   ReferenceImage image;
   std::string sha256_hex;
+  double shader_compile_milliseconds{};
+  double render_milliseconds{};
+  double elapsed_milliseconds{};
 };
 
 [[nodiscard]] std::string_view ReferenceSceneName(ReferenceScene scene) noexcept;
@@ -52,6 +56,18 @@ struct ReferenceRenderResult {
     std::uint32_t height) noexcept;
 
 [[nodiscard]] ReferenceRenderResult RenderWarpSkyFieldRadiance(
+    ReferenceScene scene,
+    const std::filesystem::path& shader_path,
+    std::uint32_t width,
+    std::uint32_t height) noexcept;
+
+[[nodiscard]] ReferenceRenderResult RenderWarpCloudVolumeScalars(
+    ReferenceScene scene,
+    const std::filesystem::path& shader_path,
+    std::uint32_t width,
+    std::uint32_t height) noexcept;
+
+[[nodiscard]] ReferenceRenderResult RenderWarpCloudVolumeRadiance(
     ReferenceScene scene,
     const std::filesystem::path& shader_path,
     std::uint32_t width,

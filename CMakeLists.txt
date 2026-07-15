@@ -52,6 +52,19 @@ if(MSVC)
   )
 endif()
 
+add_library(truth_cloud_volume STATIC
+  src/render/CloudVolume.cpp
+)
+target_compile_features(truth_cloud_volume PUBLIC cxx_std_23)
+target_include_directories(truth_cloud_volume PUBLIC include)
+target_link_libraries(truth_cloud_volume PUBLIC truth_sky_fields)
+
+if(MSVC)
+  target_compile_options(truth_cloud_volume PRIVATE
+    /W4 /WX /permissive- /EHsc /utf-8
+  )
+endif()
+
 if(WIN32)
   add_library(truth_reference_renderer_core STATIC
     src/render/ReferenceRenderer.cpp
@@ -142,6 +155,21 @@ if(BUILD_TESTING)
 
   add_test(NAME truth_cloud_lighting_cpp COMMAND truth_cloud_lighting_tests)
 
+  add_executable(truth_cloud_volume_tests
+    tests/CloudVolumeTests.cpp
+  )
+  target_compile_features(truth_cloud_volume_tests PRIVATE cxx_std_23)
+  target_link_libraries(truth_cloud_volume_tests PRIVATE truth_cloud_volume)
+  set_property(TARGET truth_cloud_volume_tests PROPERTY VS_GLOBAL_VcpkgApplocalDeps false)
+
+  if(MSVC)
+    target_compile_options(truth_cloud_volume_tests PRIVATE
+      /W4 /WX /permissive- /EHsc /utf-8
+    )
+  endif()
+
+  add_test(NAME truth_cloud_volume_cpp COMMAND truth_cloud_volume_tests)
+
   if(WIN32)
     add_executable(truth_reference_renderer_tests
       tests/ReferenceRendererTests.cpp
@@ -149,6 +177,7 @@ if(BUILD_TESTING)
     target_compile_features(truth_reference_renderer_tests PRIVATE cxx_std_23)
     target_link_libraries(truth_reference_renderer_tests PRIVATE
       truth_reference_renderer_core
+      truth_cloud_volume
       truth_sky_fields
     )
     set_property(TARGET truth_reference_renderer_tests PROPERTY VS_GLOBAL_VcpkgApplocalDeps false)
@@ -206,6 +235,37 @@ if(BUILD_TESTING)
     truth_shader_fxc_a1_p1 1 1 TruthA1P1
   )
 
+  function(add_truth_cloud_volume_permutation
+      test_name volume_macro_value quality_macro_value artifact_name)
+    add_test(
+      NAME "${test_name}"
+      COMMAND "${CMAKE_COMMAND}"
+        "-DTRUTH_FXC=${TRUTH_FXC_EXECUTABLE}"
+        "-DTRUTH_SHADER=${CMAKE_CURRENT_SOURCE_DIR}/shaders/truth/TruthReferenceSky.hlsl"
+        "-DTRUTH_REQUIRED_SOURCE=${CMAKE_CURRENT_SOURCE_DIR}/shaders/truth/TruthCloudVolume.fxh"
+        "-DTRUTH_INCLUDE=${CMAKE_CURRENT_SOURCE_DIR}/shaders/truth"
+        "-DTRUTH_DEFINE=TRUTH_ENABLE_CLOUD_VOLUME=${volume_macro_value}"
+        "-DTRUTH_SECOND_DEFINE=TRUTH_CLOUD_VOLUME_QUALITY=${quality_macro_value}"
+        "-DTRUTH_OUTPUT=${CMAKE_CURRENT_BINARY_DIR}/shaders/$<CONFIG>/${artifact_name}.cso"
+        "-DTRUTH_LISTING=${CMAKE_CURRENT_BINARY_DIR}/shaders/$<CONFIG>/${artifact_name}.asm"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/CompileTruthReferencePixelShader.cmake"
+    )
+    set_tests_properties("${test_name}" PROPERTIES LABELS "shader;fxc;cloud-volume")
+  endfunction()
+
+  add_truth_cloud_volume_permutation(
+    truth_cloud_volume_fxc_fallback 0 2 TruthCloudFallback
+  )
+  add_truth_cloud_volume_permutation(
+    truth_cloud_volume_fxc_quality_1 1 1 TruthCloudQuality1
+  )
+  add_truth_cloud_volume_permutation(
+    truth_cloud_volume_fxc_quality_2 1 2 TruthCloudQuality2
+  )
+  add_truth_cloud_volume_permutation(
+    truth_cloud_volume_fxc_quality_3 1 3 TruthCloudQuality3
+  )
+
   add_test(
     NAME truth_shader_atmosphere_permutations_distinct
     COMMAND "${CMAKE_COMMAND}" -E compare_files
@@ -227,6 +287,30 @@ if(BUILD_TESTING)
   set_tests_properties(truth_shader_direct_control_permutations_distinct PROPERTIES
     DEPENDS "truth_shader_fxc_a1_p1;truth_shader_fxc_a1_p0"
     LABELS "shader;fxc"
+    WILL_FAIL TRUE
+  )
+
+  add_test(
+    NAME truth_cloud_volume_fallback_is_distinct
+    COMMAND "${CMAKE_COMMAND}" -E compare_files
+      "${CMAKE_CURRENT_BINARY_DIR}/shaders/$<CONFIG>/TruthCloudFallback.cso"
+      "${CMAKE_CURRENT_BINARY_DIR}/shaders/$<CONFIG>/TruthCloudQuality2.cso"
+  )
+  set_tests_properties(truth_cloud_volume_fallback_is_distinct PROPERTIES
+    DEPENDS "truth_cloud_volume_fxc_fallback;truth_cloud_volume_fxc_quality_2"
+    LABELS "shader;fxc;cloud-volume"
+    WILL_FAIL TRUE
+  )
+
+  add_test(
+    NAME truth_cloud_volume_quality_tiers_are_distinct
+    COMMAND "${CMAKE_COMMAND}" -E compare_files
+      "${CMAKE_CURRENT_BINARY_DIR}/shaders/$<CONFIG>/TruthCloudQuality1.cso"
+      "${CMAKE_CURRENT_BINARY_DIR}/shaders/$<CONFIG>/TruthCloudQuality3.cso"
+  )
+  set_tests_properties(truth_cloud_volume_quality_tiers_are_distinct PROPERTIES
+    DEPENDS "truth_cloud_volume_fxc_quality_1;truth_cloud_volume_fxc_quality_3"
+    LABELS "shader;fxc;cloud-volume"
     WILL_FAIL TRUE
   )
 endif()

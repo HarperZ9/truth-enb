@@ -1,0 +1,10 @@
+* text=auto
+
+*.cmake text eol=lf
+*.cpp text eol=lf
+*.fx text eol=lf
+*.fxh text eol=lf
+*.hpp text eol=lf
+*.json text eol=lf
+*.md text eol=lf
+LICENSE text eol=lf

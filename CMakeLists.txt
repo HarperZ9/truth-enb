@@ -30,6 +30,16 @@ if(MSVC)
   target_compile_options(truth_atmosphere PRIVATE /W4 /WX /permissive- /EHsc /utf-8)
 endif()
 
+add_library(truth_sky_fields STATIC
+  src/render/SkyFields.cpp
+)
+target_compile_features(truth_sky_fields PUBLIC cxx_std_23)
+target_include_directories(truth_sky_fields PUBLIC include)
+
+if(MSVC)
+  target_compile_options(truth_sky_fields PRIVATE /W4 /WX /permissive- /EHsc /utf-8)
+endif()
+
 if(BUILD_TESTING)
   add_executable(truth_master_look_tests
     tests/MasterLookTests.cpp
@@ -59,18 +69,34 @@ if(BUILD_TESTING)
 
   add_test(NAME truth_atmosphere_cpp COMMAND truth_atmosphere_tests)
 
+  add_executable(truth_sky_fields_tests
+    tests/SkyFieldsTests.cpp
+  )
+  target_compile_features(truth_sky_fields_tests PRIVATE cxx_std_23)
+  target_link_libraries(truth_sky_fields_tests PRIVATE truth_sky_fields)
+  set_property(TARGET truth_sky_fields_tests PROPERTY VS_GLOBAL_VcpkgApplocalDeps false)
+
+  if(MSVC)
+    target_compile_options(truth_sky_fields_tests PRIVATE /W4 /WX /permissive- /EHsc /utf-8)
+  endif()
+
+  add_test(NAME truth_sky_fields_cpp COMMAND truth_sky_fields_tests)
+
   set(TRUTH_FXC_EXECUTABLE
     "C:/Program Files (x86)/Windows Kits/10/bin/10.0.26100.0/x64/fxc.exe"
   )
-  function(add_truth_shader_permutation test_name macro_value artifact_name)
+  function(add_truth_shader_permutation
+      test_name atmosphere_macro_value procedural_sky_macro_value artifact_name)
     add_test(
       NAME "${test_name}"
       COMMAND "${CMAKE_COMMAND}"
         "-DTRUTH_FXC=${TRUTH_FXC_EXECUTABLE}"
         "-DTRUTH_SHADER=${CMAKE_CURRENT_SOURCE_DIR}/shaders/enbeffect.fx"
         "-DTRUTH_REQUIRED_SOURCE=${CMAKE_CURRENT_SOURCE_DIR}/shaders/truth/TruthAtmosphereCore.fxh"
+        "-DTRUTH_REQUIRED_SOURCE_2=${CMAKE_CURRENT_SOURCE_DIR}/shaders/truth/TruthSkyFields.fxh"
         "-DTRUTH_INCLUDE=${CMAKE_CURRENT_SOURCE_DIR}/shaders/truth"
-        "-DTRUTH_DEFINE=TRUTH_ENABLE_ATMOSPHERE=${macro_value}"
+        "-DTRUTH_DEFINE=TRUTH_ENABLE_ATMOSPHERE=${atmosphere_macro_value}"
+        "-DTRUTH_SECOND_DEFINE=TRUTH_ENABLE_PROCEDURAL_SKY=${procedural_sky_macro_value}"
         "-DTRUTH_OUTPUT=${CMAKE_CURRENT_BINARY_DIR}/shaders/$<CONFIG>/${artifact_name}.fxo"
         "-DTRUTH_LISTING=${CMAKE_CURRENT_BINARY_DIR}/shaders/$<CONFIG>/${artifact_name}.asm"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/CompileTruthShader.cmake"
@@ -79,10 +105,16 @@ if(BUILD_TESTING)
   endfunction()
 
   add_truth_shader_permutation(
-    truth_shader_fxc_atmosphere_enabled 1 TruthAtmosphereEnabled
+    truth_shader_fxc_atmosphere_enabled 1 1 TruthAtmosphereEnabled
   )
   add_truth_shader_permutation(
-    truth_shader_fxc_atmosphere_disabled 0 TruthAtmosphereDisabled
+    truth_shader_fxc_atmosphere_disabled 0 0 TruthAtmosphereDisabled
+  )
+  add_truth_shader_permutation(
+    truth_shader_fxc_procedural_sky_enabled 1 1 TruthProceduralSkyEnabled
+  )
+  add_truth_shader_permutation(
+    truth_shader_fxc_procedural_sky_disabled 1 0 TruthProceduralSkyDisabled
   )
 
   add_test(
@@ -93,6 +125,18 @@ if(BUILD_TESTING)
   )
   set_tests_properties(truth_shader_permutations_distinct PROPERTIES
     DEPENDS "truth_shader_fxc_atmosphere_enabled;truth_shader_fxc_atmosphere_disabled"
+    LABELS "shader;fxc"
+    WILL_FAIL TRUE
+  )
+
+  add_test(
+    NAME truth_shader_procedural_sky_permutations_distinct
+    COMMAND "${CMAKE_COMMAND}" -E compare_files
+      "${CMAKE_CURRENT_BINARY_DIR}/shaders/$<CONFIG>/TruthProceduralSkyEnabled.fxo"
+      "${CMAKE_CURRENT_BINARY_DIR}/shaders/$<CONFIG>/TruthProceduralSkyDisabled.fxo"
+  )
+  set_tests_properties(truth_shader_procedural_sky_permutations_distinct PROPERTIES
+    DEPENDS "truth_shader_fxc_procedural_sky_enabled;truth_shader_fxc_procedural_sky_disabled"
     LABELS "shader;fxc"
     WILL_FAIL TRUE
   )

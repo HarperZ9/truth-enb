@@ -123,3 +123,23 @@ the disabled macro retains the original scene path. CTest compiles both with
 exact x64 FXC `fx_5_0` and asserts their generated objects differ.
 
 `.superpowers/sdd/task-02-report.md` records the CPU and FXC RED/GREEN evidence.
+
+## Procedural sky fields
+
+`SkyFieldInput` is a validated POD containing a normalized view direction,
+looped phase, bounded wind, cloud/weather controls, aurora activity, and night
+factor. `EvaluateSkyFields` commits once after producing bounded low-frequency
+cloud body, independent detail erosion, composed density, curtain mask, and
+intrinsic aurora radiance. Invalid input preserves the caller's output.
+
+Phase `1.0` is canonically evaluated as phase `0.0`; the sinusoidal wind orbit
+is therefore exactly loopable. Coverage, density, and weather only scale or
+raise cloud occupancy, so each control is monotonic for a fixed field sample.
+Daylight (`night_factor == 0`) writes exact positive zero for both aurora mask
+and intrinsic radiance.
+
+`TruthSkyFields.fxh` mirrors the texture-free field. In the enabled effect it
+derives a normalized view ray from screen position, supplies generated cloud
+density and aurora mask to `TruthEvaluateAtmosphere`, and adds the resulting
+composite before exposure. `TRUTH_ENABLE_PROCEDURAL_SKY=0` retains the direct
+cloud-density and aurora-mask inputs as an explicit fallback.

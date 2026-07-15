@@ -1,8 +1,13 @@
 #include "truth/TruthColorCore.fxh"
 #include "truth/TruthAtmosphereCore.fxh"
+#include "truth/TruthSkyFields.fxh"
 
 #ifndef TRUTH_ENABLE_ATMOSPHERE
 #define TRUTH_ENABLE_ATMOSPHERE 1
+#endif
+
+#ifndef TRUTH_ENABLE_PROCEDURAL_SKY
+#define TRUTH_ENABLE_PROCEDURAL_SKY 1
 #endif
 
 Texture2D TruthSceneTexture : register(t0);
@@ -38,6 +43,13 @@ cbuffer TruthAtmosphereParameters : register(b1)
     float TruthAuroraMask;
     float TruthNightFactor;
     float2 TruthAtmospherePadding;
+};
+
+cbuffer TruthSkyFieldParameters : register(b2)
+{
+    float TruthSkyPhase;
+    float2 TruthSkyWind;
+    float TruthSkyProjectionScale;
 };
 
 struct TruthVertexInput
@@ -83,10 +95,33 @@ float4 TruthPixelMain(TruthVertexOutput input) : SV_Target0
     atmosphere_input.sun_elevation = clamp(TruthSunElevation, -1.0, 1.0);
     atmosphere_input.weather_density = saturate(TruthWeatherDensity);
     atmosphere_input.cloud_coverage = saturate(TruthCloudCoverage);
+#if TRUTH_ENABLE_PROCEDURAL_SKY
+    float2 projected_view = ((input.texcoord * 2.0) - 1.0)
+        * max(abs(TruthSkyProjectionScale), 0.001);
+    float view_vertical = TruthViewZenithCosine < 0.0
+        ? min(TruthViewZenithCosine, -0.05)
+        : max(TruthViewZenithCosine, 0.05);
+    TruthSkyFieldInput sky_field_input;
+    sky_field_input.view_direction = normalize(float3(projected_view, view_vertical));
+    sky_field_input.phase = saturate(TruthSkyPhase);
+    sky_field_input.wind = clamp(TruthSkyWind, -1.0, 1.0);
+    sky_field_input.cloud_coverage = saturate(TruthCloudCoverage);
+    sky_field_input.cloud_density = saturate(TruthCloudDensity);
+    sky_field_input.weather_density = saturate(TruthWeatherDensity);
+    sky_field_input.aurora_activity = saturate(TruthAuroraActivity);
+    sky_field_input.night_factor = saturate(TruthNightFactor);
+    TruthSkyFieldOutput sky_field_output = TruthEvaluateSkyFields(sky_field_input);
+    atmosphere_input.cloud_density = sky_field_output.cloud_density;
+#else
     atmosphere_input.cloud_density = saturate(TruthCloudDensity);
+#endif
     atmosphere_input.fog_density = saturate(TruthFogDensity);
     atmosphere_input.aurora_activity = saturate(TruthAuroraActivity);
+#if TRUTH_ENABLE_PROCEDURAL_SKY
+    atmosphere_input.aurora_mask = sky_field_output.aurora_mask;
+#else
     atmosphere_input.aurora_mask = saturate(TruthAuroraMask);
+#endif
     atmosphere_input.night_factor = saturate(TruthNightFactor);
     TruthUnifiedAtmosphereOutput atmosphere_output = TruthEvaluateAtmosphere(atmosphere_input);
     linear_color += atmosphere_output.composite_radiance;

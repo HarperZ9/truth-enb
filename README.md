@@ -22,6 +22,11 @@ depend on recovered or peer shader source.
   fog, and aurora reference with single-pass cloud/fog coupling.
 - `TruthAtmosphereCore.fxh`: the original shader mirror, compiled in live
   atmosphere-enabled and atmosphere-disabled permutations.
+- `SkyFieldInput` / `SkyFieldOutput`: a deterministic, texture-free procedural
+  cloud body/detail erosion field and night-only aurora curtain reference.
+- `TruthSkyFields.fxh`: the shader mirror; its generated cloud density and
+  aurora mask feed the unified atmosphere before exposure, with a macro-off
+  direct-control fallback.
 
 ## Toolchain
 
@@ -52,6 +57,9 @@ color before exposure. Aurora is pre-exposed and attenuated exactly once:
 aurora = intrinsic_aurora * cloud_transmittance * fog_transmittance
 composite = sky * cloud_transmittance * fog_transmittance + aurora
 ```
+
+Procedural sky animation uses normalized phase `[0,1]`; both endpoints map to
+the same exact field state. The field has no cloud or aurora texture inputs.
 
 ## Input contract
 

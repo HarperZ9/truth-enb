@@ -25,6 +25,12 @@ if(NOT EXISTS "${TRUTH_REQUIRED_SOURCE}")
   message(FATAL_ERROR "Required Truth shader source is absent: ${TRUTH_REQUIRED_SOURCE}")
 endif()
 
+if(DEFINED TRUTH_REQUIRED_SOURCE_2
+    AND NOT "${TRUTH_REQUIRED_SOURCE_2}" STREQUAL ""
+    AND NOT EXISTS "${TRUTH_REQUIRED_SOURCE_2}")
+  message(FATAL_ERROR "Second required Truth shader source is absent: ${TRUTH_REQUIRED_SOURCE_2}")
+endif()
+
 if(NOT IS_DIRECTORY "${TRUTH_INCLUDE}")
   message(FATAL_ERROR "Truth shader include directory is absent: ${TRUTH_INCLUDE}")
 endif()
@@ -32,15 +38,24 @@ endif()
 cmake_path(GET TRUTH_OUTPUT PARENT_PATH truth_output_directory)
 file(MAKE_DIRECTORY "${truth_output_directory}")
 
+set(truth_fxc_command
+  "${TRUTH_FXC}"
+  /nologo
+  /T fx_5_0
+  /I "${TRUTH_INCLUDE}"
+  "/D${TRUTH_DEFINE}"
+)
+if(DEFINED TRUTH_SECOND_DEFINE AND NOT "${TRUTH_SECOND_DEFINE}" STREQUAL "")
+  list(APPEND truth_fxc_command "/D${TRUTH_SECOND_DEFINE}")
+endif()
+list(APPEND truth_fxc_command
+  /Fo "${TRUTH_OUTPUT}"
+  /Fc "${TRUTH_LISTING}"
+  "${TRUTH_SHADER}"
+)
+
 execute_process(
-  COMMAND "${TRUTH_FXC}"
-    /nologo
-    /T fx_5_0
-    /I "${TRUTH_INCLUDE}"
-    "/D${TRUTH_DEFINE}"
-    /Fo "${TRUTH_OUTPUT}"
-    /Fc "${TRUTH_LISTING}"
-    "${TRUTH_SHADER}"
+  COMMAND ${truth_fxc_command}
   RESULT_VARIABLE truth_fxc_result
   OUTPUT_VARIABLE truth_fxc_stdout
   ERROR_VARIABLE truth_fxc_stderr
@@ -67,5 +82,8 @@ endforeach()
 message(STATUS "FXC compiler: ${TRUTH_FXC}")
 message(STATUS "FXC target: fx_5_0")
 message(STATUS "FXC define: ${TRUTH_DEFINE}")
+if(DEFINED TRUTH_SECOND_DEFINE AND NOT "${TRUTH_SECOND_DEFINE}" STREQUAL "")
+  message(STATUS "FXC second define: ${TRUTH_SECOND_DEFINE}")
+endif()
 message(STATUS "FXC object: ${TRUTH_OUTPUT}")
 message(STATUS "FXC listing: ${TRUTH_LISTING}")

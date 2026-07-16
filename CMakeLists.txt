@@ -143,7 +143,10 @@ endif()
 
 if(WIN32 AND TRUTH_BUILD_RUNTIME)
   set(TRUTH_RELEASE_COMPONENT TruthPrivateRelease)
-  set(TRUTH_RELEASE_SHADER_ROOT "enbseries")
+  # MO2 Root-Builder layout: everything under Root/ maps to the game root, so
+  # ENBSeries finds enbseries\ and the .dllplugin where it reads them. The
+  # documentation root stays top-level (MO2 shows it, never deploys it).
+  set(TRUTH_RELEASE_SHADER_ROOT "Root/enbseries")
   set(TRUTH_RELEASE_DOCUMENTATION_ROOT "Truth ENB Documentation")
   set(TRUTH_RELEASE_SHADER_INCLUDES
     shaders/truth/TruthAtmosphereCore.fxh

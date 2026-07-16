@@ -20,17 +20,17 @@ set(expected_files
   "Truth ENB Documentation/docs/release-validation.md"
   "Truth ENB Documentation/enb-runtime-core.lock"
   "Truth ENB Documentation/enb-upstream.lock"
-  "enbseries/TruthENBRuntime.dllplugin"
-  "enbseries/enb/ENBSeries0504VanillaPostProcess.fxh"
-  "enbseries/enbeffect.fx"
-  "enbseries/truth/TruthAtmosphereCore.fxh"
-  "enbseries/truth/TruthAuroraCurtain.fxh"
-  "enbseries/truth/TruthCloudLighting.fxh"
-  "enbseries/truth/TruthColorCore.fxh"
-  "enbseries/truth/TruthEffectParameters.fxh"
-  "enbseries/truth/TruthRuntimeParameters.fxh"
-  "enbseries/truth/TruthSkyFields.fxh"
-  "enbseries/truth/TruthSkyViewAdapter.fxh"
+  "Root/enbseries/TruthENBRuntime.dllplugin"
+  "Root/enbseries/enb/ENBSeries0504VanillaPostProcess.fxh"
+  "Root/enbseries/enbeffect.fx"
+  "Root/enbseries/truth/TruthAtmosphereCore.fxh"
+  "Root/enbseries/truth/TruthAuroraCurtain.fxh"
+  "Root/enbseries/truth/TruthCloudLighting.fxh"
+  "Root/enbseries/truth/TruthColorCore.fxh"
+  "Root/enbseries/truth/TruthEffectParameters.fxh"
+  "Root/enbseries/truth/TruthRuntimeParameters.fxh"
+  "Root/enbseries/truth/TruthSkyFields.fxh"
+  "Root/enbseries/truth/TruthSkyViewAdapter.fxh"
 )
 list(SORT expected_files)
 
@@ -49,13 +49,13 @@ function(truth_expected_source relative output)
     set(source "${TRUTH_SOURCE_ROOT}/runtime/enb-upstream.lock")
   elseif(relative STREQUAL "Truth ENB Documentation/docs/release-validation.md")
     set(source "${TRUTH_SOURCE_ROOT}/docs/release-validation.md")
-  elseif(relative STREQUAL "enbseries/TruthENBRuntime.dllplugin")
+  elseif(relative STREQUAL "Root/enbseries/TruthENBRuntime.dllplugin")
     set(source "${TRUTH_RUNTIME_PLUGIN}")
-  elseif(relative STREQUAL "enbseries/enbeffect.fx")
+  elseif(relative STREQUAL "Root/enbseries/enbeffect.fx")
     set(source "${TRUTH_SOURCE_ROOT}/shaders/enbeffect.fx")
-  elseif(relative MATCHES "^enbseries/enb/(.+)$")
+  elseif(relative MATCHES "^Root/enbseries/enb/(.+)$")
     set(source "${TRUTH_SOURCE_ROOT}/shaders/enb/${CMAKE_MATCH_1}")
-  elseif(relative MATCHES "^enbseries/truth/(.+)$")
+  elseif(relative MATCHES "^Root/enbseries/truth/(.+)$")
     set(source "${TRUTH_SOURCE_ROOT}/shaders/truth/${CMAKE_MATCH_1}")
   else()
     message(FATAL_ERROR "package test has no source mapping for ${relative}")

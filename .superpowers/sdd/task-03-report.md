@@ -69,9 +69,19 @@ out-of-range occlusion rejects; too many apertures rejects.
 Full Debug suite re-run after integration: **41/41 tests passed, 0 failed**
 (`truth_interior_light_cpp` added as test #2; all 40 prior cases unchanged).
 
+## Shader mirror (delivered in the follow-up commit)
+
+`shaders/truth/TruthInteriorLight.fxh` mirrors the CPU arithmetic (aperture sum
+clamp, open factor, exact-zero basement exclusion, bounded interior light);
+`TruthInteriorLightProbe.fx` forces full consumption of the model and compiles
+strict through the project gate. CTest `truth_interior_light_fxc` passed
+(`fx_5_0 /WX /Ges /Gis /O3`, exact pinned x64 FXC). Full suite after
+integration: **42/42**.
+
 ## Not yet in this task (next)
 
-- The `.fxh` shader mirror of the interior model and its FXC strict-permutation
-  compile witness (Truth couples CPU reference and shader mirror per slice).
+- WARP-executed CPU/HLSL numeric parity for the interior model (the compile
+  witness proves the mirror builds; parity execution follows the sky-view
+  adapter's WARP pattern).
 - Portal/window-anchor geometry binding and lightning propagation, which the
   full Helios-class replacement will layer on this reference.

@@ -445,6 +445,20 @@ if(BUILD_TESTING)
     set_tests_properties("${test_name}" PROPERTIES LABELS "shader;fxc")
   endfunction()
 
+  add_test(
+    NAME truth_interior_light_fxc
+    COMMAND "${CMAKE_COMMAND}"
+      "-DTRUTH_FXC=${TRUTH_FXC_EXECUTABLE}"
+      "-DTRUTH_SHADER=${CMAKE_CURRENT_SOURCE_DIR}/shaders/truth/TruthInteriorLightProbe.fx"
+      "-DTRUTH_REQUIRED_SOURCE=${CMAKE_CURRENT_SOURCE_DIR}/shaders/truth/TruthInteriorLight.fxh"
+      "-DTRUTH_INCLUDE=${CMAKE_CURRENT_SOURCE_DIR}/shaders/truth"
+      "-DTRUTH_DEFINE=TRUTH_INTERIOR_LIGHT_PROBE=1"
+      "-DTRUTH_OUTPUT=${CMAKE_CURRENT_BINARY_DIR}/shaders/$<CONFIG>/TruthInteriorLightProbe.fxo"
+      "-DTRUTH_LISTING=${CMAKE_CURRENT_BINARY_DIR}/shaders/$<CONFIG>/TruthInteriorLightProbe.asm"
+      -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/CompileTruthShader.cmake"
+  )
+  set_tests_properties(truth_interior_light_fxc PROPERTIES LABELS "shader;fxc;interior")
+
   add_truth_shader_permutation(
     truth_shader_fxc_a0_p0 0 0 TruthA0P0
   )

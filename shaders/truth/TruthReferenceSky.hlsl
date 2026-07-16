@@ -114,13 +114,13 @@ float3 TruthReferenceStarRadiance(float3 view_direction, float night_factor)
     float3 secondary_position = view_direction * 109.0;
     int3 secondary_cell = int3(floor(secondary_position));
     float3 secondary_local = frac(secondary_position) - 0.5;
-    float secondary_hash = TruthAuroraLatticeHash3D(secondary_cell + int3(17, -9, 23));
+    float secondary_hash = TruthSkyLatticeHash3D(secondary_cell + int3(17, -9, 23));
     float secondary_core = TruthAuroraSmoothStep(0.25, 0.025, length(secondary_local));
     float secondary_gate = TruthAuroraSmoothStep(0.991, 0.9995, secondary_hash);
 
     float primary = primary_core * primary_gate;
     float secondary = secondary_core * secondary_gate;
-    float color_hash = TruthAuroraLatticeHash3D(primary_cell + int3(-5, 31, 11));
+    float color_hash = TruthSkyLatticeHash3D(primary_cell + int3(-5, 31, 11));
     float3 star_color = lerp(
         float3(0.78, 0.86, 1.00),
         float3(1.00, 0.91, 0.76),

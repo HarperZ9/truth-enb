@@ -91,11 +91,15 @@ static_assert(sizeof(SceneParameters) == 64U);
     const char* entry_point,
     const char* target,
     ComPtr<ID3DBlob>& bytecode,
-    std::string& diagnostic) {
+    std::string& diagnostic,
+    const char* const define_name = nullptr,
+    const char* const define_value = nullptr) {
   struct CacheEntry {
     std::filesystem::path path;
     std::string entry_point;
     std::string target;
+    std::string define_name;
+    std::string define_value;
     ComPtr<ID3DBlob> bytecode;
   };
   static std::mutex cache_mutex;
@@ -107,7 +111,9 @@ static_assert(sizeof(SceneParameters) == 64U);
     for (const auto& entry : cache) {
       if (entry.path == normalized_path
           && entry.entry_point == entry_point
-          && entry.target == target) {
+          && entry.target == target
+          && entry.define_name == (define_name == nullptr ? "" : define_name)
+          && entry.define_value == (define_value == nullptr ? "" : define_value)) {
         bytecode = entry.bytecode;
         return true;
       }
@@ -115,13 +121,20 @@ static_assert(sizeof(SceneParameters) == 64U);
   }
 
   ComPtr<ID3DBlob> errors;
+  std::array<D3D_SHADER_MACRO, 2U> macros{};
+  const D3D_SHADER_MACRO* macro_pointer{};
+  if (define_name != nullptr && define_value != nullptr) {
+    macros[0] = {define_name, define_value};
+    macros[1] = {nullptr, nullptr};
+    macro_pointer = macros.data();
+  }
   constexpr UINT flags = D3DCOMPILE_ENABLE_STRICTNESS
       | D3DCOMPILE_WARNINGS_ARE_ERRORS
       | D3DCOMPILE_IEEE_STRICTNESS
       | D3DCOMPILE_OPTIMIZATION_LEVEL1;
   const HRESULT result = D3DCompileFromFile(
       normalized_path.c_str(),
-      nullptr,
+      macro_pointer,
       D3D_COMPILE_STANDARD_FILE_INCLUDE,
       entry_point,
       target,
@@ -131,7 +144,14 @@ static_assert(sizeof(SceneParameters) == 64U);
       &errors);
   if (SUCCEEDED(result)) {
     const std::scoped_lock lock{cache_mutex};
-    cache.push_back({normalized_path, entry_point, target, bytecode});
+    cache.push_back({
+        normalized_path,
+        entry_point,
+        target,
+        define_name == nullptr ? "" : define_name,
+        define_value == nullptr ? "" : define_value,
+        bytecode,
+    });
     return true;
   }
 
@@ -277,7 +297,8 @@ std::string_view ReferenceSceneName(const ReferenceScene scene) noexcept {
     const std::filesystem::path& shader_path,
     const std::uint32_t width,
     const std::uint32_t height,
-    const char* const pixel_entry) noexcept {
+    const char* const pixel_entry,
+    const char* const aurora_quality_define = nullptr) noexcept {
   try {
     const auto start_time = std::chrono::steady_clock::now();
     if (ReferenceSceneName(scene).empty()) {
@@ -297,7 +318,11 @@ std::string_view ReferenceSceneName(const ReferenceScene scene) noexcept {
       return Fail(ReferenceRenderStatus::shader_compile_failed, std::move(diagnostic));
     }
     if (!CompileShader(shader_path, pixel_entry, "ps_5_0",
-                       pixel_bytecode, diagnostic)) {
+                       pixel_bytecode, diagnostic,
+                       aurora_quality_define == nullptr
+                           ? nullptr
+                           : "TRUTH_AURORA_QUALITY",
+                       aurora_quality_define)) {
       return Fail(ReferenceRenderStatus::shader_compile_failed, std::move(diagnostic));
     }
     const auto shader_compile_end_time = std::chrono::steady_clock::now();
@@ -458,6 +483,21 @@ std::string_view ReferenceSceneName(const ReferenceScene scene) noexcept {
   }
 }
 
+[[nodiscard]] const char* AuroraQualityDefine(
+    const AuroraQuality quality) noexcept {
+  switch (quality) {
+    case AuroraQuality::fallback:
+      return "0";
+    case AuroraQuality::low:
+      return "1";
+    case AuroraQuality::balanced:
+      return "2";
+    case AuroraQuality::high:
+      return "3";
+  }
+  return nullptr;
+}
+
 ReferenceRenderResult RenderWarpReference(
     const ReferenceScene scene,
     const std::filesystem::path& shader_path,
@@ -476,6 +516,25 @@ ReferenceRenderResult RenderWarpSkyFieldScalars(
       scene, shader_path, width, height, "TruthSkyFieldScalarProbePixelMain");
 }
 
+ReferenceRenderResult RenderWarpSkyFieldScalars(
+    const ReferenceScene scene,
+    const std::filesystem::path& shader_path,
+    const std::uint32_t width,
+    const std::uint32_t height,
+    const AuroraQuality quality) noexcept {
+  const char* const define = AuroraQualityDefine(quality);
+  if (define == nullptr) {
+    return Fail(ReferenceRenderStatus::invalid_request,
+                "unknown aurora quality tier");
+  }
+  return RenderWarpPass(scene,
+                        shader_path,
+                        width,
+                        height,
+                        "TruthSkyFieldScalarProbePixelMain",
+                        define);
+}
+
 ReferenceRenderResult RenderWarpSkyFieldRadiance(
     const ReferenceScene scene,
     const std::filesystem::path& shader_path,
@@ -483,6 +542,25 @@ ReferenceRenderResult RenderWarpSkyFieldRadiance(
     const std::uint32_t height) noexcept {
   return RenderWarpPass(
       scene, shader_path, width, height, "TruthSkyFieldRadianceProbePixelMain");
+}
+
+ReferenceRenderResult RenderWarpSkyFieldRadiance(
+    const ReferenceScene scene,
+    const std::filesystem::path& shader_path,
+    const std::uint32_t width,
+    const std::uint32_t height,
+    const AuroraQuality quality) noexcept {
+  const char* const define = AuroraQualityDefine(quality);
+  if (define == nullptr) {
+    return Fail(ReferenceRenderStatus::invalid_request,
+                "unknown aurora quality tier");
+  }
+  return RenderWarpPass(scene,
+                        shader_path,
+                        width,
+                        height,
+                        "TruthSkyFieldRadianceProbePixelMain",
+                        define);
 }
 
 ReferenceRenderResult RenderWarpCloudVolumeScalars(

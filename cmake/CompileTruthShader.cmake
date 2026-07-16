@@ -49,11 +49,16 @@ endif()
 
 cmake_path(GET TRUTH_OUTPUT PARENT_PATH truth_output_directory)
 file(MAKE_DIRECTORY "${truth_output_directory}")
+file(REMOVE "${TRUTH_OUTPUT}" "${TRUTH_LISTING}")
 
 set(truth_fxc_command
   "${TRUTH_FXC}"
   /nologo
   /T fx_5_0
+  /WX
+  /Ges
+  /Gis
+  /O3
   /I "${TRUTH_INCLUDE}"
   "/D${TRUTH_DEFINE}"
 )

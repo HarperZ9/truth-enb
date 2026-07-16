@@ -80,7 +80,13 @@ on its numeric domain, and never reaches white for a finite value below `4.0`.
 `shaders/truth/TruthColorCore.fxh` mirrors `TruthAtmosphereSample`,
 `TruthMasterLookState`, unified luminance, target EV, bounded adaptation,
 exposure application, and the filmic curve using original Truth names.
-`shaders/enbeffect.fx` supplies a standalone Effects 11 vertex/pixel fixture.
+`shaders/enbeffect.fx` supplies the production ENBSeries 0.504 vertex/pixel
+effect. ENB-owned scene, bloom, lens, depth, adaptation, weather, time, and
+day/interior inputs are named exactly at this boundary. The Truth-owned
+`TRUTHPASSTHROUGH` technique is a safe scene-color fallback. Separately, the
+official ENB 0.504 `PS_DrawOriginal` and reserved `ORIGINALPOSTPROCESS`
+technique are retained unchanged as the required vanilla fallback and locked
+by source hash; Truth rendering never substitutes its own code under that name.
 
 CTest invokes only the exact x64 FXC selected by the project, with target
 `fx_5_0`. The compile script rejects missing inputs, a nonzero compiler result,
@@ -92,6 +98,13 @@ to `build/shaders/<configuration>/`.
 - The C++ assertion harness tests ten named behaviors, including exact
   bit-pattern preservation for rejected NaN-containing state.
 - The shader test compiles the real effect, not a mock or syntax-only surrogate.
+- The D3D11 WARP ABI test executes the production row builder and sky-view
+  adapter, reflects all six runtime vectors and their exact offsets, and
+  compares asymmetric row-major transforms against the CPU reference.
+- That gate also executes the exact optimized `TruthEnbPixelMain` against five
+  ENB-shaped textures. It covers defaults, manual-exposure endpoints, master
+  passthrough, bloom/lens mixing, depth/interior preservation, active sky
+  replacement, and non-finite runtime, scene, adaptation, and UI values.
 - CMake presets pin the Visual Studio generator, x64 platform, C++23 mode, and
   static MSVC runtime selection.
 - `.superpowers/sdd/task-01-report.md` records the observed RED/GREEN sequence.
@@ -139,11 +152,40 @@ raise cloud occupancy, so each control is monotonic for a fixed field sample.
 Daylight (`night_factor == 0`) writes exact positive zero for both aurora mask
 and intrinsic radiance.
 
-`TruthSkyFields.fxh` mirrors the texture-free field. In the enabled effect it
-derives a normalized view ray from screen position and supplies generated cloud
-density, detail erosion, and intrinsic aurora radiance to cloud lighting before
-exposure. `TRUTH_ENABLE_PROCEDURAL_SKY=0` retains the direct cloud-density and
+`TruthSkyFields.fxh` mirrors the texture-free field. In the enabled effect,
+`TruthSkyViewAdapter.fxh` reconstructs a world-space direction with the
+row-major inverse view-projection matrix, rebases the raw engine camera around
+an explicit aurora origin, and converts engine units to artist units before the
+field is evaluated. The resulting cloud density, detail erosion, and intrinsic
+aurora radiance feed cloud lighting before exposure.
+`TRUTH_ENABLE_PROCEDURAL_SKY=0` retains the direct cloud-density and
 aurora-mask inputs as an explicit fallback.
+
+## ENB runtime bridge
+
+The world-space path is an explicit fail-closed protocol rather than an
+implicit shader assumption:
+
+```text
+Address Library database -> world-root camera relocation
+                         -> inverse view-projection + camera
+                         -> ENB callback parameter writes
+                         -> six hidden float4 values
+                         -> readiness gate -> sky-view adapter
+```
+
+Exactly protocol `1.0` carries four row vectors, one camera vector, and one status vector
+containing protocol version, valid flag, generation, and engine-world-units per
+aurora unit. Default status is zero, so a missing bridge cannot accidentally
+enable the replacement. The effect checks version, validity, scale, camera,
+matrix arithmetic, homogeneous division, direction length, and rebased camera
+bounds before it replaces a sky pixel. Interior pixels and non-sky depth retain
+the ordinary ENB color path.
+
+The runtime source reads Address Library directly and does not use SKSE or
+CommonLib. ENB SDK calls are made only from ENB callbacks. Shader state is
+restored around ENB load/save transitions so serialized presets do not retain a
+transient runtime camera.
 
 ## Procedural aurora curtain
 
@@ -154,14 +196,25 @@ higher, broader, and driven by a lower-frequency persistent flux. The physical
 ordering follows the Lawlor–Genetti rendering formulation while all distances
 remain explicit Skyrim-scale artist coordinates.
 
-Each view ray intersects the bounded auroral height slab. The evaluator samples
-world positions along that path, applies a domain-warped curved sheet plus
-coarse/fine filament flux, multiplies it by the per-channel deposition profile,
-and accumulates bounded intrinsic radiance. View-angle path length is capped;
+Each view ray intersects the bounded auroral height slab. A three-point coarse
+pass rejects rays outside the sheet before integration. Surviving rays evaluate
+three two-dimensional noise fields once to establish a shared field context;
+fixed samples then use analytic curved-sheet and filament terms, compact-support
+deposition windows, and bounded accumulation. View-angle path length is capped;
 horizon visibility is softened; phase follows an exact sinusoidal loop; camera
 translation moves the world-space sheet without altering direction-space
 clouds. CPU and HLSL use fixed `1/4/7/10` sample budgets and expose the same
-fallback, low, balanced, and high tiers.
+fallback, low, balanced, and high tiers. Low (`4`) is the default, while tests
+require cumulative error to decrease from fallback through low and balanced
+toward high.
+
+The full ENB-bound effect is budgeted, not just the isolated helper. FXC
+listing inspection rejects a default build above `2,464` static instruction
+slots; the IEEE-strict effect is currently `2,443`. Its report records the static count and a
+labelled slot-pixel estimate at 1080p, 1440p, and 4K, not a dynamic
+executed-instruction upper bound. Activity zero, daylight, below-slab rays, and
+coarse-rejected empty rays return exact positive zero with zero integration
+samples.
 
 Cloud and fog attenuation remain outside the intrinsic aurora evaluator so the
 existing single-composition rule applies them exactly once. The WARP witness

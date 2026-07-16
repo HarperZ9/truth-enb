@@ -1,4 +1,5 @@
 #include "truth/render/ReferenceRenderer.hpp"
+#include "truth/render/AuroraCurtain.hpp"
 #include "truth/render/CloudVolume.hpp"
 #include "truth/render/SkyFields.hpp"
 
@@ -510,6 +511,82 @@ void CpuAndHlslSkyFieldsRemainAligned(
   }
 }
 
+void CpuAndHlslAuroraQualityTiersRemainAligned(
+    TestContext& context,
+    const std::filesystem::path& shader_path) {
+  constexpr std::uint32_t width = 16U;
+  constexpr std::uint32_t height = 16U;
+  constexpr float pi = 3.14159265358979323846F;
+  constexpr float tolerance = 2.1F / 255.0F;
+  constexpr std::array qualities{
+      truth::render::AuroraQuality::fallback,
+      truth::render::AuroraQuality::low,
+      truth::render::AuroraQuality::balanced,
+      truth::render::AuroraQuality::high,
+  };
+  for (const auto quality : qualities) {
+    const auto scalars = truth::render::RenderWarpSkyFieldScalars(
+        ReferenceScene::active_clear_night,
+        shader_path,
+        width,
+        height,
+        quality);
+    context.expect(scalars.status == ReferenceRenderStatus::rendered,
+                   scalars.diagnostic.empty() ? "quality scalar probe failed"
+                                              : scalars.diagnostic);
+    const auto radiance = truth::render::RenderWarpSkyFieldRadiance(
+        ReferenceScene::active_clear_night,
+        shader_path,
+        width,
+        height,
+        quality);
+    context.expect(radiance.status == ReferenceRenderStatus::rendered,
+                   radiance.diagnostic.empty() ? "quality radiance probe failed"
+                                               : radiance.diagnostic);
+    for (std::uint32_t y = 0; y < height; ++y) {
+      const float vertical = 1.0F
+          - ((static_cast<float>(y) + 0.5F) / static_cast<float>(height));
+      const float elevation = 0.035F + (((0.5F * pi) - 0.07F) * vertical);
+      const float view_z = std::sin(elevation);
+      const float view_radius = std::cos(elevation);
+      for (std::uint32_t x = 0; x < width; ++x) {
+        const float horizontal = (static_cast<float>(x) + 0.5F)
+            / static_cast<float>(width);
+        const float azimuth = ((horizontal * 2.0F) - 1.0F) * pi;
+        truth::render::AuroraCurtainInput input{
+            0.0F, 0.0F, 0.20F,
+            std::sin(azimuth) * view_radius,
+            std::cos(azimuth) * view_radius,
+            view_z,
+            0.63F,
+            0.62F, -0.27F,
+            0.82F,
+            1.0F,
+            quality,
+        };
+        truth::render::AuroraCurtainOutput cpu{};
+        context.expect(
+            truth::render::EvaluateAuroraCurtain(input, cpu).status
+                == truth::render::AuroraCurtainStatus::evaluated,
+            "CPU quality-tier parity sample was rejected");
+        const auto offset = (static_cast<std::size_t>(y) * width + x) * 4U;
+        const auto close = [&](const std::uint8_t gpu, const float expected) {
+          return std::fabs((static_cast<float>(gpu) / 255.0F) - expected)
+              <= tolerance;
+        };
+        context.expect(close(scalars.image.rgba8[offset + 3U], cpu.mask),
+                       "CPU/HLSL quality-tier aurora mask drifted");
+        context.expect(close(radiance.image.rgba8[offset], cpu.intrinsic_radiance.r)
+                           && close(radiance.image.rgba8[offset + 1U],
+                                    cpu.intrinsic_radiance.g)
+                           && close(radiance.image.rgba8[offset + 2U],
+                                    cpu.intrinsic_radiance.b),
+                       "CPU/HLSL quality-tier aurora radiance drifted");
+      }
+    }
+  }
+}
+
 void CpuAndHlslCloudVolumeRemainAligned(
     TestContext& context,
     const std::filesystem::path& shader_path) {
@@ -702,6 +779,10 @@ int main(int argc, char** argv) {
     ++passed;
     std::cout << "[PASS] CPU and HLSL sky fields remain aligned\n";
 
+    CpuAndHlslAuroraQualityTiersRemainAligned(context, shader_path);
+    ++passed;
+    std::cout << "[PASS] CPU and HLSL aurora quality tiers remain aligned\n";
+
     CpuAndHlslCloudVolumeRemainAligned(context, shader_path);
     ++passed;
     std::cout << "[PASS] CPU and HLSL cloud volume remain aligned\n";
@@ -742,7 +823,7 @@ int main(int argc, char** argv) {
                  << " render_ms=" << capture.render_milliseconds
                  << " elapsed_ms=" << capture.elapsed_milliseconds << '\n';
     }
-    std::cout << "Truth WARP reference cases: " << passed << "/10; assertions: "
+    std::cout << "Truth WARP reference cases: " << passed << "/11; assertions: "
               << context.assertions << '\n';
     return 0;
   } catch (const std::exception& exception) {

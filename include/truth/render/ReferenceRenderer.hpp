@@ -1,5 +1,7 @@
 #pragma once
 
+#include "truth/render/AuroraCurtain.hpp"
+
 #include <cstdint>
 #include <filesystem>
 #include <string>
@@ -58,11 +60,25 @@ struct ReferenceRenderResult {
     std::uint32_t width,
     std::uint32_t height) noexcept;
 
+[[nodiscard]] ReferenceRenderResult RenderWarpSkyFieldScalars(
+    ReferenceScene scene,
+    const std::filesystem::path& shader_path,
+    std::uint32_t width,
+    std::uint32_t height,
+    AuroraQuality quality) noexcept;
+
 [[nodiscard]] ReferenceRenderResult RenderWarpSkyFieldRadiance(
     ReferenceScene scene,
     const std::filesystem::path& shader_path,
     std::uint32_t width,
     std::uint32_t height) noexcept;
+
+[[nodiscard]] ReferenceRenderResult RenderWarpSkyFieldRadiance(
+    ReferenceScene scene,
+    const std::filesystem::path& shader_path,
+    std::uint32_t width,
+    std::uint32_t height,
+    AuroraQuality quality) noexcept;
 
 [[nodiscard]] ReferenceRenderResult RenderWarpCloudVolumeScalars(
     ReferenceScene scene,

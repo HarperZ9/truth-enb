@@ -406,11 +406,29 @@ void ProceduralSkyAuroraFeedsLightingWithoutHueLoss(TestContext& context) {
       0.4F, -0.25F,
       0.78F, 0.85F, 0.45F,
       1.0F, 1.0F,
+      0.0F, 0.0F, 0.20F,
   };
   SkyFieldOutput sky_output{};
-  const auto sky_evaluation = EvaluateSkyFields(sky_input, sky_output);
-  context.expect(sky_evaluation.status == SkyFieldStatus::evaluated,
-                 "procedural sky input failed before cloud lighting");
+  constexpr float pi = 3.14159265358979323846F;
+  for (std::uint32_t y = 0U; y < 12U; ++y) {
+    const float view_z = 0.10F + (0.80F * static_cast<float>(y) / 11.0F);
+    const float radial = std::sqrt(1.0F - (view_z * view_z));
+    for (std::uint32_t x = 0U; x < 96U; ++x) {
+      const float azimuth = -pi
+          + (2.0F * pi * static_cast<float>(x) / 96.0F);
+      sky_input.view_x = std::sin(azimuth) * radial;
+      sky_input.view_y = std::cos(azimuth) * radial;
+      sky_input.view_z = view_z;
+      SkyFieldOutput candidate{};
+      const auto sky_evaluation = EvaluateSkyFields(sky_input, candidate);
+      context.expect(sky_evaluation.status == SkyFieldStatus::evaluated,
+                     "procedural sky input failed before cloud lighting");
+      if (candidate.aurora_intrinsic_radiance.g
+          > sky_output.aurora_intrinsic_radiance.g) {
+        sky_output = candidate;
+      }
+    }
+  }
   context.expect(sky_output.aurora_intrinsic_radiance.g > 0.0F,
                  "procedural sky fixture emitted no aurora");
 

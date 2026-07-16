@@ -1,6 +1,7 @@
 #include "truth/render/AuroraCurtain.hpp"
 
 #include <algorithm>
+#include <array>
 #include <bit>
 #include <cmath>
 #include <cstdint>
@@ -20,9 +21,25 @@ struct Point3 {
   float z;
 };
 
+struct Point2 {
+  float x;
+  float y;
+};
+
 struct ElectronFlux {
   float dynamic;
   float persistent;
+};
+
+struct FieldCoordinates {
+  float along;
+  float across;
+};
+
+struct FieldContext {
+  float broad_warp;
+  float curl_warp;
+  float filament_noise;
 };
 
 [[nodiscard]] bool InRange(
@@ -65,51 +82,41 @@ struct ElectronFlux {
   return value;
 }
 
-[[nodiscard]] float LatticeHash3D(
+[[nodiscard]] float LatticeHash2D(
     const std::int32_t x,
-    const std::int32_t y,
-    const std::int32_t z) noexcept {
+    const std::int32_t y) noexcept {
   const std::uint32_t x_bits = std::bit_cast<std::uint32_t>(x);
   const std::uint32_t y_bits = std::bit_cast<std::uint32_t>(y);
-  const std::uint32_t z_bits = std::bit_cast<std::uint32_t>(z);
   const std::uint32_t combined = (x_bits * 0xA24BAED5U)
       ^ (y_bits * 0x9FB21C65U)
-      ^ (z_bits * 0xC13FA9A9U)
       ^ 0x91E10DA5U;
   return static_cast<float>(MixBits(combined) & 0x00FFFFFFU) / 16777215.0F;
 }
 
-[[nodiscard]] float ValueNoise3D(const Point3 point) noexcept {
+[[nodiscard]] float ValueNoise2D(const Point2 point) noexcept {
   const float floor_x = std::floor(point.x);
   const float floor_y = std::floor(point.y);
-  const float floor_z = std::floor(point.z);
   const auto lattice_x = static_cast<std::int32_t>(floor_x);
   const auto lattice_y = static_cast<std::int32_t>(floor_y);
-  const auto lattice_z = static_cast<std::int32_t>(floor_z);
   const float blend_x = Smooth(point.x - floor_x);
   const float blend_y = Smooth(point.y - floor_y);
-  const float blend_z = Smooth(point.z - floor_z);
-
-  const auto plane = [&](const std::int32_t plane_z) noexcept {
-    const float lower = LinearInterpolate(
-        LatticeHash3D(lattice_x, lattice_y, plane_z),
-        LatticeHash3D(lattice_x + 1, lattice_y, plane_z),
-        blend_x);
-    const float upper = LinearInterpolate(
-        LatticeHash3D(lattice_x, lattice_y + 1, plane_z),
-        LatticeHash3D(lattice_x + 1, lattice_y + 1, plane_z),
-        blend_x);
-    return LinearInterpolate(lower, upper, blend_y);
-  };
-  return LinearInterpolate(plane(lattice_z), plane(lattice_z + 1), blend_z);
+  const float lower = LinearInterpolate(
+      LatticeHash2D(lattice_x, lattice_y),
+      LatticeHash2D(lattice_x + 1, lattice_y),
+      blend_x);
+  const float upper = LinearInterpolate(
+      LatticeHash2D(lattice_x, lattice_y + 1),
+      LatticeHash2D(lattice_x + 1, lattice_y + 1),
+      blend_x);
+  return LinearInterpolate(lower, upper, blend_y);
 }
 
-[[nodiscard]] float Gaussian(
+[[nodiscard]] float CompactWindow(
     const float value,
     const float center,
-    const float standard_deviation) noexcept {
-  const float normalized = (value - center) / standard_deviation;
-  return std::exp(-0.5F * normalized * normalized);
+    const float half_width) noexcept {
+  const float distance = std::fabs((value - center) / half_width);
+  return Smooth(std::clamp(1.0F - distance, 0.0F, 1.0F));
 }
 
 [[nodiscard]] AuroraCurtainDiagnostic ValidateInput(
@@ -197,7 +204,7 @@ struct ElectronFlux {
   return AuroraCurtainDiagnostic::none;
 }
 
-[[nodiscard]] ElectronFlux EvaluateElectronFlux(
+[[nodiscard]] FieldCoordinates EvaluateFieldCoordinates(
     const float world_x,
     const float world_y,
     const float phase_sine,
@@ -209,62 +216,105 @@ struct ElectronFlux {
   const float along = (basis_cosine * world_x) + (basis_sine * world_y);
   const float across = (-basis_sine * world_x) + (basis_cosine * world_y);
   const float phase_arc = 1.0F - phase_cosine;
-  const float advected_along = along
-      + (0.78F * wind_x * phase_sine)
-      + (0.31F * wind_y * phase_arc);
-  const float advected_across = across
-      + (0.64F * wind_y * phase_sine)
-      - (0.24F * wind_x * phase_arc);
+  return {
+      along + (0.78F * wind_x * phase_sine) + (0.31F * wind_y * phase_arc),
+      across + (0.64F * wind_y * phase_sine) - (0.24F * wind_x * phase_arc),
+  };
+}
 
-  const float broad_warp = ValueNoise3D({
-      (0.055F * advected_along) + (0.42F * phase_sine) + 11.3F,
-      (0.045F * advected_across) + (0.42F * phase_cosine) - 7.1F,
-      2.9F + (0.35F * phase_sine),
-  }) - 0.5F;
-  const float curl_warp = ValueNoise3D({
-      (0.13F * advected_along) - (0.37F * phase_cosine) - 5.8F,
-      (0.10F * advected_across) + (0.37F * phase_sine) + 9.6F,
-      -4.2F + (0.29F * phase_cosine),
-  }) - 0.5F;
-  const float center = 10.45F
-      + (0.0060F * advected_along * advected_along)
-      + (1.15F * std::sin((0.115F * advected_along) + (0.55F * phase_sine)))
-      + (0.52F * std::sin((0.34F * advected_along) - (0.42F * phase_cosine)))
-      + (1.75F * broad_warp)
-      + (0.58F * curl_warp);
-  const float primary_width = 1.05F
-      + (0.40F * ValueNoise3D({
-          (0.085F * advected_along) + 3.2F,
-          (0.065F * advected_across) - 8.4F,
-          7.7F + (0.25F * phase_sine),
-      }));
-  const float primary_distance = (advected_across - center) / primary_width;
-  const float primary_sheet = std::exp(-0.5F * primary_distance * primary_distance);
+[[nodiscard]] FieldContext EvaluateFieldContext(
+    const FieldCoordinates coordinates,
+    const float phase_sine,
+    const float phase_cosine) noexcept {
+  return {
+      ValueNoise2D({
+          (0.055F * coordinates.along) + (0.42F * phase_sine) + 11.3F,
+          (0.045F * coordinates.across) + (0.42F * phase_cosine) - 7.1F,
+      }) - 0.5F,
+      ValueNoise2D({
+          (0.13F * coordinates.along) - (0.37F * phase_cosine) - 5.8F,
+          (0.10F * coordinates.across) + (0.37F * phase_sine) + 9.6F,
+      }) - 0.5F,
+      ValueNoise2D({
+          (0.24F * coordinates.along) + (0.75F * phase_sine) + 4.8F,
+          (0.035F * coordinates.across) + (0.75F * phase_cosine) - 3.1F,
+      }),
+  };
+}
 
+[[nodiscard]] float CurtainCenter(
+    const FieldCoordinates coordinates,
+    const FieldContext context,
+    const float phase_sine,
+    const float phase_cosine) noexcept {
+  return 10.45F
+      + (0.0060F * coordinates.along * coordinates.along)
+      + (1.15F * std::sin((0.115F * coordinates.along) + (0.55F * phase_sine)))
+      + (0.52F * std::sin((0.34F * coordinates.along) - (0.42F * phase_cosine)))
+      + (1.75F * context.broad_warp)
+      + (0.58F * context.curl_warp);
+}
+
+[[nodiscard]] float PrimaryWidth(
+    const FieldCoordinates coordinates,
+    const float phase_sine) noexcept {
+  return 1.05F + (0.20F * (1.0F + std::sin(
+      (0.085F * coordinates.along)
+      + (0.065F * coordinates.across)
+      + (0.25F * phase_sine)
+      + 3.2F)));
+}
+
+[[nodiscard]] float EvaluateCoarseSupport(
+    const FieldCoordinates coordinates,
+    const FieldContext context,
+    const float phase_sine,
+    const float phase_cosine,
+    const float margin) noexcept {
+  const float center = CurtainCenter(
+      coordinates, context, phase_sine, phase_cosine);
+  const float primary_distance = (coordinates.across - center)
+      / PrimaryWidth(coordinates, phase_sine);
   const float secondary_center = center + 4.35F
-      + (0.62F * std::sin((0.19F * advected_along) + 1.4F - phase_sine));
-  const float secondary_distance = (advected_across - secondary_center) / 1.55F;
-  const float secondary_sheet = std::exp(
-      -0.5F * secondary_distance * secondary_distance);
-  const float along_envelope = std::exp(
-      -0.5F * (advected_along / 29.0F) * (advected_along / 29.0F));
+      + (0.62F * std::sin((0.19F * coordinates.along) + 1.4F - phase_sine));
+  const float secondary_distance = (coordinates.across - secondary_center) / 1.55F;
+  const float sheet = std::clamp(
+      CompactWindow(primary_distance, 0.0F, margin)
+          + (0.52F * CompactWindow(secondary_distance, 0.0F, margin)),
+      0.0F,
+      1.0F);
+  return CompactWindow(coordinates.along, 0.0F, 110.0F) * sheet;
+}
 
-  const float coarse_filament = ValueNoise3D({
-      (0.24F * advected_along) + (0.75F * phase_sine) + 4.8F,
-      (0.035F * advected_across) + (0.75F * phase_cosine) - 3.1F,
-      12.7F + (0.45F * phase_sine),
-  });
-  const float fine_filament = ValueNoise3D({
-      (0.92F * advected_along) - (1.15F * phase_cosine) - 8.2F,
-      (0.055F * advected_across) + (1.15F * phase_sine) + 5.7F,
-      -6.4F + (0.63F * phase_cosine),
-  });
-  const float filament_wave = 0.5F + (0.5F * std::sin(
-      (2.75F * advected_along) + (1.9F * curl_warp) + (0.8F * phase_sine)));
-  const float filament_signal = (0.53F * coarse_filament)
-      + (0.31F * fine_filament)
-      + (0.16F * filament_wave);
-  const float filaments = 0.52F + (0.48F * SmoothStep(0.30F, 0.78F, filament_signal));
+[[nodiscard]] ElectronFlux EvaluateElectronFlux(
+    const FieldCoordinates coordinates,
+    const FieldContext context,
+    const float phase_sine,
+    const float phase_cosine) noexcept {
+  const float center = CurtainCenter(
+      coordinates, context, phase_sine, phase_cosine);
+  const float primary_distance = (coordinates.across - center)
+      / PrimaryWidth(coordinates, phase_sine);
+  const float primary_sheet = CompactWindow(primary_distance, 0.0F, 2.75F);
+  const float secondary_center = center + 4.35F
+      + (0.62F * std::sin((0.19F * coordinates.along) + 1.4F - phase_sine));
+  const float secondary_distance = (coordinates.across - secondary_center) / 1.55F;
+  const float secondary_sheet = CompactWindow(secondary_distance, 0.0F, 2.75F);
+  const float along_envelope = CompactWindow(coordinates.along, 0.0F, 82.0F);
+  const float coarse_wave = 0.5F + (0.5F * std::sin(
+      (0.63F * coordinates.along)
+      + (0.17F * coordinates.across)
+      + (3.2F * context.broad_warp)
+      + (0.55F * phase_sine)));
+  const float fine_wave = 0.5F + (0.5F * std::sin(
+      (2.75F * coordinates.along)
+      + (1.9F * context.curl_warp)
+      + (0.8F * phase_sine)));
+  const float filament_signal = (0.42F * context.filament_noise)
+      + (0.34F * coarse_wave)
+      + (0.24F * fine_wave);
+  const float filaments = 0.50F
+      + (0.50F * SmoothStep(0.30F, 0.78F, filament_signal));
   const float sheet = std::clamp(
       primary_sheet + (0.38F * secondary_sheet), 0.0F, 1.0F);
   const float persistent_sheet = std::clamp(
@@ -273,7 +323,7 @@ struct ElectronFlux {
       std::clamp(along_envelope * sheet * filaments, 0.0F, 1.0F),
       std::clamp(along_envelope
                      * persistent_sheet
-                     * (0.70F + (0.30F * coarse_filament)),
+                     * (0.70F + (0.30F * context.filament_noise)),
                  0.0F,
                  1.0F),
   };
@@ -299,13 +349,13 @@ AuroraDepositionProfile EvaluateAuroraDepositionProfile(
     return {};
   }
   const float height = std::clamp(normalized_height, 0.0F, 1.0F);
-  const float green = Gaussian(height, 0.32F, 0.13F);
+  const float green = CompactWindow(height, 0.32F, 0.30F);
   const float blue = std::clamp(
-      (0.84F * Gaussian(height, 0.29F, 0.115F))
-          + (0.16F * Gaussian(height, 0.46F, 0.17F)),
+      (0.84F * CompactWindow(height, 0.29F, 0.27F))
+          + (0.16F * CompactWindow(height, 0.46F, 0.34F)),
       0.0F,
       1.0F);
-  const float red = Gaussian(height, 0.72F, 0.23F);
+  const float red = CompactWindow(height, 0.72F, 0.55F);
   return {red, green, blue};
 }
 
@@ -318,7 +368,8 @@ AuroraCurtainEvaluation EvaluateAuroraCurtain(
   }
 
   AuroraCurtainOutput candidate{};
-  if (input.night_factor == 0.0F
+  if (input.activity == 0.0F
+      || input.night_factor == 0.0F
       || input.view_z <= kMinimumRayElevation
       || input.camera_z >= kAuroraTopHeight) {
     output = candidate;
@@ -339,6 +390,60 @@ AuroraCurtainEvaluation EvaluateAuroraCurtain(
       kMaximumStepPathWeight);
   const float horizon_fade = SmoothStep(0.035F, 0.14F, input.view_z);
 
+  constexpr std::array<float, 3U> coarse_height_fractions{0.0F, 0.5F, 1.0F};
+  std::array<FieldCoordinates, 3U> coarse_coordinates{};
+  std::uint32_t coarse_coordinate_count{};
+  for (const float fraction : coarse_height_fractions) {
+    const float height = lower_height + (height_span * fraction);
+    const float distance = (height - input.camera_z) / input.view_z;
+    if (distance <= kAuroraMaximumRayDistance) {
+      coarse_coordinates[coarse_coordinate_count++] = EvaluateFieldCoordinates(
+          input.camera_x + (input.view_x * distance),
+          input.camera_y + (input.view_y * distance),
+          phase_sine,
+          phase_cosine,
+          input.wind_x,
+          input.wind_y);
+    }
+  }
+  if (coarse_coordinate_count == 0U) {
+    output = candidate;
+    return {AuroraCurtainStatus::evaluated, AuroraCurtainDiagnostic::none};
+  }
+  const FieldContext unwarped_context{};
+  float unwarped_support{};
+  for (std::uint32_t index = 0U; index < coarse_coordinate_count; ++index) {
+    unwarped_support = std::max(
+        unwarped_support,
+        EvaluateCoarseSupport(coarse_coordinates[index],
+                              unwarped_context,
+                              phase_sine,
+                              phase_cosine,
+                              6.0F));
+  }
+  if (unwarped_support == 0.0F) {
+    output = candidate;
+    return {AuroraCurtainStatus::evaluated, AuroraCurtainDiagnostic::none};
+  }
+  const FieldCoordinates representative =
+      coarse_coordinates[coarse_coordinate_count / 2U];
+  const FieldContext field_context = EvaluateFieldContext(
+      representative, phase_sine, phase_cosine);
+  float warped_support{};
+  for (std::uint32_t index = 0U; index < coarse_coordinate_count; ++index) {
+    warped_support = std::max(
+        warped_support,
+        EvaluateCoarseSupport(coarse_coordinates[index],
+                              field_context,
+                              phase_sine,
+                              phase_cosine,
+                              4.0F));
+  }
+  if (warped_support == 0.0F) {
+    output = candidate;
+    return {AuroraCurtainStatus::evaluated, AuroraCurtainDiagnostic::none};
+  }
+
   float mask{};
   AuroraRadiance radiance{};
   for (std::uint32_t index = 0; index < sample_count; ++index) {
@@ -351,13 +456,15 @@ AuroraCurtainEvaluation EvaluateAuroraCurtain(
     }
     const float world_x = input.camera_x + (input.view_x * distance);
     const float world_y = input.camera_y + (input.view_y * distance);
-    const ElectronFlux flux = EvaluateElectronFlux(
+    const FieldCoordinates coordinates = EvaluateFieldCoordinates(
         world_x,
         world_y,
         phase_sine,
         phase_cosine,
         input.wind_x,
         input.wind_y);
+    const ElectronFlux flux = EvaluateElectronFlux(
+        coordinates, field_context, phase_sine, phase_cosine);
     const float normalized_altitude = (height - kAuroraBaseHeight)
         / (kAuroraTopHeight - kAuroraBaseHeight);
     const AuroraDepositionProfile deposition =

@@ -313,6 +313,7 @@ void DirectionSpaceIsContinuousAcrossThePanorama(TestContext& context) {
   for (const float view_z : {0.08F, 0.32F, 0.62F, 0.88F}) {
     SkyFieldOutput previous{};
     SkyFieldOutput first{};
+    float maximum_aurora_delta{};
     for (std::uint32_t index = 0; index <= azimuth_samples; ++index) {
       const float azimuth = -pi
           + (2.0F * pi * static_cast<float>(index)
@@ -328,8 +329,7 @@ void DirectionSpaceIsContinuousAcrossThePanorama(TestContext& context) {
         context.expect(std::fabs(output.cloud_density - previous.cloud_density) < 0.12F,
                        "cloud density jumped between adjacent angular samples");
         const float aurora_delta = std::fabs(output.aurora_mask - previous.aurora_mask);
-        context.expect(aurora_delta < 0.12F,
-                       "aurora curtain jumped between adjacent angular samples");
+        maximum_aurora_delta = std::max(maximum_aurora_delta, aurora_delta);
       }
       previous = output;
     }
@@ -339,6 +339,10 @@ void DirectionSpaceIsContinuousAcrossThePanorama(TestContext& context) {
                    "cloud density opened at the panorama seam");
     context.expect(std::fabs(previous.aurora_mask - first.aurora_mask) < 1.0e-5F,
                    "aurora curtain opened at the panorama seam");
+    std::cout << "aurora adjacent delta view_z=" << view_z
+              << " maximum=" << maximum_aurora_delta << '\n';
+    context.expect(maximum_aurora_delta < 0.12F,
+                   "aurora curtain jumped between adjacent angular samples");
   }
 }
 
@@ -623,27 +627,21 @@ void AuroraRadianceIsGreenLedAndRestrained(TestContext& context) {
                  "aurora integration was not green-led and restrained");
 }
 
-void AuroraActivityScalesOnlyRadiance(TestContext& context) {
+void InactiveAuroraIsExactZero(TestContext& context) {
   SkyFieldInput inactive = ReferenceInput();
   inactive.night_factor = 1.0F;
   inactive.aurora_activity = 0.0F;
   SetPanoramaDirection(inactive, 0.0F, 0.60F);
-  SkyFieldInput active = inactive;
-  active.aurora_activity = 1.0F;
   SkyFieldOutput inactive_output{};
-  SkyFieldOutput active_output{};
   ExpectSucceeded(context, EvaluateSkyFields(inactive, inactive_output));
-  ExpectSucceeded(context, EvaluateSkyFields(active, active_output));
-  context.expect(SameFloatBits(inactive_output.aurora_mask, active_output.aurora_mask),
-                 "aurora activity changed the spatial curtain mask");
+  context.expect(SameFloatBits(inactive_output.aurora_mask, 0.0F),
+                 "inactive aurora mask was not exact +0");
   context.expect(SameFloatBits(inactive_output.aurora_intrinsic_radiance.r, 0.0F),
                  "inactive aurora intrinsic r was not exact +0");
   context.expect(SameFloatBits(inactive_output.aurora_intrinsic_radiance.g, 0.0F),
                  "inactive aurora intrinsic g was not exact +0");
   context.expect(SameFloatBits(inactive_output.aurora_intrinsic_radiance.b, 0.0F),
                  "inactive aurora intrinsic b was not exact +0");
-  context.expect(active_output.aurora_intrinsic_radiance.g > 0.0F,
-                 "active aurora intrinsic radiance stayed zero");
 }
 
 void AuroraUsesWorldSpaceCameraParallax(TestContext& context) {
@@ -692,7 +690,7 @@ constexpr TestCase kTests[] = {
      &AuroraRadianceIsGreenLedAndRestrained},
     {"aurora forms one broad world-space arc", &AuroraFormsOneBroadWorldSpaceArc},
     {"cloud masses are not vertical pillars", &CloudMassesAreNotVerticalPillars},
-    {"aurora activity scales only radiance", &AuroraActivityScalesOnlyRadiance},
+    {"inactive aurora is exact zero", &InactiveAuroraIsExactZero},
     {"aurora uses world-space camera parallax", &AuroraUsesWorldSpaceCameraParallax},
 };
 

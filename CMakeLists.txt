@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.28)
+cmake_minimum_required(VERSION 3.30)
 
 cmake_policy(SET CMP0091 NEW)
 project(TruthENB VERSION 0.1.0 LANGUAGES CXX)
@@ -9,6 +9,16 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+
+option(
+  TRUTH_BUILD_RUNTIME
+  "Build the pinned standalone Truth ENB camera bridge"
+  ON
+)
+
+if(WIN32 AND TRUTH_BUILD_RUNTIME)
+  add_subdirectory(runtime)
+endif()
 
 add_library(truth_master_look STATIC
   src/render/MasterLook.cpp
@@ -79,6 +89,18 @@ endif()
 
 target_link_libraries(truth_sky_fields PUBLIC truth_aurora_curtain)
 
+add_library(truth_sky_view_adapter STATIC
+  src/render/SkyViewAdapter.cpp
+)
+target_compile_features(truth_sky_view_adapter PUBLIC cxx_std_23)
+target_include_directories(truth_sky_view_adapter PUBLIC include)
+
+if(MSVC)
+  target_compile_options(truth_sky_view_adapter PRIVATE
+    /W4 /WX /permissive- /EHsc /utf-8
+  )
+endif()
+
 if(WIN32)
   add_library(truth_reference_renderer_core STATIC
     src/render/ReferenceRenderer.cpp
@@ -107,6 +129,82 @@ if(WIN32)
       /W4 /WX /permissive- /EHsc /utf-8
     )
   endif()
+endif()
+
+if(WIN32 AND TRUTH_BUILD_RUNTIME)
+  set(TRUTH_RELEASE_COMPONENT TruthPrivateRelease)
+  set(TRUTH_RELEASE_SHADER_ROOT "enbseries")
+  set(TRUTH_RELEASE_DOCUMENTATION_ROOT "Truth ENB Documentation")
+  set(TRUTH_RELEASE_SHADER_INCLUDES
+    shaders/truth/TruthAtmosphereCore.fxh
+    shaders/truth/TruthAuroraCurtain.fxh
+    shaders/truth/TruthCloudLighting.fxh
+    shaders/truth/TruthColorCore.fxh
+    shaders/truth/TruthEffectParameters.fxh
+    shaders/truth/TruthRuntimeParameters.fxh
+    shaders/truth/TruthSkyFields.fxh
+    shaders/truth/TruthSkyViewAdapter.fxh
+  )
+  set(TRUTH_RELEASE_ENB_CONTRACT
+    shaders/enb/ENBSeries0504VanillaPostProcess.fxh
+  )
+
+  install(
+    FILES shaders/enbeffect.fx
+    DESTINATION "${TRUTH_RELEASE_SHADER_ROOT}"
+    COMPONENT "${TRUTH_RELEASE_COMPONENT}"
+  )
+  install(
+    FILES ${TRUTH_RELEASE_SHADER_INCLUDES}
+    DESTINATION "${TRUTH_RELEASE_SHADER_ROOT}/truth"
+    COMPONENT "${TRUTH_RELEASE_COMPONENT}"
+  )
+  install(
+    FILES ${TRUTH_RELEASE_ENB_CONTRACT}
+    DESTINATION "${TRUTH_RELEASE_SHADER_ROOT}/enb"
+    COMPONENT "${TRUTH_RELEASE_COMPONENT}"
+  )
+  install(
+    TARGETS truth_enb_runtime_plugin
+    RUNTIME DESTINATION "${TRUTH_RELEASE_SHADER_ROOT}"
+    COMPONENT "${TRUTH_RELEASE_COMPONENT}"
+  )
+  install(
+    FILES
+      README.md
+      LICENSE
+      runtime/enb-runtime-core.lock
+      runtime/enb-upstream.lock
+    DESTINATION "${TRUTH_RELEASE_DOCUMENTATION_ROOT}"
+    COMPONENT "${TRUTH_RELEASE_COMPONENT}"
+  )
+  install(
+    FILES
+      docs/architecture.md
+      docs/release-validation.md
+    DESTINATION "${TRUTH_RELEASE_DOCUMENTATION_ROOT}/docs"
+    COMPONENT "${TRUTH_RELEASE_COMPONENT}"
+  )
+  install(
+    FILES runtime/README.md
+    DESTINATION "${TRUTH_RELEASE_DOCUMENTATION_ROOT}"
+    RENAME Runtime.md
+    COMPONENT "${TRUTH_RELEASE_COMPONENT}"
+  )
+
+  set(CPACK_GENERATOR "ZIP")
+  set(CPACK_PACKAGE_NAME "Truth ENB Private RC")
+  set(CPACK_PACKAGE_VENDOR "Truth ENB")
+  set(CPACK_PACKAGE_DESCRIPTION_SUMMARY
+    "Truth ENB original shader system and native camera bridge private RC")
+  set(CPACK_PACKAGE_VERSION "0.1.0")
+  set(CPACK_PACKAGE_FILE_NAME "Truth-ENB-Private-RC-win64")
+  set(CPACK_INCLUDE_TOPLEVEL_DIRECTORY OFF)
+  set(CPACK_COMPONENTS_ALL "${TRUTH_RELEASE_COMPONENT}")
+  set(CPACK_THREADS 1)
+  set(CPACK_PACKAGE_CHECKSUM SHA256)
+  include(CPack)
+
 endif()
 
 if(BUILD_TESTING)
@@ -198,6 +296,77 @@ if(BUILD_TESTING)
   endif()
 
   add_test(NAME truth_aurora_curtain_cpp COMMAND truth_aurora_curtain_tests)
+
+  add_executable(truth_sky_view_adapter_tests
+    tests/SkyViewAdapterTests.cpp
+  )
+  target_compile_features(truth_sky_view_adapter_tests PRIVATE cxx_std_23)
+  target_link_libraries(truth_sky_view_adapter_tests PRIVATE truth_sky_view_adapter)
+  set_property(TARGET truth_sky_view_adapter_tests PROPERTY VS_GLOBAL_VcpkgApplocalDeps false)
+
+  if(MSVC)
+    target_compile_options(truth_sky_view_adapter_tests PRIVATE
+      /W4 /WX /permissive- /EHsc /utf-8
+    )
+  endif()
+
+  add_test(NAME truth_sky_view_adapter_cpp COMMAND truth_sky_view_adapter_tests)
+
+  if(WIN32)
+    add_executable(truth_sky_view_adapter_warp_tests
+      tests/SkyViewAdapterWarpTests.cpp
+    )
+    target_compile_features(truth_sky_view_adapter_warp_tests PRIVATE cxx_std_23)
+    target_link_libraries(truth_sky_view_adapter_warp_tests PRIVATE
+      truth_master_look
+      truth_sky_view_adapter
+      d3d11
+      d3dcompiler
+    )
+    set_property(TARGET truth_sky_view_adapter_warp_tests
+      PROPERTY VS_GLOBAL_VcpkgApplocalDeps false)
+
+    if(MSVC)
+      target_compile_options(truth_sky_view_adapter_warp_tests PRIVATE
+        /W4 /WX /permissive- /EHsc /utf-8
+      )
+    endif()
+
+    add_test(
+      NAME truth_sky_view_adapter_warp
+      COMMAND truth_sky_view_adapter_warp_tests
+        "${CMAKE_CURRENT_SOURCE_DIR}/shaders/truth/TruthSkyViewAdapterProbe.hlsl"
+        "${CMAKE_CURRENT_SOURCE_DIR}/shaders/truth/TruthRuntimeParametersProbe.hlsl"
+        "${CMAKE_CURRENT_SOURCE_DIR}/shaders/enbeffect.fx"
+    )
+    set_tests_properties(truth_sky_view_adapter_warp PROPERTIES
+      LABELS "gpu;warp;shader;adapter;abi"
+    )
+  endif()
+
+  add_test(
+    NAME truth_sky_view_adapter_shader_contract
+    COMMAND "${CMAKE_COMMAND}"
+      "-DTRUTH_EFFECT=${CMAKE_CURRENT_SOURCE_DIR}/shaders/enbeffect.fx"
+      "-DTRUTH_ADAPTER=${CMAKE_CURRENT_SOURCE_DIR}/shaders/truth/TruthSkyViewAdapter.fxh"
+      "-DTRUTH_RUNTIME=${CMAKE_CURRENT_SOURCE_DIR}/shaders/truth/TruthRuntimeParameters.fxh"
+      "-DTRUTH_ENB_VANILLA=${CMAKE_CURRENT_SOURCE_DIR}/shaders/enb/ENBSeries0504VanillaPostProcess.fxh"
+      "-DTRUTH_COMPILE_SCRIPT=${CMAKE_CURRENT_SOURCE_DIR}/cmake/CompileTruthShader.cmake"
+      -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/CheckTruthSkyViewAdapterContract.cmake"
+  )
+  set_tests_properties(truth_sky_view_adapter_shader_contract PROPERTIES
+    LABELS "shader;adapter;contract"
+  )
+
+  add_test(
+    NAME truth_aurora_default_quality_contract
+    COMMAND "${CMAKE_COMMAND}"
+      "-DTRUTH_AURORA_SOURCE=${CMAKE_CURRENT_SOURCE_DIR}/shaders/truth/TruthAuroraCurtain.fxh"
+      -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/CheckTruthAuroraDefaultContract.cmake"
+  )
+  set_tests_properties(truth_aurora_default_quality_contract PROPERTIES
+    LABELS "shader;aurora;contract;performance"
+  )
 
   if(WIN32)
     add_executable(truth_reference_renderer_tests
@@ -398,4 +567,76 @@ if(BUILD_TESTING)
     LABELS "shader;fxc;aurora"
     WILL_FAIL TRUE
   )
+
+  add_test(
+    NAME truth_aurora_default_instruction_budget
+    COMMAND "${CMAKE_COMMAND}"
+      "-DTRUTH_COMPILE_SCRIPT=${CMAKE_CURRENT_SOURCE_DIR}/cmake/CompileTruthShader.cmake"
+      "-DTRUTH_FXC=${TRUTH_FXC_EXECUTABLE}"
+      "-DTRUTH_SHADER=${CMAKE_CURRENT_SOURCE_DIR}/shaders/enbeffect.fx"
+      "-DTRUTH_REQUIRED_SOURCE=${CMAKE_CURRENT_SOURCE_DIR}/shaders/truth/TruthAtmosphereCore.fxh"
+      "-DTRUTH_REQUIRED_SOURCE_2=${CMAKE_CURRENT_SOURCE_DIR}/shaders/truth/TruthSkyFields.fxh"
+      "-DTRUTH_REQUIRED_SOURCE_3=${CMAKE_CURRENT_SOURCE_DIR}/shaders/truth/TruthCloudLighting.fxh"
+      "-DTRUTH_REQUIRED_SOURCE_4=${CMAKE_CURRENT_SOURCE_DIR}/shaders/truth/TruthAuroraCurtain.fxh"
+      "-DTRUTH_INCLUDE=${CMAKE_CURRENT_SOURCE_DIR}/shaders/truth"
+      "-DTRUTH_DEFINE=TRUTH_ENABLE_ATMOSPHERE=1"
+      "-DTRUTH_SECOND_DEFINE=TRUTH_ENABLE_PROCEDURAL_SKY=1"
+      "-DTRUTH_OUTPUT=${CMAKE_CURRENT_BINARY_DIR}/shaders/$<CONFIG>/TruthBudgetA1P1.fxo"
+      "-DTRUTH_LISTING=${CMAKE_CURRENT_BINARY_DIR}/shaders/$<CONFIG>/TruthBudgetA1P1.asm"
+      # IEEE-strict compilation reports 2,443 slots for the ENB-bound path at
+      # this revision. Keep only 21 slots of headroom so camera/depth/optical
+      # correctness cannot hide a material shader-cost regression.
+      "-DTRUTH_MAXIMUM_INSTRUCTION_SLOTS=2464"
+      "-DTRUTH_BASELINE_INSTRUCTION_SLOTS=6499"
+      "-DTRUTH_BASELINE_REVISION=12776780d4ed3d6ff71b09694dd666f3d07b5cf2"
+      "-DTRUTH_QUALITY=low-default"
+      "-DTRUTH_REPORT=${CMAKE_CURRENT_BINARY_DIR}/reports/$<CONFIG>/truth-aurora-cost-budget.csv"
+      -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/CheckTruthShaderInstructionBudget.cmake"
+  )
+  set_tests_properties(truth_aurora_default_instruction_budget PROPERTIES
+    LABELS "shader;fxc;aurora;performance"
+  )
+
+  if(WIN32 AND TRUTH_BUILD_RUNTIME)
+    add_custom_target(truth_release_gate
+      COMMAND "${CMAKE_CTEST_COMMAND}"
+        --test-dir "${CMAKE_CURRENT_BINARY_DIR}"
+        -C "$<CONFIG>"
+        -R "^(truth_sky_view_adapter_warp|truth_sky_view_adapter_shader_contract|truth_shader_fxc_a1_p1|truth_aurora_default_instruction_budget|truth_runtime_reproducible_release)$"
+        --output-on-failure
+        --no-tests=error
+      DEPENDS truth_sky_view_adapter_warp_tests truth_enb_runtime_plugin
+      COMMENT "Running the exact production Truth shader and runtime release gates"
+      VERBATIM
+    )
+
+    add_custom_target(truth_private_release_package
+      COMMAND "${CMAKE_COMMAND}" -E make_directory
+        "${CMAKE_CURRENT_BINARY_DIR}/packages/$<CONFIG>"
+      COMMAND "${CMAKE_COMMAND}" -E env SOURCE_DATE_EPOCH=946684800
+        "${CMAKE_CPACK_COMMAND}"
+        --config "${CMAKE_CURRENT_BINARY_DIR}/CPackConfig.cmake"
+        -C "$<CONFIG>"
+        -G ZIP
+        -B "${CMAKE_CURRENT_BINARY_DIR}/packages/$<CONFIG>"
+      DEPENDS truth_enb_runtime_plugin truth_release_gate
+      COMMENT "Packaging the deterministic Truth ENB private release candidate"
+      VERBATIM
+    )
+
+    add_test(
+      NAME truth_private_release_package_manifest
+      COMMAND "${CMAKE_COMMAND}"
+        "-DTRUTH_BUILD_ROOT=${CMAKE_CURRENT_BINARY_DIR}"
+        "-DTRUTH_CONFIGURATION=$<CONFIG>"
+        "-DTRUTH_WORK_ROOT=${CMAKE_CURRENT_BINARY_DIR}/package-validation/$<CONFIG>"
+        "-DTRUTH_SOURCE_ROOT=${CMAKE_CURRENT_SOURCE_DIR}"
+        "-DTRUTH_RUNTIME_PLUGIN=$<TARGET_FILE:truth_enb_runtime_plugin>"
+        "-DTRUTH_CPACK=${CMAKE_CPACK_COMMAND}"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/CheckTruthReleasePackage.cmake"
+    )
+    set_tests_properties(truth_private_release_package_manifest PROPERTIES
+      LABELS "install;package;manifest;determinism;release"
+    )
+  endif()
 endif()

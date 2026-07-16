@@ -228,7 +228,7 @@ void DepositionBandsHavePhysicalAltitudeOrdering(TestContext& context) {
                  "red deposition band was not longer-lived/broader in altitude");
 }
 
-void DayAndInactiveRadianceIsExactZero(TestContext& context) {
+void DayAndInactiveAuroraAreExactZero(TestContext& context) {
   AuroraCurtainInput input = ReferenceInput();
   input.night_factor = 0.0F;
   AuroraCurtainOutput output{};
@@ -242,20 +242,27 @@ void DayAndInactiveRadianceIsExactZero(TestContext& context) {
   context.expect(output.samples == 0U,
                  "day aurora consumed integration samples");
 
-  input = ReferenceInput();
-  input.activity = 0.0F;
-  AuroraCurtainOutput inactive{};
-  AuroraCurtainOutput active{};
-  ExpectSucceeded(context, EvaluateAuroraCurtain(ReferenceInput(), active));
-  ExpectSucceeded(context, EvaluateAuroraCurtain(input, inactive));
-  context.expect(SameFloatBits(inactive.mask, active.mask),
-                 "aurora activity changed the spatial curtain mask");
-  context.expect(SameFloatBits(inactive.intrinsic_radiance.r, 0.0F)
-                     && SameFloatBits(inactive.intrinsic_radiance.g, 0.0F)
-                     && SameFloatBits(inactive.intrinsic_radiance.b, 0.0F),
-                 "inactive aurora radiance was not exact +0");
-  context.expect(inactive.samples == truth::render::AuroraSampleCount(input.quality),
-                 "inactive aurora changed the spatial integration budget");
+  constexpr std::array qualities{
+      AuroraQuality::fallback,
+      AuroraQuality::low,
+      AuroraQuality::balanced,
+      AuroraQuality::high,
+  };
+  for (const auto quality : qualities) {
+    input = ReferenceInput();
+    input.activity = 0.0F;
+    input.quality = quality;
+    AuroraCurtainOutput inactive{};
+    ExpectSucceeded(context, EvaluateAuroraCurtain(input, inactive));
+    context.expect(SameFloatBits(inactive.mask, 0.0F),
+                   "inactive aurora mask was not exact +0");
+    context.expect(SameFloatBits(inactive.intrinsic_radiance.r, 0.0F)
+                       && SameFloatBits(inactive.intrinsic_radiance.g, 0.0F)
+                       && SameFloatBits(inactive.intrinsic_radiance.b, 0.0F),
+                   "inactive aurora radiance was not exact +0");
+    context.expect(inactive.samples == 0U,
+                   "inactive aurora consumed integration samples");
+  }
 }
 
 void DenseGridIsDeterministicFiniteAndBounded(TestContext& context) {
@@ -289,12 +296,17 @@ void DenseGridIsDeterministicFiniteAndBounded(TestContext& context) {
         context.expect(SameOutput(first, second),
                        "identical aurora input changed output bits");
         ExpectBounded(context, first);
-        const std::uint32_t expected_samples =
-            input.night_factor == 0.0F || input.view_z <= 0.0F
-            ? 0U
-            : truth::render::AuroraSampleCount(quality);
-        context.expect(first.samples == expected_samples,
+        const std::uint32_t quality_budget =
+            truth::render::AuroraSampleCount(quality);
+        context.expect(first.samples == 0U || first.samples == quality_budget,
                        "aurora integration exceeded its quality budget");
+        if (first.samples == 0U) {
+          context.expect(SameFloatBits(first.mask, 0.0F)
+                             && SameFloatBits(first.intrinsic_radiance.r, 0.0F)
+                             && SameFloatBits(first.intrinsic_radiance.g, 0.0F)
+                             && SameFloatBits(first.intrinsic_radiance.b, 0.0F),
+                         "coarse-rejected aurora retained visible energy");
+        }
       }
     }
   }
@@ -388,6 +400,77 @@ void QualityTiersAreBoundedAndDistinct(TestContext& context) {
   ExpectBounded(context, low);
   ExpectBounded(context, balanced);
   ExpectBounded(context, high);
+}
+
+void EmptyWorldSpaceRaysAreRejectedBeforeIntegration(TestContext& context) {
+  constexpr std::array qualities{
+      AuroraQuality::fallback,
+      AuroraQuality::low,
+      AuroraQuality::balanced,
+      AuroraQuality::high,
+  };
+  for (const auto quality : qualities) {
+    AuroraCurtainInput input = ReferenceInput();
+    input.camera_x = 512.0F;
+    input.camera_y = 512.0F;
+    input.view_x = 0.0F;
+    input.view_y = 0.0F;
+    input.view_z = 1.0F;
+    input.quality = quality;
+    AuroraCurtainOutput output{};
+    ExpectSucceeded(context, EvaluateAuroraCurtain(input, output));
+    context.expect(SameFloatBits(output.mask, 0.0F),
+                   "empty world-space ray retained an aurora mask");
+    context.expect(SameFloatBits(output.intrinsic_radiance.r, 0.0F)
+                       && SameFloatBits(output.intrinsic_radiance.g, 0.0F)
+                       && SameFloatBits(output.intrinsic_radiance.b, 0.0F),
+                   "empty world-space ray retained aurora radiance");
+    context.expect(output.samples == 0U,
+                   "empty world-space ray entered the fine integration loop");
+  }
+}
+
+void QualityTiersConvergeTowardHigh(TestContext& context) {
+  constexpr float pi = 3.14159265358979323846F;
+  double fallback_error{};
+  double low_error{};
+  double balanced_error{};
+  const auto accumulate_error = [](const AuroraCurtainOutput& value,
+                                   const AuroraCurtainOutput& reference) {
+    return static_cast<double>(std::fabs(value.mask - reference.mask)
+        + std::fabs(value.intrinsic_radiance.r - reference.intrinsic_radiance.r)
+        + std::fabs(value.intrinsic_radiance.g - reference.intrinsic_radiance.g)
+        + std::fabs(value.intrinsic_radiance.b - reference.intrinsic_radiance.b));
+  };
+  for (std::uint32_t x = 0; x < 48U; ++x) {
+    const float azimuth = -pi + (2.0F * pi * static_cast<float>(x) / 48.0F);
+    for (std::uint32_t y = 0; y < 20U; ++y) {
+      AuroraCurtainInput input = ReferenceInput();
+      SetPanoramaDirection(
+          input,
+          azimuth,
+          0.06F + (0.88F * static_cast<float>(y) / 19.0F));
+      input.quality = AuroraQuality::high;
+      AuroraCurtainOutput high{};
+      ExpectSucceeded(context, EvaluateAuroraCurtain(input, high));
+      input.quality = AuroraQuality::fallback;
+      AuroraCurtainOutput fallback{};
+      ExpectSucceeded(context, EvaluateAuroraCurtain(input, fallback));
+      input.quality = AuroraQuality::low;
+      AuroraCurtainOutput low{};
+      ExpectSucceeded(context, EvaluateAuroraCurtain(input, low));
+      input.quality = AuroraQuality::balanced;
+      AuroraCurtainOutput balanced{};
+      ExpectSucceeded(context, EvaluateAuroraCurtain(input, balanced));
+      fallback_error += accumulate_error(fallback, high);
+      low_error += accumulate_error(low, high);
+      balanced_error += accumulate_error(balanced, high);
+    }
+  }
+  context.expect(balanced_error < low_error,
+                 "balanced aurora did not converge beyond low quality");
+  context.expect(low_error < fallback_error,
+                 "low aurora did not converge beyond fallback quality");
 }
 
 void CurtainFormsBroadArcsWithoutPillars(TestContext& context) {
@@ -492,7 +575,7 @@ constexpr TestCase kTests[] = {
     {"invalid inputs preserve output", &InvalidInputsPreserveOutput},
     {"deposition bands have physical altitude ordering",
      &DepositionBandsHavePhysicalAltitudeOrdering},
-    {"day and inactive radiance is exact zero", &DayAndInactiveRadianceIsExactZero},
+    {"day and inactive aurora are exact zero", &DayAndInactiveAuroraAreExactZero},
     {"dense grid is deterministic finite and bounded",
      &DenseGridIsDeterministicFiniteAndBounded},
     {"phase loop is exact and temporally continuous",
@@ -500,6 +583,9 @@ constexpr TestCase kTests[] = {
     {"panorama seam is continuous", &PanoramaSeamIsContinuous},
     {"camera translation produces parallax", &CameraTranslationProducesParallax},
     {"quality tiers are bounded and distinct", &QualityTiersAreBoundedAndDistinct},
+    {"empty world-space rays are rejected before integration",
+     &EmptyWorldSpaceRaysAreRejectedBeforeIntegration},
+    {"quality tiers converge toward high", &QualityTiersConvergeTowardHigh},
     {"curtain forms broad arcs without pillars", &CurtainFormsBroadArcsWithoutPillars},
     {"emission budget is restrained and green led", &EmissionBudgetIsRestrainedAndGreenLed},
 };

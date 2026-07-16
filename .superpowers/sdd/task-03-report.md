@@ -78,10 +78,17 @@ strict through the project gate. CTest `truth_interior_light_fxc` passed
 (`fx_5_0 /WX /Ges /Gis /O3`, exact pinned x64 FXC). Full suite after
 integration: **42/42**.
 
+## WARP numeric parity (delivered)
+
+`tests/InteriorLightWarpTests.cpp` + `shaders/truth/TruthInteriorLightWarpProbe.hlsl`:
+the GPU probe and the C++ harness independently build the same five canonical
+cases (open room, basement, sealed cell, partial aperture/occlusion, over-unity
+clamp); the harness runs the CPU `EvaluateInteriorLight` and asserts field-by-field
+agreement on a WARP device. CTest `truth_interior_light_warp` passed
+(5 cases matched CPU). The interior slice now meets the same CPU/HLSL-parity
+standard as Truth's other rendering slices.
+
 ## Not yet in this task (next)
 
-- WARP-executed CPU/HLSL numeric parity for the interior model (the compile
-  witness proves the mirror builds; parity execution follows the sky-view
-  adapter's WARP pattern).
 - Portal/window-anchor geometry binding and lightning propagation, which the
   full Helios-class replacement will layer on this reference.

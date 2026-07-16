@@ -247,6 +247,33 @@ if(BUILD_TESTING)
 
   add_test(NAME truth_interior_light_cpp COMMAND truth_interior_light_tests)
 
+  if(WIN32)
+    add_executable(truth_interior_light_warp_tests
+      tests/InteriorLightWarpTests.cpp
+    )
+    target_compile_features(truth_interior_light_warp_tests PRIVATE cxx_std_23)
+    target_link_libraries(truth_interior_light_warp_tests PRIVATE
+      truth_interior_light
+      d3d11
+      d3dcompiler
+    )
+    set_property(TARGET truth_interior_light_warp_tests
+      PROPERTY VS_GLOBAL_VcpkgApplocalDeps false)
+    if(MSVC)
+      target_compile_options(truth_interior_light_warp_tests PRIVATE
+        /W4 /WX /permissive- /EHsc /utf-8
+      )
+    endif()
+    add_test(
+      NAME truth_interior_light_warp
+      COMMAND truth_interior_light_warp_tests
+        "${CMAKE_CURRENT_SOURCE_DIR}/shaders/truth/TruthInteriorLightWarpProbe.hlsl"
+    )
+    set_tests_properties(truth_interior_light_warp PROPERTIES
+      LABELS "gpu;warp;shader;interior"
+    )
+  endif()
+
   add_executable(truth_atmosphere_tests
     tests/AtmosphereTests.cpp
   )

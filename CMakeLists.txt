@@ -30,6 +30,16 @@ if(MSVC)
   target_compile_options(truth_master_look PRIVATE /W4 /permissive- /EHsc /utf-8)
 endif()
 
+add_library(truth_interior_light STATIC
+  src/render/InteriorLight.cpp
+)
+target_compile_features(truth_interior_light PUBLIC cxx_std_23)
+target_include_directories(truth_interior_light PUBLIC include)
+
+if(MSVC)
+  target_compile_options(truth_interior_light PRIVATE /W4 /permissive- /EHsc /utf-8)
+endif()
+
 add_library(truth_atmosphere STATIC
   src/render/Atmosphere.cpp
 )
@@ -222,6 +232,20 @@ if(BUILD_TESTING)
   endif()
 
   add_test(NAME truth_master_look_cpp COMMAND truth_master_look_tests)
+
+  add_executable(truth_interior_light_tests
+    tests/InteriorLightTests.cpp
+  )
+  target_compile_features(truth_interior_light_tests PRIVATE cxx_std_23)
+  target_link_libraries(truth_interior_light_tests PRIVATE truth_interior_light)
+
+  set_property(TARGET truth_interior_light_tests PROPERTY VS_GLOBAL_VcpkgApplocalDeps false)
+
+  if(MSVC)
+    target_compile_options(truth_interior_light_tests PRIVATE /W4 /permissive- /EHsc /utf-8)
+  endif()
+
+  add_test(NAME truth_interior_light_cpp COMMAND truth_interior_light_tests)
 
   add_executable(truth_atmosphere_tests
     tests/AtmosphereTests.cpp

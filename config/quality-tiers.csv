@@ -1,0 +1,6 @@
+tier,id,label,cloud_mode,cloud_primary_steps,cloud_light_steps,aurora_samples,ao_directions,ao_steps,dof_rings,bloom_radius,ssr_steps
+0,performance,Performance,analytic,0,0,1,4,2,0,2,0
+1,balanced,Balanced,analytic,0,0,2,6,3,2,3,0
+2,quality,Quality,volume,8,2,4,8,4,3,4,8
+3,ultra,Ultra,volume,12,3,7,12,5,4,5,12
+4,cinematic,Cinematic,volume,16,4,10,16,6,5,6,16

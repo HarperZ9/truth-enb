@@ -221,6 +221,17 @@ if(WIN32 AND TRUTH_BUILD_RUNTIME)
 endif()
 
 if(BUILD_TESTING)
+  add_test(
+    NAME truth_quality_presets
+    COMMAND "${CMAKE_COMMAND}"
+      "-DTRUTH_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}"
+      "-DTRUTH_BINARY_DIR=${CMAKE_CURRENT_BINARY_DIR}"
+      -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/CheckTruthQualityPresets.cmake"
+  )
+  set_tests_properties(truth_quality_presets PROPERTIES
+    LABELS "shader;quality;presets;determinism"
+  )
+
   add_executable(truth_master_look_tests
     tests/MasterLookTests.cpp
   )

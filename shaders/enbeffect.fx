@@ -1,3 +1,9 @@
+#ifndef TRUTH_SKY_FIELD_QUALITY
+// The live ENB pass uses the balanced five-noise cloud field. Reference and CPU
+// parity shaders retain the full quality-2 field unless they opt down.
+#define TRUTH_SKY_FIELD_QUALITY 1
+#endif
+
 #include "truth/TruthColorCore.fxh"
 #include "truth/TruthAtmosphereCore.fxh"
 #include "truth/TruthSkyFields.fxh"
@@ -52,9 +58,16 @@ SamplerState Sampler1
 #include "enb/ENBSeries0504VanillaPostProcess.fxh"
 #pragma warning(pop)
 
+bool TruthFinite3(float3 value)
+{
+    return all((asuint(value) & 0x7fffffffu) < 0x7f800000u);
+}
+
 float3 TruthResolveProceduralSunDirection(out float sun_elevation)
 {
     static const float TruthPi = 3.14159265358979323846;
+    // This remains the bounded fallback until the runtime publishes the engine
+    // sun vector. Keep it isolated so the eventual ABI replacement is explicit.
     float game_hour = frac(max(Weather.w, 0.0) / 24.0) * 24.0;
     float solar_phase = (game_hour - 6.0) * (TruthPi / 12.0);
     sun_elevation = sin(solar_phase);
@@ -130,24 +143,46 @@ float3 TruthResolveSkyRadiance(float2 texcoord, out float valid)
     cloud_input.night_factor = night_factor;
     cloud_input.fog_transmittance = atmosphere.fog_transmittance;
     TruthCloudLightingOutput cloud = TruthEvaluateCloudLighting(cloud_input);
+
+    float3 radiance = cloud.composite_radiance
+        * clamp(TruthSkyRadianceScale, 0.0, 8.0);
+    if (!TruthFinite3(radiance))
+    {
+        return float3(0.0, 0.0, 0.0);
+    }
     valid = 1.0;
-    return max(cloud.composite_radiance, 0.0) * max(TruthSkyRadianceScale, 0.0);
+    return clamp(radiance, 0.0, 16.0);
 }
 
 float3 TruthResolveEnbOpticalInput(float2 texcoord)
 {
-    float3 color = max(TextureColor.Sample(Sampler0, texcoord).rgb, 0.0);
-    if (TruthUseEnbLens)
+    float3 color = TextureColor.Sample(Sampler0, texcoord).rgb;
+    color = TruthFinite3(color) ? max(color, 0.0) : float3(0.0, 0.0, 0.0);
+
+    float lens_strength = TruthRuntimeFinite1(ENBParams01.y)
+        ? clamp(ENBParams01.y, 0.0, 4.0)
+        : 0.0;
+    if (TruthUseEnbLens && lens_strength > 0.0)
     {
-        color += max(TextureLens.Sample(Sampler1, texcoord).rgb, 0.0)
-            * max(ENBParams01.y, 0.0);
+        float3 lens = TextureLens.Sample(Sampler1, texcoord).rgb;
+        if (TruthFinite3(lens))
+        {
+            color += max(lens, 0.0) * lens_strength;
+        }
     }
-    if (TruthUseEnbBloom)
+
+    float bloom_strength = TruthRuntimeFinite1(ENBParams01.x)
+        ? clamp(ENBParams01.x, 0.0, 4.0)
+        : 0.0;
+    if (TruthUseEnbBloom && bloom_strength > 0.0)
     {
-        float3 bloom = max(TextureBloom.Sample(Sampler1, texcoord).rgb, 0.0);
-        color += max(bloom - color, 0.0) * max(ENBParams01.x, 0.0);
+        float3 bloom = TextureBloom.Sample(Sampler1, texcoord).rgb;
+        if (TruthFinite3(bloom))
+        {
+            color += max(max(bloom, 0.0) - color, 0.0) * bloom_strength;
+        }
     }
-    return color;
+    return TruthFinite3(color) ? min(color, 65536.0) : float3(0.0, 0.0, 0.0);
 }
 
 float4 TruthEnbPixelMain(VS_OUTPUT_POST input) : SV_Target
@@ -162,45 +197,81 @@ float4 TruthEnbPixelMain(VS_OUTPUT_POST input) : SV_Target
     if (TruthProceduralSkyEnabled && TruthRuntimeReady()
         && EInteriorFactor < 0.5)
     {
-        float raw_depth = TextureDepth.SampleLevel(Sampler0, input.txcoord0, 0.0).x;
-        float threshold = clamp(TruthSkyDepthThreshold, 0.99, 1.0);
-        float feather = clamp(TruthSkyDepthFeather, 0.00001, 0.005);
-        float sky_mask = smoothstep(threshold, min(threshold + feather, 1.0), raw_depth)
-            * saturate(1.0 - EInteriorFactor);
-        if (sky_mask > 0.0)
+        float raw_depth = TextureDepth.SampleLevel(
+            Sampler0, input.txcoord0, 0.0).x;
+        if (TruthRuntimeFinite1(raw_depth))
         {
-            float sky_valid;
-            float3 sky_radiance = TruthResolveSkyRadiance(
-                input.txcoord0, sky_valid);
-            linear_color = lerp(
-                linear_color,
-                sky_radiance,
-                sky_mask * sky_valid * saturate(TruthSkyReplacementStrength));
+            float feather = clamp(TruthSkyDepthFeather, 0.00001, 0.005);
+            // Keeping the lower and upper smoothstep edges distinct removes the
+            // threshold==1 degeneracy that can produce NaNs or hard sky pops.
+            float threshold = clamp(
+                TruthSkyDepthThreshold, 0.99, 1.0 - feather);
+            float sky_mask = smoothstep(
+                threshold, threshold + feather, raw_depth);
+
+            // A far-depth sample can belong to sky while sharing a derivative
+            // quad with foreground geometry. Reject that silhouette quad rather
+            // than bleeding the procedural sky over trees, hair, or mountains.
+            float depth_gradient = max(
+                abs(ddx(raw_depth)), abs(ddy(raw_depth)));
+            float silhouette_width = max(feather * 8.0, 0.0001);
+            float silhouette_guard = 1.0
+                - saturate(depth_gradient / silhouette_width);
+            sky_mask *= silhouette_guard
+                * saturate(1.0 - EInteriorFactor);
+
+            if (sky_mask > 0.0001)
+            {
+                float sky_valid;
+                float3 sky_radiance = TruthResolveSkyRadiance(
+                    input.txcoord0, sky_valid);
+                linear_color = lerp(
+                    linear_color,
+                    sky_radiance,
+                    sky_mask * sky_valid
+                        * saturate(TruthSkyReplacementStrength));
+            }
         }
     }
 #endif
 
-    float measured_luminance = max(
-        TextureAdaptation.SampleLevel(Sampler0, input.txcoord0, 0.0).x,
-        TruthLuminanceFloor);
+    float measured_luminance = TextureAdaptation.SampleLevel(
+        Sampler0, input.txcoord0, 0.0).x;
+    measured_luminance = TruthRuntimeFinite1(measured_luminance)
+        ? max(measured_luminance, TruthLuminanceFloor)
+        : TruthMiddleGray;
     TruthAtmosphereSample metering;
     metering.scene_luminance = measured_luminance;
     metering.sky_luminance = measured_luminance;
     metering.interior_factor = saturate(EInteriorFactor);
-    metering.delta_seconds = max(Timer.w, 0.0);
+    metering.delta_seconds = TruthRuntimeFinite1(Timer.w)
+        ? max(Timer.w, 0.0)
+        : 0.0;
     metering.discontinuity = 0.0;
     float target_exposure_ev = TruthTargetExposureEv(metering);
+    float manual_exposure_ev = TruthRuntimeFinite1(TruthManualExposureEv)
+        ? clamp(TruthManualExposureEv, -8.0, 8.0)
+        : 0.0;
+    float auto_exposure_blend = TruthRuntimeFinite1(TruthAutoExposureBlend)
+        ? saturate(TruthAutoExposureBlend)
+        : 0.0;
     float exposure_ev = lerp(
-        clamp(TruthManualExposureEv, -8.0, 8.0),
+        manual_exposure_ev,
         target_exposure_ev,
-        saturate(TruthAutoExposureBlend));
+        auto_exposure_blend);
     float3 exposed = TruthApplyExposure(linear_color, exposure_ev);
-    return float4(saturate(TruthFilmicToneCurve3(exposed)), 1.0);
+    float3 tone_mapped = TruthFilmicToneCurve3(exposed);
+    tone_mapped = TruthFinite3(tone_mapped)
+        ? saturate(tone_mapped)
+        : float3(0.0, 0.0, 0.0);
+    return float4(tone_mapped, 1.0);
 }
 
 float4 TruthEnbFallbackPixel(VS_OUTPUT_POST input) : SV_Target
 {
-    return float4(saturate(TextureColor.Sample(Sampler0, input.txcoord0).rgb), 1.0);
+    float3 color = TextureColor.Sample(Sampler0, input.txcoord0).rgb;
+    color = TruthFinite3(color) ? saturate(color) : float3(0.0, 0.0, 0.0);
+    return float4(color, 1.0);
 }
 
 technique11 Draw <string UIName = "Truth ENB";>
@@ -223,13 +294,11 @@ technique11 TRUTHPASSTHROUGH <string UIName = "Truth: Safe passthrough";>
     }
 }
 
-
-
 technique11 ORIGINALPOSTPROCESS <string UIName="Vanilla";> //do not modify this technique
 {
-	pass p0
-	{
-		SetVertexShader(CompileShader(vs_5_0, VS_Draw()));
-		SetPixelShader(CompileShader(ps_5_0, PS_DrawOriginal()));
-	}
+    pass p0
+    {
+        SetVertexShader(CompileShader(vs_5_0, VS_Draw()));
+        SetPixelShader(CompileShader(ps_5_0, PS_DrawOriginal()));
+    }
 }

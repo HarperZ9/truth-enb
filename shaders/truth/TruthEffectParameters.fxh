@@ -1,6 +1,11 @@
 #ifndef TRUTH_EFFECT_PARAMETERS_FXH
 #define TRUTH_EFFECT_PARAMETERS_FXH
 
+// Public-release defaults are intentionally restrained. Every large optical or
+// atmospheric contribution remains available to authors, but the initial state
+// avoids stacking lens artifacts, dense weather, full-strength sky replacement,
+// and an always-on aurora before a user has calibrated the preset in-game.
+
 bool TruthMasterEnabled
 <
     string UIName = "[Truth 00] Master | Enabled";
@@ -32,7 +37,7 @@ bool TruthUseEnbBloom
 bool TruthUseEnbLens
 <
     string UIName = "[Truth 02] Optical | ENB Lens";
-> = true;
+> = false;
 
 bool TruthProceduralSkyEnabled
 <
@@ -46,14 +51,14 @@ float TruthSkyReplacementStrength
     float UIMin = 0.0;
     float UIMax = 1.0;
     float UIStep = 0.01;
-> = 1.0;
+> = 0.75;
 
 float TruthSkyDepthThreshold
 <
     string UIName = "[Truth 10] Sky | Depth Threshold";
     string UIWidget = "Spinner";
     float UIMin = 0.99;
-    float UIMax = 1.0;
+    float UIMax = 0.99999;
     float UIStep = 0.0001;
 > = 0.9998;
 
@@ -73,7 +78,7 @@ float TruthSkyRadianceScale
     float UIMin = 0.1;
     float UIMax = 8.0;
     float UIStep = 0.05;
-> = 1.0;
+> = 0.90;
 
 float TruthWeatherDensity
 <
@@ -82,7 +87,7 @@ float TruthWeatherDensity
     float UIMin = 0.0;
     float UIMax = 1.0;
     float UIStep = 0.01;
-> = 0.25;
+> = 0.18;
 
 float TruthCloudCoverage
 <
@@ -91,7 +96,7 @@ float TruthCloudCoverage
     float UIMin = 0.0;
     float UIMax = 1.0;
     float UIStep = 0.01;
-> = 0.45;
+> = 0.35;
 
 float TruthCloudDensity
 <
@@ -100,7 +105,7 @@ float TruthCloudDensity
     float UIMin = 0.0;
     float UIMax = 1.0;
     float UIStep = 0.01;
-> = 0.62;
+> = 0.48;
 
 float TruthFogDensity
 <
@@ -109,7 +114,7 @@ float TruthFogDensity
     float UIMin = 0.0;
     float UIMax = 1.0;
     float UIStep = 0.01;
-> = 0.12;
+> = 0.06;
 
 float TruthAuroraActivity
 <
@@ -118,7 +123,7 @@ float TruthAuroraActivity
     float UIMin = 0.0;
     float UIMax = 1.0;
     float UIStep = 0.01;
-> = 0.55;
+> = 0.0;
 
 float TruthAuroraMask
 <
@@ -136,7 +141,7 @@ float TruthSkyWindX
     float UIMin = -1.0;
     float UIMax = 1.0;
     float UIStep = 0.01;
-> = 0.62;
+> = 0.18;
 
 float TruthSkyWindY
 <
@@ -145,7 +150,7 @@ float TruthSkyWindY
     float UIMin = -1.0;
     float UIMax = 1.0;
     float UIStep = 0.01;
-> = -0.27;
+> = -0.08;
 
 float3 TruthAuroraWorldOrigin
 <

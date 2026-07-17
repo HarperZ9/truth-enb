@@ -3,9 +3,24 @@
 
 #include "TruthAuroraCurtain.fxh"
 
+#ifndef TRUTH_SKY_FIELD_QUALITY
+#define TRUTH_SKY_FIELD_QUALITY 2
+#endif
+
+#if TRUTH_SKY_FIELD_QUALITY < 0 || TRUTH_SKY_FIELD_QUALITY > 2
+#error TRUTH_SKY_FIELD_QUALITY must be 0, 1, or 2
+#endif
+
+// Quality 2 preserves the original reference field. Quality 1 removes three
+// 3D-noise evaluations while retaining domain warp, broad/strata structure, and
+// detail erosion. Quality 0 is a two-noise fallback for constrained hardware.
+// The production ENB pass selects quality 1; CPU/reference shaders keep quality
+// 2 unless they explicitly opt down.
+
 static const float TruthSkyPi = 3.14159265358979323846;
 static const float TruthSkyTwoPi = 2.0 * TruthSkyPi;
 static const float TruthSkyCloudErosionScale = 0.22;
+static const float TruthSkyActivityFloor = 0.0001;
 
 struct TruthSkyFieldInput
 {
@@ -98,72 +113,127 @@ float TruthSkySmoothStep(float lower, float upper, float value)
 
 TruthSkyFieldOutput TruthEvaluateSkyFields(TruthSkyFieldInput input)
 {
-    float wrapped_phase = input.phase >= 1.0 ? 0.0 : input.phase;
-    float phase_angle = wrapped_phase * TruthSkyTwoPi;
-    float phase_sine = sin(phase_angle);
-    float phase_cosine = cos(phase_angle);
-    float phase_arc = 1.0 - phase_cosine;
-    float3 loop_offset = float3(
-        (0.48 * input.wind.x * phase_sine) + (0.19 * input.wind.y * phase_arc),
-        (0.48 * input.wind.y * phase_sine) - (0.19 * input.wind.x * phase_arc),
-        (0.17 * (input.wind.x + input.wind.y) * phase_sine)
-            + (0.09 * (input.wind.x - input.wind.y) * phase_arc));
-    float3 direction_space = float3(
-        (1.62 * input.view_direction.x) + loop_offset.x,
-        (1.62 * input.view_direction.y) + loop_offset.y,
-        (2.35 * input.view_direction.z) + loop_offset.z);
-    float3 domain_warp = float3(
-        TruthSkyValueNoise3D(TruthSkyScaleAndOffset(
-            direction_space, 0.72, float3(17.1, -4.7, 8.3))) - 0.5,
-        TruthSkyValueNoise3D(TruthSkyScaleAndOffset(
-            direction_space, 0.72, float3(-9.2, 13.6, 2.8))) - 0.5,
-        TruthSkyValueNoise3D(TruthSkyScaleAndOffset(
-            direction_space, 0.72, float3(5.4, 7.9, -11.5))) - 0.5);
-    float3 warped = direction_space
-        + (domain_warp * float3(0.58, 0.58, 0.38));
-    float body_broad = TruthSkyValueNoise3D(TruthSkyScaleAndOffset(
-        warped, 0.62, float3(1.7, -3.2, 5.1)));
-    float body_strata = TruthSkyValueNoise3D(TruthSkyScaleAndOffset(
-        warped, 1.24, float3(-6.4, 8.8, 2.3)));
-    float body_breakup = TruthSkyValueNoise3D(TruthSkyScaleAndOffset(
-        warped, 2.48, float3(12.9, 4.6, -7.7)));
-    float cloud_body = saturate(
-        0.075
-        + (0.52 * body_broad)
-        + (0.31 * body_strata)
-        + (0.17 * body_breakup));
-    float detail_primary = TruthSkyValueNoise3D(TruthSkyScaleAndOffset(
-        warped, 5.1, float3(-5.4, 9.2, 3.1)));
-    float detail_fine = TruthSkyValueNoise3D(TruthSkyScaleAndOffset(
-        warped, 10.3, float3(3.8, -12.6, 7.4)));
-    float detail_noise = saturate((0.64 * detail_primary) + (0.36 * detail_fine));
-    float detail_erosion = detail_noise * TruthSkyCloudErosionScale;
-    float coverage_threshold = lerp(0.72, 0.30, input.cloud_coverage);
-    float coverage_gate = TruthSkySmoothStep(0.0, 0.20, input.cloud_coverage);
-    float occupied_body = input.cloud_coverage == 0.0
-        ? 0.0
-        : TruthSkySmoothStep(
+    TruthSkyFieldOutput output;
+    output.cloud_body = 0.0;
+    output.cloud_detail_erosion = 0.0;
+    output.cloud_density = 0.0;
+    output.aurora_mask = 0.0;
+    output.aurora_intrinsic_radiance = float3(0.0, 0.0, 0.0);
+
+    if (input.cloud_coverage > TruthSkyActivityFloor
+        && input.cloud_density > TruthSkyActivityFloor)
+    {
+        float wrapped_phase = input.phase >= 1.0 ? 0.0 : input.phase;
+        float phase_angle = wrapped_phase * TruthSkyTwoPi;
+        float phase_sine = sin(phase_angle);
+        float phase_cosine = cos(phase_angle);
+        float phase_arc = 1.0 - phase_cosine;
+        float3 loop_offset = float3(
+            (0.48 * input.wind.x * phase_sine)
+                + (0.19 * input.wind.y * phase_arc),
+            (0.48 * input.wind.y * phase_sine)
+                - (0.19 * input.wind.x * phase_arc),
+            (0.17 * (input.wind.x + input.wind.y) * phase_sine)
+                + (0.09 * (input.wind.x - input.wind.y) * phase_arc));
+        float3 direction_space = float3(
+            (1.62 * input.view_direction.x) + loop_offset.x,
+            (1.62 * input.view_direction.y) + loop_offset.y,
+            (2.35 * input.view_direction.z) + loop_offset.z);
+
+        float3 warped = direction_space;
+        float cloud_body;
+        float detail_noise;
+
+#if TRUTH_SKY_FIELD_QUALITY == 2
+        float3 domain_warp = float3(
+            TruthSkyValueNoise3D(TruthSkyScaleAndOffset(
+                direction_space, 0.72, float3(17.1, -4.7, 8.3))) - 0.5,
+            TruthSkyValueNoise3D(TruthSkyScaleAndOffset(
+                direction_space, 0.72, float3(-9.2, 13.6, 2.8))) - 0.5,
+            TruthSkyValueNoise3D(TruthSkyScaleAndOffset(
+                direction_space, 0.72, float3(5.4, 7.9, -11.5))) - 0.5);
+        warped += domain_warp * float3(0.58, 0.58, 0.38);
+
+        float body_broad = TruthSkyValueNoise3D(TruthSkyScaleAndOffset(
+            warped, 0.62, float3(1.7, -3.2, 5.1)));
+        float body_strata = TruthSkyValueNoise3D(TruthSkyScaleAndOffset(
+            warped, 1.24, float3(-6.4, 8.8, 2.3)));
+        float body_breakup = TruthSkyValueNoise3D(TruthSkyScaleAndOffset(
+            warped, 2.48, float3(12.9, 4.6, -7.7)));
+        cloud_body = saturate(
+            0.075
+            + (0.52 * body_broad)
+            + (0.31 * body_strata)
+            + (0.17 * body_breakup));
+
+        float detail_primary = TruthSkyValueNoise3D(TruthSkyScaleAndOffset(
+            warped, 5.1, float3(-5.4, 9.2, 3.1)));
+        float detail_fine = TruthSkyValueNoise3D(TruthSkyScaleAndOffset(
+            warped, 10.3, float3(3.8, -12.6, 7.4)));
+        detail_noise = saturate(
+            (0.64 * detail_primary) + (0.36 * detail_fine));
+#elif TRUTH_SKY_FIELD_QUALITY == 1
+        float2 domain_warp_xy = float2(
+            TruthSkyValueNoise3D(TruthSkyScaleAndOffset(
+                direction_space, 0.72, float3(17.1, -4.7, 8.3))) - 0.5,
+            TruthSkyValueNoise3D(TruthSkyScaleAndOffset(
+                direction_space, 0.72, float3(-9.2, 13.6, 2.8))) - 0.5);
+        warped += float3(
+            0.58 * domain_warp_xy.x,
+            0.58 * domain_warp_xy.y,
+            0.19 * (domain_warp_xy.x + domain_warp_xy.y));
+
+        float body_broad = TruthSkyValueNoise3D(TruthSkyScaleAndOffset(
+            warped, 0.62, float3(1.7, -3.2, 5.1)));
+        float body_strata = TruthSkyValueNoise3D(TruthSkyScaleAndOffset(
+            warped, 1.24, float3(-6.4, 8.8, 2.3)));
+        cloud_body = saturate(
+            0.075 + (0.60 * body_broad) + (0.40 * body_strata));
+        detail_noise = TruthSkyValueNoise3D(TruthSkyScaleAndOffset(
+            warped, 5.1, float3(-5.4, 9.2, 3.1)));
+#else
+        float body_broad = TruthSkyValueNoise3D(TruthSkyScaleAndOffset(
+            warped, 0.72, float3(1.7, -3.2, 5.1)));
+        cloud_body = saturate(0.12 + (0.88 * body_broad));
+        detail_noise = TruthSkyValueNoise3D(TruthSkyScaleAndOffset(
+            warped, 4.2, float3(-5.4, 9.2, 3.1)));
+#endif
+
+        float detail_erosion = saturate(detail_noise)
+            * TruthSkyCloudErosionScale;
+        float coverage_threshold = lerp(
+            0.72, 0.30, saturate(input.cloud_coverage));
+        float coverage_gate = TruthSkySmoothStep(
+            0.0, 0.20, input.cloud_coverage);
+        float occupied_body = TruthSkySmoothStep(
             coverage_threshold - 0.12,
             coverage_threshold + 0.42,
             cloud_body) * coverage_gate;
-    float weather_scale = 0.35 + (0.65 * input.weather_density);
+        float weather_scale = 0.35 + (0.65 * saturate(input.weather_density));
 
-    TruthSkyFieldOutput output;
-    output.cloud_body = cloud_body;
-    output.cloud_detail_erosion = detail_erosion;
-    output.cloud_density = saturate(
-        max(occupied_body - detail_erosion, 0.0) * input.cloud_density * weather_scale);
+        output.cloud_body = cloud_body;
+        output.cloud_detail_erosion = detail_erosion;
+        output.cloud_density = saturate(
+            max(occupied_body - detail_erosion, 0.0)
+            * saturate(input.cloud_density)
+            * weather_scale);
+    }
 
-    TruthAuroraCurtainInput aurora_input;
-    aurora_input.camera_position = input.camera_position;
-    aurora_input.view_direction = input.view_direction;
-    aurora_input.phase = input.phase;
-    aurora_input.wind = input.wind;
-    aurora_input.activity = input.aurora_activity;
-    aurora_input.night_factor = input.night_factor;
-    TruthAuroraCurtainOutput aurora = TruthEvaluateAuroraCurtain(aurora_input);
-    output.aurora_mask = aurora.mask;
-    output.aurora_intrinsic_radiance = aurora.intrinsic_radiance;
+    if (input.aurora_activity > TruthSkyActivityFloor
+        && input.night_factor > TruthSkyActivityFloor)
+    {
+        TruthAuroraCurtainInput aurora_input;
+        aurora_input.camera_position = input.camera_position;
+        aurora_input.view_direction = input.view_direction;
+        aurora_input.phase = input.phase;
+        aurora_input.wind = input.wind;
+        aurora_input.activity = input.aurora_activity;
+        aurora_input.night_factor = input.night_factor;
+        TruthAuroraCurtainOutput aurora = TruthEvaluateAuroraCurtain(aurora_input);
+        output.aurora_mask = aurora.mask;
+        output.aurora_intrinsic_radiance = aurora.intrinsic_radiance;
+    }
+
     return output;
 }
 

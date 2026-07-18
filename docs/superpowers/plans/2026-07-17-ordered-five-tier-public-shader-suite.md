@@ -135,6 +135,7 @@ git commit -m "feat: add five Truth quality presets"
 - Create: `shaders/enbbloom.fx`
 - Create: `shaders/enbadaptation.fx`
 - Create: `shaders/enblens.fx`
+- Modify: `shaders/enbeffect.fx`
 - Create: `shaders/enbeffectpostpass.fx`
 - Create: `shaders/enbsunsprite.fx`
 - Create: `shaders/enbunderwater.fx`

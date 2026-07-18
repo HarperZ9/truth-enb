@@ -38,6 +38,55 @@ foreach(required_token IN ITEMS
   endif()
 endforeach()
 
+set(canonical_quality_rows
+  "0,performance,Performance,analytic,0,0,1,4,2,0,2,0"
+  "1,balanced,Balanced,analytic,0,0,2,6,3,2,3,0"
+  "2,quality,Quality,volume,8,2,4,8,4,3,4,8"
+  "3,ultra,Ultra,volume,12,3,7,12,5,4,5,12"
+  "4,cinematic,Cinematic,volume,16,4,10,16,6,5,6,16")
+foreach(tier RANGE 0 4)
+  list(GET canonical_quality_rows ${tier} canonical_quality_row)
+  string(REPLACE "," ";" canonical_quality_fields "${canonical_quality_row}")
+  list(GET canonical_quality_fields 3 cloud_mode)
+  list(GET canonical_quality_fields 4 cloud_primary_steps)
+  list(GET canonical_quality_fields 5 cloud_light_steps)
+  list(GET canonical_quality_fields 6 aurora_samples)
+  list(GET canonical_quality_fields 7 ao_directions)
+  list(GET canonical_quality_fields 8 ao_steps)
+  list(GET canonical_quality_fields 9 dof_rings)
+  list(GET canonical_quality_fields 10 bloom_radius)
+  list(GET canonical_quality_fields 11 ssr_steps)
+  if(cloud_mode STREQUAL "volume")
+    set(uses_volume_clouds 1)
+  else()
+    set(uses_volume_clouds 0)
+  endif()
+  if(tier EQUAL 0)
+    set(quality_branch "#if TRUTH_QUALITY_TIER == ${tier}")
+  elseif(tier LESS 4)
+    set(quality_branch "#elif TRUTH_QUALITY_TIER == ${tier}")
+  else()
+    set(quality_branch "#else")
+  endif()
+  string(CONCAT expected_hlsl_branch
+    "${quality_branch}\n"
+    "static const uint TruthQualityCloudPrimarySteps = ${cloud_primary_steps}u;\n"
+    "static const uint TruthQualityCloudLightSteps = ${cloud_light_steps}u;\n"
+    "static const uint TruthQualityAuroraSamples = ${aurora_samples}u;\n"
+    "static const uint TruthQualityAODirections = ${ao_directions}u;\n"
+    "static const uint TruthQualityAOSteps = ${ao_steps}u;\n"
+    "static const uint TruthQualityDOFRings = ${dof_rings}u;\n"
+    "static const uint TruthQualityBloomRadius = ${bloom_radius}u;\n"
+    "static const uint TruthQualitySSRSteps = ${ssr_steps}u;\n"
+    "static const uint TruthQualityUsesVolumeClouds = ${uses_volume_clouds}u;")
+  string(FIND "${quality_include_source}" "${expected_hlsl_branch}"
+    quality_branch_position)
+  if(quality_branch_position EQUAL -1)
+    message(FATAL_ERROR
+      "Truth quality constants do not match the canonical tier ${tier} contract")
+  endif()
+endforeach()
+
 set(truth_check_root "${truth_binary_dir}/truth-quality-presets-check")
 file(REMOVE_RECURSE "${truth_check_root}")
 file(MAKE_DIRECTORY "${truth_check_root}")
@@ -164,11 +213,11 @@ endforeach()
 
 set(manifest_header
   "tier,id,label,cloud_mode,cloud_primary_steps,cloud_light_steps,aurora_samples,ao_directions,ao_steps,dof_rings,bloom_radius,ssr_steps")
-set(row_0 "0,performance,Performance,analytic,0,0,1,4,2,0,2,0")
-set(row_1 "1,balanced,Balanced,analytic,0,0,2,6,3,2,3,0")
-set(row_2 "2,quality,Quality,volume,8,2,4,8,4,3,4,8")
-set(row_3 "3,ultra,Ultra,volume,12,3,7,12,5,4,5,12")
-set(row_4 "4,cinematic,Cinematic,volume,16,4,10,16,6,5,6,16")
+list(GET canonical_quality_rows 0 row_0)
+list(GET canonical_quality_rows 1 row_1)
+list(GET canonical_quality_rows 2 row_2)
+list(GET canonical_quality_rows 3 row_3)
+list(GET canonical_quality_rows 4 row_4)
 
 expect_truth_quality_generator_rejection(
   "missing-tier"
@@ -182,6 +231,9 @@ expect_truth_quality_generator_rejection(
 expect_truth_quality_generator_rejection(
   "invalid-integer"
   "${manifest_header}\n${row_0}\n1,balanced,Balanced,analytic,zero,0,2,6,3,2,3,0\n${row_2}\n${row_3}\n${row_4}\n")
+expect_truth_quality_generator_rejection(
+  "canonical-numeric-drift"
+  "${manifest_header}\n0,performance,Performance,analytic,0,0,999,4,2,0,2,0\n${row_1}\n${row_2}\n${row_3}\n${row_4}\n")
 
 set(unsafe_output "${truth_source_dir}/truth-quality-presets-unsafe")
 execute_process(

@@ -56,6 +56,12 @@ endif()
 set(expected_ids performance balanced quality ultra cinematic)
 set(expected_labels Performance Balanced Quality Ultra Cinematic)
 set(expected_cloud_modes analytic analytic volume volume volume)
+set(expected_quality_rows
+  "0,performance,Performance,analytic,0,0,1,4,2,0,2,0"
+  "1,balanced,Balanced,analytic,0,0,2,6,3,2,3,0"
+  "2,quality,Quality,volume,8,2,4,8,4,3,4,8"
+  "3,ultra,Ultra,volume,12,3,7,12,5,4,5,12"
+  "4,cinematic,Cinematic,volume,16,4,10,16,6,5,6,16")
 set(seen_tiers)
 set(truth_numeric_columns
   tier
@@ -107,6 +113,7 @@ foreach(line_index RANGE 1 5)
   list(GET expected_ids ${tier} expected_id)
   list(GET expected_labels ${tier} expected_label)
   list(GET expected_cloud_modes ${tier} expected_cloud_mode)
+  list(GET expected_quality_rows ${tier} expected_quality_row)
   if(NOT tier_id STREQUAL expected_id)
     message(FATAL_ERROR
       "Truth quality manifest has an unexpected id for tier ${tier}: ${tier_id}")
@@ -118,6 +125,10 @@ foreach(line_index RANGE 1 5)
   if(NOT cloud_mode STREQUAL expected_cloud_mode)
     message(FATAL_ERROR
       "Truth quality manifest has an unexpected cloud mode for tier ${tier}: ${cloud_mode}")
+  endif()
+  if(NOT quality_line STREQUAL expected_quality_row)
+    message(FATAL_ERROR
+      "Truth quality manifest row for tier ${tier} does not match the canonical contract")
   endif()
 
   set("truth_quality_row_${tier}" "${quality_fields}")

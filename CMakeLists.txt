@@ -378,6 +378,30 @@ if(BUILD_TESTING)
   add_test(NAME truth_sky_view_adapter_cpp COMMAND truth_sky_view_adapter_tests)
 
   if(WIN32)
+    add_executable(truth_capability_warp_tests
+      tests/TruthCapabilityWarpTests.cpp
+    )
+    target_compile_features(truth_capability_warp_tests PRIVATE cxx_std_23)
+    target_link_libraries(truth_capability_warp_tests PRIVATE
+      d3d11
+      d3dcompiler
+    )
+    set_property(TARGET truth_capability_warp_tests
+      PROPERTY VS_GLOBAL_VcpkgApplocalDeps false)
+    if(MSVC)
+      target_compile_options(truth_capability_warp_tests PRIVATE
+        /W4 /WX /permissive- /EHsc /utf-8
+      )
+    endif()
+    add_test(
+      NAME truth_capability_warp
+      COMMAND truth_capability_warp_tests
+        "${CMAKE_CURRENT_SOURCE_DIR}/shaders/truth/TruthCapabilityWarpProbe.hlsl"
+    )
+    set_tests_properties(truth_capability_warp PROPERTIES
+      LABELS "gpu;warp;shader;capability"
+    )
+
     add_executable(truth_sky_view_adapter_warp_tests
       tests/SkyViewAdapterWarpTests.cpp
     )

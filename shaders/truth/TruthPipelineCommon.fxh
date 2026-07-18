@@ -132,17 +132,31 @@ TruthCapabilityValue TruthResolveCapability(
 }
 
 float4 TruthResolveCapabilityColor(
-    float4 source,
+    float4 native_color,
+    float4 bridge_color,
+    float4 spatial_color,
+    float4 identity_color,
     float native_availability,
     float bridge_availability,
     float spatial_availability)
 {
     TruthCapabilityValue selected = TruthResolveCapability(
-        TruthMakeCapability(source, native_availability),
-        TruthMakeCapability(source, bridge_availability),
-        TruthMakeCapability(source, spatial_availability),
-        TruthMakeCapability(source, 1.0));
+        TruthMakeCapability(native_color, native_availability),
+        TruthMakeCapability(bridge_color, bridge_availability),
+        TruthMakeCapability(spatial_color, spatial_availability),
+        TruthMakeCapability(identity_color, 1.0));
     return selected.color;
+}
+
+float4 TruthResolveCapabilityColor(
+    float4 source,
+    float native_availability,
+    float bridge_availability,
+    float spatial_availability)
+{
+    return TruthResolveCapabilityColor(
+        source, source, source, source,
+        native_availability, bridge_availability, spatial_availability);
 }
 
 float4 TruthStageIdentity(float4 source, bool stage_enabled, float intensity)

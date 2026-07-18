@@ -128,6 +128,7 @@ git commit -m "feat: add five Truth quality presets"
 
 **Files:**
 - Create: `shaders/truth/TruthPipelineCommon.fxh`
+- Create: `shaders/truth/TruthHostCapabilities.fxh`
 - Create: `shaders/truth/TruthStageParameters.fxh`
 - Create: `shaders/enbeffectprepass.fx`
 - Create: `shaders/enbdepthoffield.fx`
@@ -143,7 +144,7 @@ git commit -m "feat: add five Truth quality presets"
 
 **Interfaces:**
 - Consumes: ENB-owned textures/uniforms and `TruthQuality.fxh`.
-- Produces: finite sanitizers, one depth convention, exact identity functions, nine compilable stage files for each of five tiers.
+- Produces: finite sanitizers, one depth convention, exact identity functions, an explicit native/Bridge/spatial/identity capability ladder, current-frame scratch ownership, and nine compilable stage files for each of five tiers.
 
 - [ ] **Step 1: Register a failing compile-matrix test**
 
@@ -189,11 +190,30 @@ float TruthSkyMask(float raw_depth, float threshold, float feather)
 }
 ```
 
-- [ ] **Step 4: Add restrained stage parameters**
+- [ ] **Step 4: Declare host capabilities and scratch ownership**
+
+`TruthHostCapabilities.fxh` defines four ordered levels:
+
+```hlsl
+#define TRUTH_CAPABILITY_IDENTITY 0
+#define TRUTH_CAPABILITY_SPATIAL  1
+#define TRUTH_CAPABILITY_BRIDGE   2
+#define TRUTH_CAPABILITY_NATIVE   3
+```
+
+Each stage must define whether it owns color, depth, normal, mask, native
+celestial/view data, previous scalar adaptation, and named current-frame
+scratch before including the contract. Full-frame history and object motion
+vectors are unavailable in the initial public release and must remain `0`.
+Reject invalid capability values, undeclared scratch reads, cross-effect alpha
+packing, and any code path that treats a current-frame target as persistent
+history.
+
+- [ ] **Step 5: Add restrained stage parameters**
 
 Declare one master, one stage enable, one stage intensity, and advanced shape controls only. Use ordered UI prefixes `[Truth 00]` through `[Truth 90]`. Defaults must match the Balanced generated preset and zero intensity must be an exact identity.
 
-- [ ] **Step 5: Add all stage files with correct ENB techniques and identity output**
+- [ ] **Step 6: Add all stage files with correct ENB techniques and identity output**
 
 Each stage initially compiles as a host-correct identity. For example:
 
@@ -206,17 +226,21 @@ float4 TruthPrepassMain(VS_OUTPUT_POST input) : SV_Target
 
 Preserve the existing `ORIGINALPOSTPROCESS` technique only in `enbeffect.fx`.
 
-- [ ] **Step 6: Implement the matrix checker**
+- [ ] **Step 7: Implement the matrix checker**
 
 Compile the nine stages for tiers `0..4` with `/Ges /WX /O3` and the stage's required entry/technique profile. Write listings below `build/shader-matrix/<tier>/`. Reject warnings and missing `TRUTH_QUALITY_TIER`.
 
-- [ ] **Step 7: Run the matrix**
+The checker also requires every stage's capability declaration and proves that
+native, Bridge-assisted, spatial-fallback, and identity helpers preserve the
+same interface. It rejects full-frame temporal claims in this release.
+
+- [ ] **Step 8: Run the matrix**
 
 Run: `ctest --test-dir build -C Debug -R "^truth_stage_compile_matrix$" --output-on-failure`
 
 Expected: PASS, 45 stage/tier compilations.
 
-- [ ] **Step 8: Commit**
+- [ ] **Step 9: Commit**
 
 ```powershell
 git add shaders cmake/CompileTruthStage.cmake cmake/CheckTruthStageMatrix.cmake CMakeLists.txt
@@ -238,6 +262,14 @@ git commit -m "feat: establish ordered Truth shader stages"
 **Interfaces:**
 - Consumes: validated view/celestial runtime payload, depth, `TruthQuality*` constants, existing atmosphere/sky/cloud/aurora/interior math.
 - Produces: one HDR scene color with environment and interior response composed exactly once.
+
+The atmosphere implementation adapts the optical-depth, Rayleigh/Mie/ozone,
+and depth-bounded ray concepts from Hillaire's production atmosphere model and
+Maxime Heckel's explanatory implementation. It must not transplant a
+full-resolution nested view/light march. Native ENB celestial data is first
+choice, the versioned SkyrimBridge celestial payload is second, the stable
+authored analytic direction is the last spatial fallback, and invalid
+confidence preserves the scene.
 
 - [ ] **Step 1: Add failing reference cases**
 
@@ -280,6 +312,12 @@ TruthPrepassResult TruthComposePrepass(
 ```
 
 The function returns the original finite scene when runtime data is invalid, applies exterior sky only through the shared sky mask, applies interior light only inside interiors, and never applies both branches to the same pixel.
+
+GTAO/contact shadowing, SSR, subsurface diffusion, atmosphere, and volumetrics
+must select the declared capability ladder. Without full-frame history they use
+world-stable sampling, edge/confidence rejection, bounded spatial filtering,
+and exact identity fallbacks; they may not use frame-random jitter or present
+luminance change as motion vectors.
 
 - [ ] **Step 5: Remove duplicate sky/environment composition from `enbeffect.fx`**
 
@@ -533,4 +571,3 @@ Use `docs/release-validation.md` to record actual SE/AE and ENB 0.504 results. D
 git add CMakeLists.txt cmake README.md docs CREDITS-AND-PROVENANCE.md THIRD_PARTY_NOTICES.md tools/sky-mesh/README.md
 git commit -m "chore: prepare Truth ENB public shader release"
 ```
-

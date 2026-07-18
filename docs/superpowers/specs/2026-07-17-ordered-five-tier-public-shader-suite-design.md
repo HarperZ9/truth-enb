@@ -44,6 +44,58 @@ contracts:
 All stages use linear HDR values until the main effect applies exposure and tone
 mapping. LDR post-processing cannot re-expose, re-grade, or re-bloom the image.
 
+## Modern-technique compatibility renderer
+
+Truth treats ENB's fixed stages, ordered sub-techniques, and named render
+targets as a small compatibility framegraph. Modern effects are backported
+where the game does not expose their ideal engine pipeline; they are not
+silently dropped merely because motion vectors, compute dispatch, or arbitrary
+history buffers are unavailable.
+
+The verified installed host surface includes HDR color and depth, engine
+normals and material mask in prepass, celestial/view data, a multiresolution
+bloom chain, one-pixel adaptation history, and current-frame scratch targets.
+Those surfaces are useful but not interchangeable. Each stage declares its
+available inputs, scratch ownership, lifetime, resolution, and fallback level.
+A target is current-frame-only unless live validation proves persistence.
+Alpha or unused color channels cannot be reused across effects without an
+explicit packing contract and a round-trip test.
+
+Every modern technique follows one public capability ladder:
+
+1. use a valid native ENB input when present;
+2. use a versioned SkyrimBridge value or reconstruction when available;
+3. use a stable bounded spatial approximation;
+4. return the exact authored identity when confidence is insufficient.
+
+The shader implementation may therefore use:
+
+- depth/normal horizon visibility for GTAO-like ambient occlusion and contact
+  shadowing;
+- short confidence-weighted SSR with edge rejection and binary refinement;
+- depth-, normal-, and mask-aware separable subsurface diffusion;
+- Rayleigh/Mie/ozone transmittance, depth-bounded aerial perspective, and
+  shipped low-dimensional atmosphere data inspired by Hillaire's production
+  model;
+- Beer-Lambert cloud extinction, stable world-space sampling, early exits, and
+  spatial bilateral reconstruction;
+- signed circle-of-confusion, multiresolution bloom, robust adaptation, and
+  luminance-preserving tone/gamut mapping.
+
+It may not label camera-only reprojection as object motion, a luminance delta as
+a motion vector, or a current-frame target as persistent history. Temporal
+upscaling, temporal SSGI/SSR denoising, frame generation, and reservoir reuse
+remain future Bridge-assisted capabilities. Until their required resources
+exist, the release uses explicit stable spatial fallbacks instead of
+frame-random sampling.
+
+Technical references:
+
+- Sébastien Hillaire, *A Scalable and Production Ready Sky and Atmosphere
+  Rendering Technique*: https://sebh.github.io/publications/egsr2020.pdf
+- Maxime Heckel, *On Rendering the Sky, Sunsets, and Planets*:
+  https://blog.maximeheckel.com/posts/on-rendering-the-sky-sunsets-and-planets/
+
 ## ENB render order and ownership
 
 The fixed host order is treated as an API:
@@ -98,6 +150,10 @@ baseline.
   feather; no stage invents its own threshold.
 - Procedural fields are world-stable. Screen-space or frame-random jitter is
   not used without a valid temporal resolve.
+- Missing history or velocity selects the documented spatial fallback; it does
+  not enable guessed reprojection or reuse an unverified persistent target.
+- Scratch-target and packed-channel ownership is statically checked so one
+  modern effect cannot consume another effect's transient data.
 - Cloud, fog, aurora, bloom, lens, and underwater attenuation each compose
   exactly once.
 - Real engine sun direction is preferred through a backward-compatible runtime
@@ -144,6 +200,10 @@ Implementation is accepted when:
 - reference captures cover clear day, clear night, cloudy aurora, storm,
   interior, high-contrast edge, underwater, and missing-runtime fallback;
 - identity controls are exact and repeated effect application is absent;
+- native, Bridge-assisted, spatial-fallback, and identity capability paths are
+  exercised without changing stage order;
+- scratch lifetimes and channel ownership match the declared compatibility
+  framegraph;
 - both deterministic package runs produce byte-identical archives and hashes;
 - the public archive contains no private/protected input or ENB binary;
 - live ENB 0.504 validation confirms stable depth, camera, FOV, weather,

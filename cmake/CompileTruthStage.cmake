@@ -117,7 +117,8 @@ else()
   endif()
 endif()
 
-if(NOT truth_stage_name STREQUAL "enbeffect.fx")
+if(NOT truth_stage_name STREQUAL "enbeffect.fx"
+    AND NOT truth_stage_name STREQUAL "enbeffectprepass.fx")
   string(FIND "${truth_stage_contents}" "TruthStageIdentity" identity_position)
   if(identity_position EQUAL -1)
     message(FATAL_ERROR
@@ -149,6 +150,36 @@ if(truth_stage_name STREQUAL "enbadaptation.fx")
     truth_scalar_history_owner_position)
   if(truth_scalar_history_owner_position EQUAL -1)
     message(FATAL_ERROR "TexturePrevious requires the adaptation scalar-history owner declaration")
+  endif()
+elseif(truth_stage_name STREQUAL "enbeffectprepass.fx")
+  list(LENGTH truth_texture_declarations truth_texture_count)
+  if(NOT truth_texture_count EQUAL 4)
+    message(FATAL_ERROR
+      "HDR prepass must declare only its current-frame color, depth, normal, and mask inputs")
+  endif()
+  foreach(required_texture IN ITEMS
+      "Texture2D TextureColor"
+      "Texture2D TextureDepth"
+      "Texture2D TextureNormal"
+      "Texture2D TextureMask")
+    list(FIND truth_texture_declarations "${required_texture}" texture_position)
+    if(texture_position EQUAL -1)
+      message(FATAL_ERROR "HDR prepass is missing required current-frame resource: ${required_texture}")
+    endif()
+  endforeach()
+  string(FIND "${truth_stage_contents}" "TruthComposePrepass" prepass_composition_position)
+  if(prepass_composition_position EQUAL -1)
+    message(FATAL_ERROR "HDR prepass must use the single TruthComposePrepass owner")
+  endif()
+  string(FIND "${truth_stage_contents}" "TexturePrevious" truth_previous_position)
+  if(NOT truth_previous_position EQUAL -1)
+    message(FATAL_ERROR "HDR prepass may not declare previous-frame history")
+  endif()
+  string(FIND "${truth_stage_contents}"
+    "#define TRUTH_STAGE_OWNS_PREVIOUS_SCALAR_ADAPTATION 1"
+    truth_prepass_history_owner_position)
+  if(NOT truth_prepass_history_owner_position EQUAL -1)
+    message(FATAL_ERROR "HDR prepass may not own scalar adaptation history")
   endif()
 elseif(NOT truth_stage_name STREQUAL "enbeffect.fx")
   list(LENGTH truth_texture_declarations truth_texture_count)

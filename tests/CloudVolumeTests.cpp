@@ -88,7 +88,7 @@ struct TestContext {
       17U,
       9U,
       0U,
-      CloudVolumeQuality::balanced,
+      CloudVolumeQuality::quality,
   };
 }
 
@@ -112,22 +112,34 @@ void StableCodesAndBudgetsAreExplicit(TestContext& context) {
                      == 301U,
                  "calculation diagnostic code changed");
   context.expect(truth::render::CloudVolumePrimaryStepBudget(
-                     CloudVolumeQuality::performance) == 16U,
+                     CloudVolumeQuality::performance) == 0U,
                  "performance primary budget changed");
   context.expect(truth::render::CloudVolumePrimaryStepBudget(
-                     CloudVolumeQuality::balanced) == 20U,
+                     CloudVolumeQuality::balanced) == 0U,
                  "balanced primary budget changed");
   context.expect(truth::render::CloudVolumePrimaryStepBudget(
-                     CloudVolumeQuality::cinematic) == 24U,
+                     CloudVolumeQuality::quality) == 8U,
+                 "quality primary budget changed");
+  context.expect(truth::render::CloudVolumePrimaryStepBudget(
+                     CloudVolumeQuality::ultra) == 12U,
+                 "ultra primary budget changed");
+  context.expect(truth::render::CloudVolumePrimaryStepBudget(
+                     CloudVolumeQuality::cinematic) == 16U,
                  "cinematic primary budget changed");
   context.expect(truth::render::CloudVolumeLightStepBudget(
-                     CloudVolumeQuality::performance) == 4U,
+                     CloudVolumeQuality::performance) == 0U,
                  "performance light budget changed");
   context.expect(truth::render::CloudVolumeLightStepBudget(
-                     CloudVolumeQuality::balanced) == 5U,
+                     CloudVolumeQuality::balanced) == 0U,
                  "balanced light budget changed");
   context.expect(truth::render::CloudVolumeLightStepBudget(
-                     CloudVolumeQuality::cinematic) == 6U,
+                     CloudVolumeQuality::quality) == 2U,
+                 "quality light budget changed");
+  context.expect(truth::render::CloudVolumeLightStepBudget(
+                     CloudVolumeQuality::ultra) == 3U,
+                 "ultra light budget changed");
+  context.expect(truth::render::CloudVolumeLightStepBudget(
+                     CloudVolumeQuality::cinematic) == 4U,
                  "cinematic light budget changed");
 }
 
@@ -419,8 +431,8 @@ void WeatherAndNightLightingStayControlled(TestContext& context) {
 
 void QualityBudgetsAndDenseGridStayBounded(TestContext& context) {
   constexpr float pi = 3.14159265358979323846F;
-  for (const auto quality : {CloudVolumeQuality::performance,
-                             CloudVolumeQuality::balanced,
+  for (const auto quality : {CloudVolumeQuality::quality,
+                             CloudVolumeQuality::ultra,
                              CloudVolumeQuality::cinematic}) {
     for (std::uint32_t azimuth_index = 0; azimuth_index < 12U; ++azimuth_index) {
       const float azimuth = 2.0F * pi * static_cast<float>(azimuth_index) / 12.0F;

@@ -1,21 +1,9 @@
 #ifndef TRUTH_AURORA_CURTAIN_FXH
 #define TRUTH_AURORA_CURTAIN_FXH
 
-#ifndef TRUTH_AURORA_QUALITY
-#define TRUTH_AURORA_QUALITY 1
-#endif
+#include "TruthQuality.fxh"
 
-#if TRUTH_AURORA_QUALITY == 0
-static const uint TruthAuroraCurtainSamples = 1u;
-#elif TRUTH_AURORA_QUALITY == 1
-static const uint TruthAuroraCurtainSamples = 4u;
-#elif TRUTH_AURORA_QUALITY == 2
-static const uint TruthAuroraCurtainSamples = 7u;
-#elif TRUTH_AURORA_QUALITY == 3
-static const uint TruthAuroraCurtainSamples = 10u;
-#else
-#error TRUTH_AURORA_QUALITY must be 0, 1, 2, or 3
-#endif
+static const uint TruthAuroraCurtainSamples = TruthQualityAuroraSamples;
 
 static const float TruthAuroraPi = 3.14159265358979323846;
 static const float TruthAuroraTwoPi = 2.0 * TruthAuroraPi;

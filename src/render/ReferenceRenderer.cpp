@@ -298,7 +298,7 @@ std::string_view ReferenceSceneName(const ReferenceScene scene) noexcept {
     const std::uint32_t width,
     const std::uint32_t height,
     const char* const pixel_entry,
-    const char* const aurora_quality_define = nullptr) noexcept {
+    const char* const quality_tier_define = nullptr) noexcept {
   try {
     const auto start_time = std::chrono::steady_clock::now();
     if (ReferenceSceneName(scene).empty()) {
@@ -319,10 +319,10 @@ std::string_view ReferenceSceneName(const ReferenceScene scene) noexcept {
     }
     if (!CompileShader(shader_path, pixel_entry, "ps_5_0",
                        pixel_bytecode, diagnostic,
-                       aurora_quality_define == nullptr
+                       quality_tier_define == nullptr
                            ? nullptr
-                           : "TRUTH_AURORA_QUALITY",
-                       aurora_quality_define)) {
+                           : "TRUTH_QUALITY_TIER",
+                       quality_tier_define)) {
       return Fail(ReferenceRenderStatus::shader_compile_failed, std::move(diagnostic));
     }
     const auto shader_compile_end_time = std::chrono::steady_clock::now();
@@ -489,11 +489,11 @@ std::string_view ReferenceSceneName(const ReferenceScene scene) noexcept {
     case AuroraQuality::fallback:
       return "0";
     case AuroraQuality::low:
-      return "1";
-    case AuroraQuality::balanced:
       return "2";
-    case AuroraQuality::high:
+    case AuroraQuality::balanced:
       return "3";
+    case AuroraQuality::high:
+      return "4";
   }
   return nullptr;
 }
@@ -504,7 +504,12 @@ ReferenceRenderResult RenderWarpReference(
     const std::uint32_t width,
     const std::uint32_t height) noexcept {
   return RenderWarpPass(
-      scene, shader_path, width, height, "TruthReferencePixelMain");
+      scene,
+      shader_path,
+      width,
+      height,
+      "TruthReferencePixelMain",
+      "2");
 }
 
 ReferenceRenderResult RenderWarpSkyFieldScalars(
@@ -513,7 +518,12 @@ ReferenceRenderResult RenderWarpSkyFieldScalars(
     const std::uint32_t width,
     const std::uint32_t height) noexcept {
   return RenderWarpPass(
-      scene, shader_path, width, height, "TruthSkyFieldScalarProbePixelMain");
+      scene,
+      shader_path,
+      width,
+      height,
+      "TruthSkyFieldScalarProbePixelMain",
+      AuroraQualityDefine(AuroraQuality::low));
 }
 
 ReferenceRenderResult RenderWarpSkyFieldScalars(
@@ -541,7 +551,12 @@ ReferenceRenderResult RenderWarpSkyFieldRadiance(
     const std::uint32_t width,
     const std::uint32_t height) noexcept {
   return RenderWarpPass(
-      scene, shader_path, width, height, "TruthSkyFieldRadianceProbePixelMain");
+      scene,
+      shader_path,
+      width,
+      height,
+      "TruthSkyFieldRadianceProbePixelMain",
+      AuroraQualityDefine(AuroraQuality::low));
 }
 
 ReferenceRenderResult RenderWarpSkyFieldRadiance(
@@ -569,7 +584,12 @@ ReferenceRenderResult RenderWarpCloudVolumeScalars(
     const std::uint32_t width,
     const std::uint32_t height) noexcept {
   return RenderWarpPass(
-      scene, shader_path, width, height, "TruthCloudVolumeScalarProbePixelMain");
+      scene,
+      shader_path,
+      width,
+      height,
+      "TruthCloudVolumeScalarProbePixelMain",
+      "2");
 }
 
 ReferenceRenderResult RenderWarpCloudVolumeRadiance(
@@ -578,7 +598,12 @@ ReferenceRenderResult RenderWarpCloudVolumeRadiance(
     const std::uint32_t width,
     const std::uint32_t height) noexcept {
   return RenderWarpPass(
-      scene, shader_path, width, height, "TruthCloudVolumeRadianceProbePixelMain");
+      scene,
+      shader_path,
+      width,
+      height,
+      "TruthCloudVolumeRadianceProbePixelMain",
+      "2");
 }
 
 bool WriteBinaryPpm(

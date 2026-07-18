@@ -19,9 +19,11 @@ struct CloudVolumeLayerIntersection {
 };
 
 enum class CloudVolumeQuality : std::uint32_t {
-  performance = 1U,
-  balanced = 2U,
-  cinematic = 3U,
+  performance = 0U,
+  balanced = 1U,
+  quality = 2U,
+  ultra = 3U,
+  cinematic = 4U,
 };
 
 struct CloudVolumeInput {
@@ -92,11 +94,15 @@ struct CloudVolumeEvaluation {
     const CloudVolumeQuality quality) noexcept {
   switch (quality) {
     case CloudVolumeQuality::performance:
-      return 16U;
+      return 0U;
     case CloudVolumeQuality::balanced:
-      return 20U;
+      return 0U;
+    case CloudVolumeQuality::quality:
+      return 8U;
+    case CloudVolumeQuality::ultra:
+      return 12U;
     case CloudVolumeQuality::cinematic:
-      return 24U;
+      return 16U;
   }
   return 0U;
 }
@@ -105,11 +111,15 @@ struct CloudVolumeEvaluation {
     const CloudVolumeQuality quality) noexcept {
   switch (quality) {
     case CloudVolumeQuality::performance:
-      return 4U;
+      return 0U;
     case CloudVolumeQuality::balanced:
-      return 5U;
+      return 0U;
+    case CloudVolumeQuality::quality:
+      return 2U;
+    case CloudVolumeQuality::ultra:
+      return 3U;
     case CloudVolumeQuality::cinematic:
-      return 6U;
+      return 4U;
   }
   return 0U;
 }

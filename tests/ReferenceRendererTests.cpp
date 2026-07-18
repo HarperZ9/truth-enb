@@ -5,12 +5,14 @@
 
 #include <algorithm>
 #include <array>
+#include <bit>
 #include <cmath>
 #include <cstdint>
 #include <exception>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <iterator>
 #include <set>
 #include <string>
 #include <string_view>
@@ -23,6 +25,12 @@ using truth::render::ReferenceScene;
 using truth::render::RenderWarpReference;
 using truth::render::WriteBinaryPpm;
 
+struct ReferenceColor {
+  float red;
+  float green;
+  float blue;
+};
+
 class TestFailure final : public std::exception {
 public:
   explicit TestFailure(std::string message) : message_(std::move(message)) {}
@@ -31,6 +39,20 @@ public:
 private:
   std::string message_;
 };
+
+[[nodiscard]] bool SameColor(const ReferenceColor lhs, const ReferenceColor rhs) {
+  return std::bit_cast<std::uint32_t>(lhs.red) == std::bit_cast<std::uint32_t>(rhs.red)
+      && std::bit_cast<std::uint32_t>(lhs.green) == std::bit_cast<std::uint32_t>(rhs.green)
+      && std::bit_cast<std::uint32_t>(lhs.blue) == std::bit_cast<std::uint32_t>(rhs.blue);
+}
+
+[[nodiscard]] std::string ReadTextFile(const std::filesystem::path& path) {
+  std::ifstream input{path, std::ios::binary};
+  if (!input.good()) {
+    throw TestFailure{"could not open reference shader source: " + path.string()};
+  }
+  return {std::istreambuf_iterator<char>{input}, std::istreambuf_iterator<char>{}};
+}
 
 struct TestContext {
   std::uint64_t assertions{};
@@ -638,7 +660,7 @@ void CpuAndHlslCloudVolumeRemainAligned(
           x,
           y,
           0U,
-          truth::render::CloudVolumeQuality::balanced,
+          truth::render::CloudVolumeQuality::quality,
       };
       truth::render::CloudVolumeOutput cpu{};
       context.expect(
@@ -737,6 +759,134 @@ void VolumeShowsParallaxAndInteriorShading(
                   "cloud body lacked lit-edge/darker-core interior shading");
 }
 
+void TierAndIdentityReferences(
+    TestContext& context,
+    const std::filesystem::path& shader_path) {
+  const auto shader_directory = shader_path.parent_path();
+  const std::string cloud = ReadTextFile(shader_directory / "TruthCloudVolume.fxh");
+  const std::string aurora = ReadTextFile(shader_directory / "TruthAuroraCurtain.fxh");
+  const std::string interior = ReadTextFile(shader_directory / "TruthInteriorLight.fxh");
+  const std::string quality = ReadTextFile(shader_directory / "TruthQuality.fxh");
+  const std::string screen_space = ReadTextFile(shader_directory / "TruthScreenSpace.fxh");
+
+  context.expect(cloud.find("#include \"TruthQuality.fxh\"") != std::string::npos,
+                 "performance-analytic-day: cloud volume does not consume TruthQuality");
+  context.expect(cloud.find("#if TRUTH_QUALITY_TIER < 2") != std::string::npos
+                     && cloud.find("#define TRUTH_ENABLE_CLOUD_VOLUME 0") != std::string::npos
+                     && quality.find("#if TRUTH_QUALITY_TIER == 0") != std::string::npos
+                     && quality.find("TruthQualityCloudPrimarySteps = 0u;")
+                            != std::string::npos,
+                 "performance-analytic-day: tier 0 must compile volume marching out");
+  context.expect(quality.find("#elif TRUTH_QUALITY_TIER == 1") != std::string::npos
+                     && quality.find("TruthQualityCloudPrimarySteps = 0u;")
+                            != std::string::npos
+                     && quality.find("TruthQualityCloudLightSteps = 0u;")
+                            != std::string::npos,
+                 "balanced-analytic-night: tier 1 must retain the analytic cloud path");
+  context.expect(cloud.find("TRUTH_CLOUD_VOLUME_QUALITY") == std::string::npos,
+                 "quality-volume-cloud: deprecated cloud quality macro remains");
+  context.expect(cloud.find("static const uint TruthCloudVolumePrimarySteps = TruthQualityCloudPrimarySteps;")
+                     != std::string::npos
+                     && cloud.find("static const uint TruthCloudVolumeLightSteps = TruthQualityCloudLightSteps;")
+                         != std::string::npos,
+                 "quality-volume-cloud: tier 2 must use the 8/2 TruthQuality budget");
+  context.expect(quality.find("#elif TRUTH_QUALITY_TIER == 2") != std::string::npos
+                     && quality.find("TruthQualityCloudPrimarySteps = 8u;")
+                            != std::string::npos
+                     && quality.find("TruthQualityCloudLightSteps = 2u;")
+                            != std::string::npos,
+                 "quality-volume-cloud: tier 2 must use an exact 8/2 budget");
+  context.expect(quality.find("#elif TRUTH_QUALITY_TIER == 3") != std::string::npos
+                     && quality.find("TruthQualityCloudPrimarySteps = 12u;")
+                            != std::string::npos
+                     && quality.find("TruthQualityCloudLightSteps = 3u;")
+                            != std::string::npos,
+                 "ultra-volume-cloud: tier 3 must use the 12/3 TruthQuality budget");
+  context.expect(quality.find("TruthQualityCloudPrimarySteps = 16u;") != std::string::npos
+                     && quality.find("TruthQualityCloudLightSteps = 4u;")
+                            != std::string::npos
+                     && cloud.find("TruthCloudVolumeInterleavedJitter") != std::string::npos,
+                 "cinematic-volume-cloud: tier 4 budget or stable sampling changed");
+
+  context.expect(aurora.find("#include \"TruthQuality.fxh\"") != std::string::npos
+                     && aurora.find("static const uint TruthAuroraCurtainSamples = TruthQualityAuroraSamples;")
+                            != std::string::npos,
+                 "aurora quality tiers do not consume TruthQuality");
+  context.expect(aurora.find("TRUTH_AURORA_QUALITY") == std::string::npos,
+                 "deprecated aurora quality macro remains");
+  context.expect(interior.find("output.exterior_excluded = (open_factor == 0.0) ? 1.0 : 0.0;")
+                     != std::string::npos,
+                 "sealed-interior: shader no longer preserves exact exterior exclusion");
+
+  const ReferenceColor scene{0.21F, 0.34F, 0.55F};
+  const auto preserve_scene = [](const ReferenceColor input, const bool runtime_valid) {
+    return runtime_valid ? ReferenceColor{0.44F, 0.33F, 0.22F} : input;
+  };
+  context.expect(SameColor(preserve_scene(scene, false), scene),
+                 "invalid-runtime-preserves-scene: invalid runtime changed scene color");
+
+  context.expect(screen_space.find("if (occlusion <= 0.0 || sample_count <= 0.0)")
+                     != std::string::npos
+                     && screen_space.find("if (visibility >= 1.0)")
+                            != std::string::npos,
+                 "ao-flat-surface-is-neutral: unoccluded AO lacks exact identity");
+  context.expect(screen_space.find("TruthScreenSpaceGeometryValid(") != std::string::npos
+                     && screen_space.find("return scene;") != std::string::npos,
+                 "ao-depth-edge-is-rejected: geometry rejection lacks identity");
+  context.expect(screen_space.find("if (!hit)") != std::string::npos,
+                 "ssr-miss-preserves-scene: SSR miss lacks exact identity");
+  context.expect(screen_space.find("if (skin_mask <= 0.0)") != std::string::npos,
+                 "sss-non-skin-preserves-scene: non-skin diffusion lacks identity");
+
+  truth::render::AuroraCurtainInput phase_zero{
+      0.0F, 0.0F, 0.20F,
+      0.0F, 1.0F, 0.0F,
+      0.0F,
+      0.62F, -0.27F,
+      0.82F,
+      1.0F,
+      truth::render::AuroraQuality::balanced,
+  };
+  auto phase_one = phase_zero;
+  phase_one.phase = 1.0F;
+  truth::render::AuroraCurtainOutput first{};
+  truth::render::AuroraCurtainOutput wrapped{};
+  context.expect(truth::render::EvaluateAuroraCurtain(phase_zero, first).status
+                     == truth::render::AuroraCurtainStatus::evaluated
+                     && truth::render::EvaluateAuroraCurtain(phase_one, wrapped).status
+                            == truth::render::AuroraCurtainStatus::evaluated,
+                 "phase-wrap: CPU aurora reference rejected a valid endpoint phase");
+  constexpr float phase_tolerance = 0.00001F;
+  context.expect(std::fabs(first.mask - wrapped.mask) <= phase_tolerance
+                     && std::fabs(first.intrinsic_radiance.r - wrapped.intrinsic_radiance.r)
+                            <= phase_tolerance
+                     && std::fabs(first.intrinsic_radiance.g - wrapped.intrinsic_radiance.g)
+                            <= phase_tolerance
+                     && std::fabs(first.intrinsic_radiance.b - wrapped.intrinsic_radiance.b)
+                            <= phase_tolerance,
+                 "phase-wrap: aurora endpoint phases drifted");
+
+  truth::render::CloudVolumeInput cloud_input{
+      {0.0F, 0.0F, 0.20F}, {0.0F, 1.0F, 0.0F}, {0.0F, 0.8525245F, 0.5226872F},
+      1.20F, 3.80F, 60.0F, 0.18F, 0.62F, -0.27F, 0.36F, 0.62F, 0.08F,
+      0.42F, 0.0F, 7U, 11U, 0U, truth::render::CloudVolumeQuality::quality,
+  };
+  constexpr truth::render::CloudVolumeVector world_sample{2.5F, -1.5F, 2.2F};
+  float baseline_density{};
+  float translated_density{};
+  context.expect(truth::render::SampleCloudVolumeDensity(
+                     cloud_input, world_sample, baseline_density).status
+                     == truth::render::CloudVolumeStatus::evaluated,
+                 "camera-stable-world-sampling: baseline CPU sample was rejected");
+  cloud_input.camera_position = {23.0F, -19.0F, 0.20F};
+  context.expect(truth::render::SampleCloudVolumeDensity(
+                     cloud_input, world_sample, translated_density).status
+                     == truth::render::CloudVolumeStatus::evaluated
+                     && std::bit_cast<std::uint32_t>(baseline_density)
+                            == std::bit_cast<std::uint32_t>(translated_density),
+                 "camera-stable-world-sampling: fixed world density drifted with camera position");
+}
+
 void PpmFilesCarryExactDimensions(
     TestContext& context,
     const Captures& captures,
@@ -774,6 +924,10 @@ int main(int argc, char** argv) {
     CompilerFailuresCarryDiagnostics(context, output_directory);
     ++passed;
     std::cout << "[PASS] shader compiler failures carry diagnostics\n";
+
+    TierAndIdentityReferences(context, shader_path);
+    ++passed;
+    std::cout << "[PASS] named tier and identity references\n";
 
     CpuAndHlslSkyFieldsRemainAligned(context, shader_path);
     ++passed;
@@ -823,7 +977,7 @@ int main(int argc, char** argv) {
                  << " render_ms=" << capture.render_milliseconds
                  << " elapsed_ms=" << capture.elapsed_milliseconds << '\n';
     }
-    std::cout << "Truth WARP reference cases: " << passed << "/11; assertions: "
+    std::cout << "Truth WARP reference cases: " << passed << "/12; assertions: "
               << context.assertions << '\n';
     return 0;
   } catch (const std::exception& exception) {

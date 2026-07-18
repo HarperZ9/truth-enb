@@ -1,27 +1,20 @@
 #ifndef TRUTH_CLOUD_VOLUME_FXH
 #define TRUTH_CLOUD_VOLUME_FXH
 
-#ifndef TRUTH_ENABLE_CLOUD_VOLUME
+#include "TruthQuality.fxh"
+
+#ifdef TRUTH_ENABLE_CLOUD_VOLUME
+#undef TRUTH_ENABLE_CLOUD_VOLUME
+#endif
+
+#if TRUTH_QUALITY_TIER < 2
+#define TRUTH_ENABLE_CLOUD_VOLUME 0
+#else
 #define TRUTH_ENABLE_CLOUD_VOLUME 1
 #endif
 
-#ifndef TRUTH_CLOUD_VOLUME_QUALITY
-#define TRUTH_CLOUD_VOLUME_QUALITY 2
-#endif
-
-#if TRUTH_CLOUD_VOLUME_QUALITY == 1
-static const uint TruthCloudVolumePrimarySteps = 16u;
-static const uint TruthCloudVolumeLightSteps = 4u;
-#elif TRUTH_CLOUD_VOLUME_QUALITY == 2
-static const uint TruthCloudVolumePrimarySteps = 20u;
-static const uint TruthCloudVolumeLightSteps = 5u;
-#elif TRUTH_CLOUD_VOLUME_QUALITY == 3
-static const uint TruthCloudVolumePrimarySteps = 24u;
-static const uint TruthCloudVolumeLightSteps = 6u;
-#else
-#error TRUTH_CLOUD_VOLUME_QUALITY must be 1, 2, or 3
-#endif
-
+static const uint TruthCloudVolumePrimarySteps = TruthQualityCloudPrimarySteps;
+static const uint TruthCloudVolumeLightSteps = TruthQualityCloudLightSteps;
 static const float TruthCloudVolumeTwoPi = 6.28318530717958647692;
 static const float TruthCloudVolumeExtinction = 1.35;
 static const float TruthCloudVolumeShadowExtinction = 1.10;
@@ -55,6 +48,8 @@ struct TruthCloudVolumeOutput
     uint primary_steps;
     uint light_samples;
 };
+
+#if TRUTH_QUALITY_TIER >= 2
 
 float TruthCloudVolumeSmooth(float value)
 {
@@ -430,5 +425,20 @@ TruthCloudVolumeOutput TruthEvaluateCloudVolume(TruthCloudVolumeInput input)
     }
     return output;
 }
+
+#else
+
+TruthCloudVolumeOutput TruthEvaluateCloudVolume(TruthCloudVolumeInput input)
+{
+    TruthCloudVolumeOutput output;
+    output.radiance = 0.0;
+    output.transmittance = 1.0;
+    output.optical_depth = 0.0;
+    output.primary_steps = 0u;
+    output.light_samples = 0u;
+    return output;
+}
+
+#endif
 
 #endif

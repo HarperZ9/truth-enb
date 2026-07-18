@@ -252,6 +252,8 @@ git commit -m "feat: establish ordered Truth shader stages"
 
 **Files:**
 - Create: `shaders/truth/TruthPrepassCore.fxh`
+- Create: `shaders/truth/TruthScreenSpace.fxh`
+- Create: `cmake/CheckTruthSceneContracts.cmake`
 - Modify: `shaders/enbeffectprepass.fx`
 - Modify: `shaders/truth/TruthCloudVolume.fxh`
 - Modify: `shaders/truth/TruthAuroraCurtain.fxh`
@@ -283,12 +285,18 @@ Add assertions for analytic tiers `0/1`, volume tiers `2/3/4`, sealed interior i
 "ultra-volume-cloud",
 "cinematic-volume-cloud",
 "sealed-interior",
-"invalid-runtime-preserves-scene"
+"invalid-runtime-preserves-scene",
+"ao-flat-surface-is-neutral",
+"ao-depth-edge-is-rejected",
+"ssr-miss-preserves-scene",
+"sss-non-skin-preserves-scene"
 ```
 
 - [ ] **Step 2: Run the focused CPU/reference test**
 
-Run: `ctest --test-dir build -C Debug -R "truth_reference_renderer|truth_cloud_volume_cpp|truth_interior_light_cpp" --output-on-failure`
+Register `truth_scene_contracts`, then run:
+
+`ctest --test-dir build -C Debug -R "truth_(reference_renderer|cloud_volume_cpp|interior_light_cpp|scene_contracts)" --output-on-failure`
 
 Expected: FAIL on missing tier-aware composition.
 
@@ -296,7 +304,29 @@ Expected: FAIL on missing tier-aware composition.
 
 Remove the former three-level cloud and four-level aurora macros. Tier `0/1` must compile out volume marching; tiers `2/3/4` use `8/2`, `12/3`, and `16/4`. Do not add frame-random jitter without a temporal resolver.
 
-- [ ] **Step 4: Implement one prepass compositor**
+- [ ] **Step 4: Implement bounded modern screen-space fallbacks**
+
+`TruthScreenSpace.fxh` independently authors current-frame techniques against
+the declared host capabilities:
+
+- GTAO-like visibility and contact response use `TruthQualityAODirections ×
+  TruthQualityAOSteps`, native normals when valid, a depth-derived fallback,
+  sky rejection, and bilateral depth/normal confidence. Flat unoccluded
+  surfaces and zero intensity are exact identities.
+- SSR is compiled out when `TruthQualitySSRSteps == 0`; higher tiers use the
+  fixed `8/12/16` steps, short view-space marching, binary refinement, edge and
+  thickness confidence, and exact miss identity. It cannot claim roughness,
+  object motion, or temporal history that the host has not supplied.
+- Subsurface diffusion is restricted to a validated skin/material mask, uses a
+  small depth/normal-aware current-frame kernel, preserves non-skin pixels
+  exactly, and never reuses alpha as hidden history.
+
+Sampling is world/screen stable and deterministic. No frame-random jitter,
+luminance-as-motion, unowned scratch, or current-frame-as-history path is
+allowed. `CheckTruthSceneContracts.cmake` supplies positive ownership checks
+and negative forbidden-resource cases.
+
+- [ ] **Step 5: Implement one prepass compositor**
 
 ```hlsl
 struct TruthPrepassResult
@@ -314,26 +344,25 @@ TruthPrepassResult TruthComposePrepass(
 
 The function returns the original finite scene when runtime data is invalid, applies exterior sky only through the shared sky mask, applies interior light only inside interiors, and never applies both branches to the same pixel.
 
-GTAO/contact shadowing, SSR, subsurface diffusion, atmosphere, and volumetrics
-must select the declared capability ladder. Without full-frame history they use
-world-stable sampling, edge/confidence rejection, bounded spatial filtering,
-and exact identity fallbacks; they may not use frame-random jitter or present
-luminance change as motion vectors.
+Environment is composed first through the sky/exterior mask. Scene-space
+visibility, SSR, and mask-aware diffusion then operate only on valid geometry
+and select the declared capability ladder. The result remains linear HDR and
+finite.
 
-- [ ] **Step 5: Remove duplicate sky/environment composition from `enbeffect.fx`**
+- [ ] **Step 6: Remove duplicate sky/environment composition from `enbeffect.fx`**
 
 `enbeffect.fx` must consume the prepass result as `TextureColor`; its responsibility becomes optical mix, exposure, tone mapping, and color only.
 
-- [ ] **Step 6: Run targeted math, matrix, and reference tests**
+- [ ] **Step 7: Run targeted math, matrix, and reference tests**
 
-Run: `ctest --test-dir build -C Debug -R "truth_(reference_renderer|cloud_volume_cpp|aurora_curtain_cpp|interior_light_cpp|stage_compile_matrix)" --output-on-failure`
+Run: `ctest --test-dir build -C Debug -R "truth_(reference_renderer|cloud_volume_cpp|aurora_curtain_cpp|interior_light_cpp|scene_contracts|stage_compile_matrix)" --output-on-failure`
 
 Expected: PASS.
 
-- [ ] **Step 7: Commit**
+- [ ] **Step 8: Commit**
 
 ```powershell
-git add shaders tests/ReferenceRendererTests.cpp CMakeLists.txt
+git add shaders cmake/CheckTruthSceneContracts.cmake tests/ReferenceRendererTests.cpp CMakeLists.txt
 git commit -m "feat: compose Truth environment in HDR prepass"
 ```
 

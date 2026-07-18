@@ -21,6 +21,7 @@
 #include "truth/TruthStageParameters.fxh"
 
 Texture2D TextureColor;
+float4 ScreenSize;
 
 SamplerState Sampler0
 {
@@ -29,10 +30,17 @@ SamplerState Sampler0
     AddressV = Clamp;
 };
 
+#include "truth/TruthPostFinish.fxh"
+
 float4 TruthPostpassMain(TruthStageVSOutput input) : SV_Target
 {
     float4 source = TextureColor.Sample(Sampler0, input.texcoord);
-    return TruthStageIdentity(source, TruthStageIsActive(), TRUTH_STAGE_INTENSITY);
+    if (!TruthStageIsActive() || TRUTH_STAGE_INTENSITY <= 0.0)
+    {
+        return TruthStageIdentity(source, false, 0.0);
+    }
+    float3 finished = TruthFinishLdr(input.texcoord, saturate(source.rgb));
+    return float4(finished, 1.0);
 }
 
 technique11 Draw <string UIName = "Truth [70] Postpass";>

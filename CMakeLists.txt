@@ -468,6 +468,16 @@ if(BUILD_TESTING)
   )
 
   add_test(
+    NAME truth_composition_contracts
+    COMMAND "${CMAKE_COMMAND}"
+      "-DTRUTH_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}"
+      -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/CheckTruthCompositionContracts.cmake"
+  )
+  set_tests_properties(truth_composition_contracts PROPERTIES
+    LABELS "shader;composition;contract"
+  )
+
+  add_test(
     NAME truth_aurora_default_quality_contract
     COMMAND "${CMAKE_COMMAND}"
       "-DTRUTH_AURORA_SOURCE=${CMAKE_CURRENT_SOURCE_DIR}/shaders/truth/TruthAuroraCurtain.fxh"

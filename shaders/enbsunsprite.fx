@@ -1,12 +1,12 @@
-#define TRUTH_STAGE_CAPABILITY TRUTH_CAPABILITY_IDENTITY
+#define TRUTH_STAGE_CAPABILITY TRUTH_CAPABILITY_NATIVE
 #define TRUTH_STAGE_OWNS_COLOR 1
 #define TRUTH_STAGE_OWNS_DEPTH 0
 #define TRUTH_STAGE_OWNS_NORMAL 0
 #define TRUTH_STAGE_OWNS_MASK 0
-#define TRUTH_STAGE_OWNS_NATIVE_CELESTIAL_VIEW 0
+#define TRUTH_STAGE_OWNS_NATIVE_CELESTIAL_VIEW 1
 #define TRUTH_STAGE_OWNS_PREVIOUS_SCALAR_ADAPTATION 0
 #define TRUTH_STAGE_OWNS_BRIDGE_VALUE 0
-#define TRUTH_STAGE_NATIVE_CAPABILITY_AVAILABLE 0
+#define TRUTH_STAGE_NATIVE_CAPABILITY_AVAILABLE 1
 #define TRUTH_STAGE_BRIDGE_CAPABILITY_AVAILABLE 0
 #define TRUTH_STAGE_SPATIAL_CAPABILITY_AVAILABLE 0
 #define TRUTH_STAGE_SCRATCH_OWNER TRUTH_SCRATCH_SUNSPRITE
@@ -21,6 +21,12 @@
 #include "truth/TruthStageParameters.fxh"
 
 Texture2D TextureColor;
+float4 TruthRuntimeCelestial
+<
+    string UIName = "Truth Runtime | Celestial";
+    string UIWidget = "Color";
+    int UIHidden = 1;
+> = {0.0, 0.0, 1.0, 0.0};
 
 SamplerState Sampler0
 {
@@ -29,10 +35,20 @@ SamplerState Sampler0
     AddressV = Clamp;
 };
 
+#include "truth/TruthSunSprite.fxh"
+
 float4 TruthSunSpriteMain(TruthStageVSOutput input) : SV_Target
 {
     float4 source = TextureColor.Sample(Sampler0, input.texcoord);
-    return TruthStageIdentity(source, TruthStageIsActive(), TRUTH_STAGE_INTENSITY);
+    if (!TruthStageIsActive() || TRUTH_STAGE_INTENSITY <= 0.0)
+    {
+        return TruthStageIdentity(source, false, 0.0);
+    }
+    float3 sprite = TruthEvaluateSunSprite(
+        input.texcoord,
+        TruthRuntimeCelestial.xyz,
+        TruthRuntimeCelestial.w);
+    return float4(TruthFiniteOrBlack(source.rgb + sprite), source.a);
 }
 
 technique11 Draw <string UIName = "Truth [80] Sun Sprite";>

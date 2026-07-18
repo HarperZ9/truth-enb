@@ -78,6 +78,12 @@ float3 TruthResolveMainCapability(float3 color)
         float4(color, 1.0), TruthRuntimeReady() ? 1.0 : 0.0, 0.0, 0.0).rgb;
 }
 
+float3 TruthCompressDisplayGamut(float3 color)
+{
+    float peak = max(max(color.r, color.g), color.b);
+    return peak > 1.0 ? color / peak : max(color, 0.0);
+}
+
 float4 TruthEnbPixelMain(VS_OUTPUT_POST input) : SV_Target
 {
     float3 linear_color = TruthResolveMainCapability(
@@ -102,7 +108,8 @@ float4 TruthEnbPixelMain(VS_OUTPUT_POST input) : SV_Target
         target_exposure_ev,
         saturate(TruthAutoExposureBlend));
     float3 exposed = TruthApplyExposure(linear_color, exposure_ev);
-    return float4(saturate(TruthFilmicToneCurve3(TruthFiniteOrBlack(exposed))), 1.0);
+    float3 display_color = TruthFilmicToneCurve3(TruthFiniteOrBlack(exposed));
+    return float4(saturate(TruthCompressDisplayGamut(display_color)), 1.0);
 }
 
 float4 TruthEnbFallbackPixel(VS_OUTPUT_POST input) : SV_Target

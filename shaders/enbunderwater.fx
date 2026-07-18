@@ -1,6 +1,6 @@
-#define TRUTH_STAGE_CAPABILITY TRUTH_CAPABILITY_IDENTITY
+#define TRUTH_STAGE_CAPABILITY TRUTH_CAPABILITY_SPATIAL
 #define TRUTH_STAGE_OWNS_COLOR 1
-#define TRUTH_STAGE_OWNS_DEPTH 0
+#define TRUTH_STAGE_OWNS_DEPTH 1
 #define TRUTH_STAGE_OWNS_NORMAL 0
 #define TRUTH_STAGE_OWNS_MASK 0
 #define TRUTH_STAGE_OWNS_NATIVE_CELESTIAL_VIEW 0
@@ -8,7 +8,7 @@
 #define TRUTH_STAGE_OWNS_BRIDGE_VALUE 0
 #define TRUTH_STAGE_NATIVE_CAPABILITY_AVAILABLE 0
 #define TRUTH_STAGE_BRIDGE_CAPABILITY_AVAILABLE 0
-#define TRUTH_STAGE_SPATIAL_CAPABILITY_AVAILABLE 0
+#define TRUTH_STAGE_SPATIAL_CAPABILITY_AVAILABLE 1
 #define TRUTH_STAGE_SCRATCH_OWNER TRUTH_SCRATCH_UNDERWATER
 #define TRUTH_STAGE_SCRATCH_READ TRUTH_SCRATCH_NONE
 #define TRUTH_STAGE_OWNS_FULL_FRAME_HISTORY 0
@@ -21,6 +21,7 @@
 #include "truth/TruthStageParameters.fxh"
 
 Texture2D TextureColor;
+Texture2D TextureDepth;
 
 SamplerState Sampler0
 {
@@ -29,10 +30,20 @@ SamplerState Sampler0
     AddressV = Clamp;
 };
 
+#include "truth/TruthUnderwater.fxh"
+
 float4 TruthUnderwaterMain(TruthStageVSOutput input) : SV_Target
 {
     float4 source = TextureColor.Sample(Sampler0, input.texcoord);
-    return TruthStageIdentity(source, TruthStageIsActive(), TRUTH_STAGE_INTENSITY);
+    if (!TruthStageIsActive() || TRUTH_STAGE_INTENSITY <= 0.0)
+    {
+        return TruthStageIdentity(source, false, 0.0);
+    }
+    float linear_depth =
+        TextureDepth.SampleLevel(Sampler0, input.texcoord, 0.0).x;
+    return float4(
+        TruthEvaluateUnderwater(input.texcoord, source.rgb, linear_depth),
+        source.a);
 }
 
 technique11 Draw <string UIName = "Truth [90] Underwater";>

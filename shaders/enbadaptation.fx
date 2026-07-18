@@ -30,13 +30,23 @@ SamplerState Sampler0
     AddressV = Clamp;
 };
 
+#include "truth/TruthAdaptation.fxh"
+
 float4 TruthAdaptationMain(TruthStageVSOutput input) : SV_Target
 {
     float4 source = TextureCurrent.Sample(Sampler0, input.texcoord);
     float previous_scalar = TexturePrevious.SampleLevel(Sampler0, float2(0.5, 0.5), 0.0).x;
     float4 selected = TruthResolveCapabilityColor(
         source, TruthFinite1(previous_scalar) ? 1.0 : 0.0, 0.0, 0.0);
-    return TruthStageIdentity(selected, TruthStageIsActive(), TRUTH_STAGE_INTENSITY);
+    if (!TruthStageIsActive() || TRUTH_STAGE_INTENSITY <= 0.0)
+    {
+        return TruthStageIdentity(selected, false, 0.0);
+    }
+    float measured = dot(
+        max(source.rgb, 0.0), float3(0.2126, 0.7152, 0.0722));
+    float adapted = TruthUpdateAdaptedLuminance(
+        measured, previous_scalar, 1.0 / 60.0);
+    return float4(adapted, adapted, adapted, 1.0);
 }
 
 technique11 Draw <string UIName = "Truth [40] Adaptation";>

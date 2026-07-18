@@ -29,10 +29,18 @@ SamplerState Sampler0
     AddressV = Clamp;
 };
 
+#include "truth/TruthLens.fxh"
+
 float4 TruthLensMain(TruthStageVSOutput input) : SV_Target
 {
-    float4 source = TextureColor.Sample(Sampler0, input.texcoord);
-    return TruthStageIdentity(source, TruthStageIsActive(), TRUTH_STAGE_INTENSITY);
+    float4 bloom = TextureColor.Sample(Sampler0, input.texcoord);
+    if (!TruthStageIsActive() || TRUTH_STAGE_INTENSITY <= 0.0)
+    {
+        return TruthStageIdentity(bloom, false, 0.0);
+    }
+    return float4(
+        TruthApplyLens(input.texcoord, max(bloom.rgb, 0.0), 0.0),
+        bloom.a);
 }
 
 technique11 Draw <string UIName = "Truth [50] Lens";>

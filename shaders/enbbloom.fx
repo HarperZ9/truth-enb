@@ -21,6 +21,7 @@
 #include "truth/TruthStageParameters.fxh"
 
 Texture2D TextureColor;
+float4 ScreenSize;
 
 SamplerState Sampler0
 {
@@ -29,10 +30,16 @@ SamplerState Sampler0
     AddressV = Clamp;
 };
 
+#include "truth/TruthBloom.fxh"
+
 float4 TruthBloomMain(TruthStageVSOutput input) : SV_Target
 {
     float4 source = TextureColor.Sample(Sampler0, input.texcoord);
-    return TruthStageIdentity(source, TruthStageIsActive(), TRUTH_STAGE_INTENSITY);
+    if (!TruthStageIsActive() || TRUTH_STAGE_INTENSITY <= 0.0)
+    {
+        return TruthStageIdentity(source, false, 0.0);
+    }
+    return float4(TruthApplyBloom(input.texcoord, source.rgb), source.a);
 }
 
 technique11 Draw <string UIName = "Truth [30] Bloom";>

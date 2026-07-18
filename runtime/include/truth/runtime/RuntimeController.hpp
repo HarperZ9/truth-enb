@@ -11,15 +11,19 @@
 namespace truth::runtime {
 
 inline constexpr std::string_view kShaderCategory = "ENBEFFECT.FX";
-inline constexpr std::array<std::string_view, 6> kShaderParameterKeys{
+inline constexpr std::array<std::string_view, 7> kShaderParameterKeys{
     "Truth Runtime | Inverse VP Row 0",
     "Truth Runtime | Inverse VP Row 1",
     "Truth Runtime | Inverse VP Row 2",
     "Truth Runtime | Inverse VP Row 3",
     "Truth Runtime | Camera World",
+    "Truth Runtime | Celestial",
     "Truth Runtime | Status",
 };
+inline constexpr std::string_view kCelestialParameterKey =
+    "Truth Runtime | Celestial";
 inline constexpr float kProtocolVersion = 1.0F;
+inline constexpr float kProtocolVersionWithCelestial = 1.1F;
 inline constexpr float kDefaultEngineWorldUnitsPerAuroraUnit = 4096.0F;
 inline constexpr std::uint64_t kExactFloatGenerationModulus = 16'777'216U;
 
@@ -92,14 +96,14 @@ public:
 
 private:
     [[nodiscard]] bool PublishPayload(
-        const std::array<Float4, 6>& payload) noexcept;
+        const std::array<Float4, 7>& payload) noexcept;
     [[nodiscard]] bool RestoreBaseline() noexcept;
 
     ShaderParameterApi& parameters_;
     CameraFrameProvider& camera_;
     float engine_world_units_per_aurora_unit_;
     RuntimeDiagnostics diagnostics_{};
-    std::array<Float4, 6> baseline_{};
+    std::array<Float4, 7> baseline_{};
 };
 
 } // namespace truth::runtime

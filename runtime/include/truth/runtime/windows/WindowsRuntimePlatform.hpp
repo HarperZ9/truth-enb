@@ -15,6 +15,8 @@ public:
         std::uintptr_t address) const noexcept override;
     [[nodiscard]] std::uintptr_t InvokeWorldRootCamera(
         std::uintptr_t function_address) const noexcept override;
+    [[nodiscard]] bool QuerySunDirection(
+        Float4& direction) const noexcept override;
     [[nodiscard]] bool Read(
         std::uintptr_t address,
         std::span<std::uint8_t> destination) const noexcept override;

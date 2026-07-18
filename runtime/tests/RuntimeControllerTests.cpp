@@ -7,6 +7,7 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <limits>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -26,13 +27,14 @@ struct ParameterCall final {
 
 class RecordingParameters final : public ShaderParameterApi {
 public:
-    std::array<Float4, 6> values{
+    std::array<Float4, 7> values{
         Float4{1.0F, 2.0F, 3.0F, 4.0F},
         Float4{5.0F, 6.0F, 7.0F, 8.0F},
         Float4{9.0F, 10.0F, 11.0F, 12.0F},
         Float4{13.0F, 14.0F, 15.0F, 16.0F},
         Float4{17.0F, 18.0F, 19.0F, 20.0F},
         Float4{21.0F, 22.0F, 23.0F, 24.0F},
+        Float4{25.0F, 26.0F, 27.0F, 28.0F},
     };
     std::vector<ParameterCall> calls;
     std::size_t fail_get_at{static_cast<std::size_t>(-1)};
@@ -96,6 +98,8 @@ public:
             Float4{0.0F, 0.0F, 0.0F, 1.0F},
         };
         next.frame.camera_world = {10.0F, 20.0F, 30.0F, 0.0F};
+        next.frame.celestial.sun_direction_valid =
+            Float4{0.0F, 0.0F, 1.0F, 1.0F};
     }
 
     [[nodiscard]] CameraFrameResult Sample() noexcept override
@@ -121,7 +125,7 @@ void PostLoadUsesExactUiNamesAndNeverHlslIdentifiers(Context& context)
         "OnInit performed parameter I/O outside parameter-ready callback");
     controller.HandleCallback(enbcore::enb::CallbackId::PostLoad);
 
-    context.expect(parameters.calls.size() == 13U,
+    context.expect(parameters.calls.size() == 15U,
         "PostLoad did not capture and transactionally replace the parameters");
     for (std::size_t index = 0; index < kShaderParameterKeys.size(); ++index) {
         const ParameterCall& get = parameters.calls[index];
@@ -134,20 +138,22 @@ void PostLoadUsesExactUiNamesAndNeverHlslIdentifiers(Context& context)
         context.expect(get.key.find("TruthInverse") == std::string::npos,
             "an HLSL identifier leaked into the ENB SDK binding");
     }
-    constexpr std::array<std::size_t, 7> expected_write_order{5, 0, 1, 2, 3, 4, 5};
+    constexpr std::array<std::size_t, 8> expected_write_order{
+        6, 0, 1, 2, 3, 4, 5, 6};
     for (std::size_t index = 0; index < expected_write_order.size(); ++index) {
-        const ParameterCall& set = parameters.calls[index + 6U];
+        const ParameterCall& set =
+            parameters.calls[index + kShaderParameterKeys.size()];
         context.expect(set.write && set.category == kShaderCategory,
             "PostLoad parameter write used the wrong operation or category");
         context.expect(set.key == kShaderParameterKeys[expected_write_order[index]],
             "PostLoad did not bracket payload writes with Status");
     }
-    context.expect(parameters.calls[6].value.y == 0.0F,
+    context.expect(parameters.calls[7].value.y == 0.0F,
         "PostLoad did not invalidate Status before writing payload data");
-    context.expect(parameters.values[5].x == kProtocolVersion
-            && parameters.values[5].y == 0.0F
-            && parameters.values[5].z == 0.0F
-            && parameters.values[5].w == kDefaultEngineWorldUnitsPerAuroraUnit,
+    context.expect(parameters.values[6].x == kProtocolVersionWithCelestial
+            && parameters.values[6].y == 0.0F
+            && parameters.values[6].z == 0.0F
+            && parameters.values[6].w == kDefaultEngineWorldUnitsPerAuroraUnit,
         "PostLoad did not publish a fail-closed status payload");
     context.expect(controller.diagnostics().baseline_captured,
         "PostLoad did not retain the original shader values");
@@ -173,15 +179,15 @@ void BeginFramePublishesCameraAndExactFoldedGeneration(Context& context)
 
     controller.HandleCallback(enbcore::enb::CallbackId::BeginFrame);
 
-    context.expect(parameters.calls.size() == 7U,
+    context.expect(parameters.calls.size() == 8U,
         "BeginFrame did not perform one complete transaction");
     for (const ParameterCall& call : parameters.calls) {
         context.expect(call.write, "BeginFrame attempted a parameter read");
     }
-    context.expect(parameters.calls.front().key == kShaderParameterKeys[5]
+    context.expect(parameters.calls.front().key == kShaderParameterKeys[6]
             && parameters.calls.front().value.y == 0.0F,
         "BeginFrame did not invalidate Status before publishing frame data");
-    context.expect(parameters.calls.back().key == kShaderParameterKeys[5]
+    context.expect(parameters.calls.back().key == kShaderParameterKeys[6]
             && parameters.calls.back().value.y == 1.0F,
         "BeginFrame did not commit valid Status last");
     for (std::size_t row = 0; row < 4U; ++row) {
@@ -191,15 +197,57 @@ void BeginFramePublishesCameraAndExactFoldedGeneration(Context& context)
     }
     context.expect(Same(parameters.values[4], camera.next.frame.camera_world),
         "camera world position was published incorrectly");
-    context.expect(parameters.values[5].x == 1.0F
-            && parameters.values[5].y == 1.0F
-            && parameters.values[5].z == 1.0F
-            && parameters.values[5].w == 4096.0F,
+    context.expect(parameters.values[6].x == kProtocolVersionWithCelestial
+            && parameters.values[6].y == 1.0F
+            && parameters.values[6].z == 1.0F
+            && parameters.values[6].w == 4096.0F,
         "valid status payload was wrong");
     const RuntimeDiagnostics diagnostics = controller.diagnostics();
     context.expect(diagnostics.generation == 1U
             && diagnostics.frame_data_valid,
         "runtime diagnostics did not record the valid frame");
+}
+
+void CelestialPayloadIsNormalizedAndCommittedBeforeStatus(Context& context)
+{
+    RecordingParameters parameters;
+    FixedCamera camera;
+    camera.next.frame.celestial.sun_direction_valid =
+        Float4{3.0F, 0.0F, 4.0F, 1.0F};
+    RuntimeController controller{parameters, camera};
+    controller.HandleCallback(enbcore::enb::CallbackId::OnInit);
+    controller.HandleCallback(enbcore::enb::CallbackId::PostLoad);
+    parameters.calls.clear();
+
+    controller.HandleCallback(enbcore::enb::CallbackId::BeginFrame);
+
+    context.expect(Same(parameters.values[5], Float4{0.6F, 0.0F, 0.8F, 1.0F}),
+        "celestial direction was not normalized before publication");
+    context.expect(parameters.calls[6].key == kCelestialParameterKey
+            && parameters.calls.back().key == kShaderParameterKeys[6],
+        "celestial value was not committed before final Status.valid");
+}
+
+void InvalidCelestialPayloadFailsClosedWithoutRejectingCamera(Context& context)
+{
+    const auto exercise = [&context](const Float4 celestial) {
+        RecordingParameters parameters;
+        FixedCamera camera;
+        camera.next.frame.celestial.sun_direction_valid = celestial;
+        RuntimeController controller{parameters, camera};
+        controller.HandleCallback(enbcore::enb::CallbackId::OnInit);
+        controller.HandleCallback(enbcore::enb::CallbackId::PostLoad);
+        controller.HandleCallback(enbcore::enb::CallbackId::BeginFrame);
+        context.expect(parameters.values[5] == Float4{},
+            "invalid celestial vector was exposed as valid shader data");
+        context.expect(parameters.values[6].y == 1.0F
+                && controller.diagnostics().frame_data_valid,
+            "invalid optional celestial data rejected a valid camera frame");
+    };
+
+    exercise(Float4{0.0F, 0.0F, 0.0F, 1.0F});
+    exercise(Float4{
+        (std::numeric_limits<float>::quiet_NaN)(), 0.0F, 1.0F, 1.0F});
 }
 
 void PreSaveRestoresBaselineAndNextFrameReapplies(Context& context)
@@ -224,8 +272,8 @@ void PreSaveRestoresBaselineAndNextFrameReapplies(Context& context)
     context.expect(parameters.calls.empty(),
         "EndFrame reapplied runtime values before the verified barrier");
     controller.HandleCallback(enbcore::enb::CallbackId::BeginFrame);
-    context.expect(parameters.values[5].y == 1.0F
-            && parameters.values[5].z == 2.0F,
+    context.expect(parameters.values[6].y == 1.0F
+            && parameters.values[6].z == 2.0F,
         "next BeginFrame did not reapply with a monotonic generation");
 }
 
@@ -251,9 +299,9 @@ void InvalidCameraPublishesOnlyTheFailClosedContract(Context& context)
     }
     context.expect(parameters.values[4] == Float4{},
         "invalid camera left a stale world position active");
-    context.expect(parameters.values[5].x == 1.0F
-            && parameters.values[5].y == 0.0F
-            && parameters.values[5].z == 0.0F,
+    context.expect(parameters.values[6].x == kProtocolVersionWithCelestial
+            && parameters.values[6].y == 0.0F
+            && parameters.values[6].z == 0.0F,
         "invalid camera did not publish frame-valid zero");
     const RuntimeDiagnostics diagnostics = controller.diagnostics();
     context.expect(diagnostics.diagnostic == RuntimeDiagnostic::CameraFrameRejected
@@ -303,7 +351,7 @@ void MidWriteFailureInvalidatesFirstAndRestoresTheWholeBaseline(Context& context
     controller.HandleCallback(enbcore::enb::CallbackId::BeginFrame);
 
     context.expect(!parameters.calls.empty()
-            && parameters.calls.front().key == kShaderParameterKeys[5]
+            && parameters.calls.front().key == kShaderParameterKeys[6]
             && parameters.calls.front().value.y == 0.0F,
         "failed transaction did not invalidate Status first");
     context.expect(parameters.values == baseline,
@@ -339,7 +387,7 @@ void FailedRollbackIsRetriedByEveryLifecycleBarrier(Context& context)
         context.expect(diagnostics.state == RuntimeSessionState::Failed
                 && diagnostics.baseline_restore_needed,
             "rollback failure did not retain restore-needed state");
-        context.expect(parameters.values[5].y == 0.0F,
+        context.expect(parameters.values[6].y == 0.0F,
             "rollback failure exposed valid Status over partial data");
 
         parameters.fail_set_calls.clear();
@@ -352,7 +400,7 @@ void FailedRollbackIsRetriedByEveryLifecycleBarrier(Context& context)
                 && diagnostics.baseline_captured == expected_baseline
                 && !diagnostics.baseline_restore_needed,
             "lifecycle retry did not finish in the safe state");
-        context.expect(parameters.calls.size() == 7U,
+        context.expect(parameters.calls.size() == 8U,
             "lifecycle retry did not perform a complete ordered restore");
     };
 
@@ -366,15 +414,17 @@ void FailedRollbackIsRetriedByEveryLifecycleBarrier(Context& context)
 
 void RepeatedPostLoadRecapturesTheCurrentEffectDefaults(Context& context)
 {
-    const std::array<Float4, 6> active_reload{
+    const std::array<Float4, 7> active_reload{
         Float4{101, 102, 103, 104}, Float4{105, 106, 107, 108},
         Float4{109, 110, 111, 112}, Float4{113, 114, 115, 116},
         Float4{117, 118, 119, 120}, Float4{121, 122, 123, 124},
+        Float4{125, 126, 127, 128},
     };
-    const std::array<Float4, 6> quiesced_reload{
+    const std::array<Float4, 7> quiesced_reload{
         Float4{201, 202, 203, 204}, Float4{205, 206, 207, 208},
         Float4{209, 210, 211, 212}, Float4{213, 214, 215, 216},
         Float4{217, 218, 219, 220}, Float4{221, 222, 223, 224},
+        Float4{225, 226, 227, 228},
     };
 
     RecordingParameters parameters;
@@ -388,7 +438,7 @@ void RepeatedPostLoadRecapturesTheCurrentEffectDefaults(Context& context)
     parameters.calls.clear();
     controller.HandleCallback(enbcore::enb::CallbackId::PostLoad);
     context.expect(controller.diagnostics().state == RuntimeSessionState::Active
-            && parameters.calls.size() == 13U,
+            && parameters.calls.size() == 15U,
         "active PostLoad did not recapture and rebind the recreated effect");
     controller.HandleCallback(enbcore::enb::CallbackId::PreSave);
     context.expect(parameters.values == active_reload,
@@ -398,7 +448,7 @@ void RepeatedPostLoadRecapturesTheCurrentEffectDefaults(Context& context)
     parameters.calls.clear();
     controller.HandleCallback(enbcore::enb::CallbackId::PostLoad);
     context.expect(controller.diagnostics().state == RuntimeSessionState::Active
-            && parameters.calls.size() == 13U,
+            && parameters.calls.size() == 15U,
         "quiesced PostLoad did not recapture and rebind the recreated effect");
     controller.HandleCallback(enbcore::enb::CallbackId::OnExit);
     context.expect(parameters.values == quiesced_reload,
@@ -414,10 +464,11 @@ void FailedReloadCaptureNeverRestoresThePreviousEffect(Context& context)
     controller.HandleCallback(enbcore::enb::CallbackId::PostLoad);
     controller.HandleCallback(enbcore::enb::CallbackId::BeginFrame);
 
-    const std::array<Float4, 6> replacement{
+    const std::array<Float4, 7> replacement{
         Float4{301, 302, 303, 304}, Float4{305, 306, 307, 308},
         Float4{309, 310, 311, 312}, Float4{313, 314, 315, 316},
         Float4{317, 318, 319, 320}, Float4{321, 322, 323, 324},
+        Float4{325, 326, 327, 328},
     };
     parameters.values = replacement;
     parameters.fail_get_at = parameters.get_count + 2U;
@@ -493,6 +544,10 @@ constexpr truth::runtime::tests::TestCase kTests[]{
         &PostLoadUsesExactUiNamesAndNeverHlslIdentifiers},
     {"BeginFrame publishes camera and exact folded generation",
         &BeginFramePublishesCameraAndExactFoldedGeneration},
+    {"celestial payload is normalized and committed before status",
+        &CelestialPayloadIsNormalizedAndCommittedBeforeStatus},
+    {"invalid celestial payload fails closed without rejecting camera",
+        &InvalidCelestialPayloadFailsClosedWithoutRejectingCamera},
     {"PreSave restores baseline and next frame reapplies",
         &PreSaveRestoresBaselineAndNextFrameReapplies},
     {"invalid camera publishes only the fail-closed contract",

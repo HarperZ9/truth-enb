@@ -13,7 +13,7 @@ set(
 
 set(
     TRUTH_ENB_RUNTIME_CORE_REVISION
-    "cfe7c0810adc0c34028a3d727b85dd1e6e51d407"
+    "e84e42b2053551e677ea00ad1400501117ccfa7c"
 )
 
 file(STRINGS

@@ -15,25 +15,51 @@ namespace {
         && std::isfinite(value.w);
 }
 
-[[nodiscard]] std::array<Float4, 6> SafePayload(
+[[nodiscard]] Float4 NormalizeCelestial(const CelestialFrame& celestial) noexcept
+{
+    const Float4 source = celestial.sun_direction_valid;
+    if (!Finite(source) || source.w <= 0.5F) {
+        return {};
+    }
+    const float length_squared =
+        (source.x * source.x) + (source.y * source.y) + (source.z * source.z);
+    if (!std::isfinite(length_squared) || length_squared <= 1.0e-8F) {
+        return {};
+    }
+    const float inverse_length = 1.0F / std::sqrt(length_squared);
+    return Float4{
+        source.x * inverse_length,
+        source.y * inverse_length,
+        source.z * inverse_length,
+        1.0F,
+    };
+}
+
+[[nodiscard]] std::array<Float4, 7> SafePayload(
     const float scale,
     const float folded_generation,
     const bool valid,
     const CameraFrame* frame) noexcept
 {
-    std::array<Float4, 6> payload{
+    std::array<Float4, 7> payload{
         Float4{1.0F, 0.0F, 0.0F, 0.0F},
         Float4{0.0F, 1.0F, 0.0F, 0.0F},
         Float4{0.0F, 0.0F, 1.0F, 0.0F},
         Float4{0.0F, 0.0F, 0.0F, 1.0F},
         Float4{},
-        Float4{kProtocolVersion, valid ? 1.0F : 0.0F, folded_generation, scale},
+        Float4{},
+        Float4{
+            kProtocolVersionWithCelestial,
+            valid ? 1.0F : 0.0F,
+            folded_generation,
+            scale},
     };
     if (valid && frame != nullptr) {
         for (std::size_t row = 0; row < 4U; ++row) {
             payload[row] = frame->inverse_view_projection_rows[row];
         }
         payload[4] = frame->camera_world;
+        payload[5] = NormalizeCelestial(frame->celestial);
     }
     return payload;
 }
@@ -77,13 +103,13 @@ bool RuntimeController::RestoreBaseline() noexcept
         engine_world_units_per_aurora_unit_,
     };
     if (!parameters_.SetColor4(
-            kShaderCategory, kShaderParameterKeys[5], invalid_status)) {
+            kShaderCategory, kShaderParameterKeys[6], invalid_status)) {
         ++diagnostics_.parameter_set_failures;
         return false;
     }
 
     bool restored = true;
-    for (std::size_t index = 0; index < 5U; ++index) {
+    for (std::size_t index = 0; index < 6U; ++index) {
         if (!parameters_.SetColor4(
                 kShaderCategory,
                 kShaderParameterKeys[index],
@@ -94,7 +120,7 @@ bool RuntimeController::RestoreBaseline() noexcept
     }
     if (restored
         && !parameters_.SetColor4(
-            kShaderCategory, kShaderParameterKeys[5], baseline_[5])) {
+            kShaderCategory, kShaderParameterKeys[6], baseline_[6])) {
         ++diagnostics_.parameter_set_failures;
         restored = false;
     }
@@ -105,22 +131,22 @@ bool RuntimeController::RestoreBaseline() noexcept
 }
 
 bool RuntimeController::PublishPayload(
-    const std::array<Float4, 6>& payload) noexcept
+    const std::array<Float4, 7>& payload) noexcept
 {
     if (!diagnostics_.baseline_captured) {
         return false;
     }
     diagnostics_.baseline_restore_needed = true;
 
-    Float4 invalid_status = payload[5];
+    Float4 invalid_status = payload[6];
     invalid_status.y = 0.0F;
     if (!parameters_.SetColor4(
-            kShaderCategory, kShaderParameterKeys[5], invalid_status)) {
+            kShaderCategory, kShaderParameterKeys[6], invalid_status)) {
         ++diagnostics_.parameter_set_failures;
         static_cast<void>(RestoreBaseline());
         return false;
     }
-    for (std::size_t index = 0; index < 5U; ++index) {
+    for (std::size_t index = 0; index < 6U; ++index) {
         if (!parameters_.SetColor4(
                 kShaderCategory,
                 kShaderParameterKeys[index],
@@ -131,7 +157,7 @@ bool RuntimeController::PublishPayload(
         }
     }
     if (!parameters_.SetColor4(
-            kShaderCategory, kShaderParameterKeys[5], payload[5])) {
+            kShaderCategory, kShaderParameterKeys[6], payload[6])) {
         ++diagnostics_.parameter_set_failures;
         static_cast<void>(RestoreBaseline());
         return false;
@@ -177,7 +203,7 @@ void RuntimeController::HandleCallback(
         diagnostics_.baseline_captured = false;
         diagnostics_.baseline_restore_needed = false;
         diagnostics_.frame_data_valid = false;
-        std::array<Float4, 6> candidate{};
+        std::array<Float4, 7> candidate{};
         for (std::size_t index = 0; index < candidate.size(); ++index) {
             if (!parameters_.GetColor4(
                     kShaderCategory,
@@ -217,7 +243,7 @@ void RuntimeController::HandleCallback(
             return;
         }
         const CameraFrameResult sampled = camera_.Sample();
-        std::array<Float4, 6> payload{};
+        std::array<Float4, 7> payload{};
         if (sampled.valid()) {
             ++diagnostics_.generation;
             payload = SafePayload(

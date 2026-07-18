@@ -76,9 +76,14 @@ struct CameraSnapshot final {
     NiCameraRuntimeData2Abi projection{};
 };
 
+struct CelestialFrame final {
+    Float4 sun_direction_valid{};
+};
+
 struct CameraFrame final {
     std::array<Float4, 4> inverse_view_projection_rows{};
     Float4 camera_world{};
+    CelestialFrame celestial{};
 };
 
 enum class CameraFrameDiagnostic : std::uint16_t {

@@ -37,6 +37,12 @@ public:
         std::uintptr_t address) const noexcept = 0;
     [[nodiscard]] virtual std::uintptr_t InvokeWorldRootCamera(
         std::uintptr_t function_address) const noexcept = 0;
+    [[nodiscard]] virtual bool QuerySunDirection(
+        Float4& direction) const noexcept
+    {
+        direction = {};
+        return false;
+    }
 };
 
 enum class NativeCameraDiagnostic : std::uint16_t {

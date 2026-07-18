@@ -160,6 +160,7 @@ foreach(required_prepass_core_token IN ITEMS
     "TruthComposePrepass("
     "TruthRuntimeReady()"
     "TruthEvaluateSkyViewAdapter"
+    "TruthRuntimeCelestialReady"
     "TruthResolveCapability("
     "TruthSkyMask("
     "TruthEvaluateInteriorLight"
@@ -172,6 +173,11 @@ foreach(required_prepass_core_token IN ITEMS
       "Truth HDR prepass core is missing required contract token: ${required_prepass_core_token}")
   endif()
 endforeach()
+string(FIND "${truth_prepass_core_source}" "Weather.w" game_hour_proxy_position)
+if(NOT game_hour_proxy_position EQUAL -1)
+  message(FATAL_ERROR
+    "Truth HDR prepass may not invent celestial direction from game hour")
+endif()
 
 foreach(required_prepass_stage_token IN ITEMS
     "#include \"truth/TruthPrepassCore.fxh\""

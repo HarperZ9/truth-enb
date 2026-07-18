@@ -113,10 +113,11 @@ public:
     }
 };
 
-std::array<Float4, 6> shader_values{
+std::array<Float4, 7> shader_values{
     Float4{1, 2, 3, 4}, Float4{5, 6, 7, 8},
     Float4{9, 10, 11, 12}, Float4{13, 14, 15, 16},
     Float4{17, 18, 19, 20}, Float4{21, 22, 23, 24},
+    Float4{25, 26, 27, 28},
 };
 std::size_t sdk_calls = 0;
 
@@ -191,10 +192,10 @@ void PluginRuntimeKeepsAllSdkIoInsideCallbacks(Context& context)
     runtime.HandleCallback(enbcore::enb::CallbackId::OnInit);
     context.expect(sdk_calls == 0U, "OnInit touched shader parameters");
     runtime.HandleCallback(enbcore::enb::CallbackId::PostLoad);
-    context.expect(sdk_calls == 13U,
+    context.expect(sdk_calls == 15U,
         "PostLoad did not execute one capture/publish transaction");
     runtime.HandleCallback(enbcore::enb::CallbackId::BeginFrame);
-    context.expect(sdk_calls == 20U,
+    context.expect(sdk_calls == 23U,
         "BeginFrame did not execute one live transaction");
 
     const PluginDiagnosticsV1 diagnostics = runtime.Snapshot();

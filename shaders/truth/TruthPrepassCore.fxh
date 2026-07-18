@@ -89,12 +89,11 @@ TruthPrepassCelestial TruthPrepassMakeCelestial(
     return output;
 }
 
-// ENB 0.504 exposes no verified direct world-space sun vector in this stage.
-// Keep the native rung explicit and unavailable until such a source is proven;
-// this prevents an unverified host value from impersonating celestial data.
 TruthPrepassCelestial TruthPrepassResolveNativeCelestial()
 {
-    return TruthPrepassMakeCelestial(float3(0.0, 0.0, 0.0), 0.0);
+    return TruthPrepassMakeCelestial(
+        TruthRuntimeCelestial.xyz,
+        TruthRuntimeCelestialReady() ? 1.0 : 0.0);
 }
 
 bool TruthPrepassBridgeActive()
@@ -113,23 +112,9 @@ TruthPrepassCelestial TruthPrepassResolveBridgeCelestial()
 
 TruthPrepassCelestial TruthPrepassResolveSpatialCelestial()
 {
-    // The authored fallback remains stable and deterministic.  Where the
-    // host's documented game-hour scalar is finite and in range, it only
-    // drives the authored orbit; it is never represented as an engine vector.
-    static const float TruthPrepassPi = 3.14159265358979323846;
-    float game_hour = 12.0;
-    if (TruthFinite1(Weather.w) && Weather.w >= 0.0 && Weather.w < 24.0)
-    {
-        game_hour = Weather.w;
-    }
-    float solar_phase = (game_hour - 6.0) * (TruthPrepassPi / 12.0);
-    float elevation = sin(solar_phase);
-    float azimuth = (game_hour * (TruthPrepassPi / 12.0)) + (0.15 * TruthPrepassPi);
-    float horizon_radius = sqrt(saturate(1.0 - (elevation * elevation)));
-    return TruthPrepassMakeCelestial(float3(
-        cos(azimuth) * horizon_radius,
-        sin(azimuth) * horizon_radius,
-        elevation), 1.0);
+    // Do not invent a sun azimuth from game hour. Missing native/Bridge
+    // celestial state fails closed so the authored scene is preserved.
+    return TruthPrepassMakeCelestial(float3(0.0, 0.0, 0.0), 0.0);
 }
 
 TruthPrepassCelestial TruthPrepassResolveCelestial()

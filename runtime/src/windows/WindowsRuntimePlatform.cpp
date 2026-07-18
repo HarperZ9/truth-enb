@@ -6,6 +6,7 @@
 #include <Psapi.h>
 
 #include <algorithm>
+#include <cstring>
 #include <filesystem>
 #include <limits>
 #include <string>
@@ -257,6 +258,55 @@ std::uintptr_t WindowsRuntimePlatform::InvokeWorldRootCamera(
     using WorldRootCamera = std::uintptr_t (*)();
     const auto function = reinterpret_cast<WorldRootCamera>(function_address);
     return function();
+}
+
+bool WindowsRuntimePlatform::QuerySunDirection(Float4& direction) const noexcept
+{
+    direction = {};
+    constexpr wchar_t kMappingName[] = L"SkyrimBridge_GameState";
+    constexpr std::uint32_t kSharedMagic = 0x53423031U;
+    constexpr std::size_t kSharedHeaderBytes = 64U;
+    constexpr std::size_t kMinimumSharedBytes =
+        kSharedHeaderBytes + sizeof(Float4);
+
+    const HANDLE mapping = OpenFileMappingW(
+        FILE_MAP_READ, FALSE, kMappingName);
+    if (mapping == nullptr) {
+        return false;
+    }
+    const void* view = MapViewOfFile(
+        mapping, FILE_MAP_READ, 0U, 0U, kMinimumSharedBytes);
+    if (view == nullptr) {
+        CloseHandle(mapping);
+        return false;
+    }
+
+    const auto* bytes = static_cast<const std::uint8_t*>(view);
+    std::uint32_t magic = 0U;
+    std::uint32_t version = 0U;
+    std::uint32_t structure_size = 0U;
+    std::memcpy(&magic, bytes, sizeof(magic));
+    std::memcpy(&version, bytes + sizeof(magic), sizeof(version));
+    std::memcpy(
+        &structure_size,
+        bytes + sizeof(magic) + sizeof(version),
+        sizeof(structure_size));
+    Float4 candidate{};
+    if (magic == kSharedMagic
+        && version >= 1U
+        && structure_size >= kMinimumSharedBytes) {
+        std::memcpy(
+            &candidate,
+            bytes + kSharedHeaderBytes,
+            sizeof(candidate));
+    }
+
+    UnmapViewOfFile(view);
+    CloseHandle(mapping);
+    direction = candidate;
+    return magic == kSharedMagic
+        && version >= 1U
+        && structure_size >= kMinimumSharedBytes;
 }
 
 bool WindowsRuntimePlatform::Read(

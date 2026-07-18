@@ -84,6 +84,8 @@ public:
     bool read_file_succeeds{true};
     bool executable{true};
     std::uintptr_t camera_address{0x180000000ULL};
+    Float4 sun_direction{3.0F, 0.0F, 4.0F, 1.0F};
+    bool sun_direction_available{true};
     mutable std::vector<std::uintptr_t> memory_reads;
     mutable std::vector<std::uintptr_t> invocations;
     std::vector<std::wstring> file_reads;
@@ -121,6 +123,15 @@ public:
     {
         invocations.push_back(address);
         return camera_address;
+    }
+
+    [[nodiscard]] bool QuerySunDirection(Float4& output) const noexcept override
+    {
+        if (!sun_direction_available) {
+            return false;
+        }
+        output = sun_direction;
+        return true;
     }
 
     [[nodiscard]] bool Read(
@@ -170,6 +181,9 @@ void InitializationUsesTheExactRuntimeDatabaseAndRelocation(Context& context)
             && frame.frame.camera_world.y == 200.0F
             && frame.frame.camera_world.z == 300.0F,
         "provider did not derive the live camera position");
+    context.expect(frame.frame.celestial.sun_direction_valid
+            == Float4{0.6F, 0.0F, 0.8F, 1.0F},
+        "provider did not normalize the live celestial direction");
 }
 
 void SeUsesItsExactIdAndStillRejectsVr(Context& context)

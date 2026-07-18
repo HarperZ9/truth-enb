@@ -1,5 +1,6 @@
 #include <truth/runtime/NativeCameraProvider.hpp>
 
+#include <cmath>
 #include <filesystem>
 #include <limits>
 
@@ -119,7 +120,32 @@ CameraFrameResult NativeCameraFrameProvider::Sample() noexcept
     if (camera == 0U) {
         return CameraFrameResult{CameraFrameDiagnostic::CameraLocatorFailed, {}};
     }
-    return ReadCameraFrame(platform_, camera);
+    CameraFrameResult frame = ReadCameraFrame(platform_, camera);
+    if (!frame.valid()) {
+        return frame;
+    }
+
+    Float4 celestial{};
+    if (!platform_.QuerySunDirection(celestial)
+        || !std::isfinite(celestial.x)
+        || !std::isfinite(celestial.y)
+        || !std::isfinite(celestial.z)) {
+        return frame;
+    }
+    const float length_squared = (celestial.x * celestial.x)
+        + (celestial.y * celestial.y)
+        + (celestial.z * celestial.z);
+    if (!std::isfinite(length_squared) || length_squared <= 1.0e-8F) {
+        return frame;
+    }
+    const float inverse_length = 1.0F / std::sqrt(length_squared);
+    frame.frame.celestial.sun_direction_valid = {
+        celestial.x * inverse_length,
+        celestial.y * inverse_length,
+        celestial.z * inverse_length,
+        1.0F,
+    };
+    return frame;
 }
 
 const NativeCameraDiagnostics&

@@ -19,14 +19,10 @@
 #include "truth/TruthHostCapabilities.fxh"
 #include "truth/TruthPipelineCommon.fxh"
 #include "truth/TruthStageParameters.fxh"
+#include "truth/TruthSkyViewAdapter.fxh"
+#include "truth/TruthRuntimeParameters.fxh"
 
 Texture2D TextureColor;
-float4 TruthRuntimeCelestial
-<
-    string UIName = "Truth Runtime | Celestial";
-    string UIWidget = "Color";
-    int UIHidden = 1;
-> = {0.0, 0.0, 1.0, 0.0};
 
 SamplerState Sampler0
 {

@@ -12,6 +12,7 @@ cbuffer TruthRuntimeProbeParameters : register(b2)
     float4 TruthRuntimeInverseViewProjectionRow2;
     float4 TruthRuntimeInverseViewProjectionRow3;
     float4 TruthRuntimeCameraWorld;
+    float4 TruthRuntimeCelestial;
     float4 TruthRuntimeStatus;
 };
 #else
@@ -53,6 +54,14 @@ float4 TruthRuntimeCameraWorld
     int UIHidden = 1;
 > = {0.0, 0.0, 0.0, 0.0};
 
+// xyz = normalized world-space sun direction; w = validity.
+float4 TruthRuntimeCelestial
+<
+    string UIName = "Truth Runtime | Celestial";
+    string UIWidget = "Color";
+    int UIHidden = 1;
+> = {0.0, 0.0, 0.0, 0.0};
+
 // x = protocol version, y = valid flag, z = generation, w = world units per
 // aurora unit. Protocol v1 uses a row-major inverse view-projection matrix.
 float4 TruthRuntimeStatus
@@ -76,11 +85,22 @@ bool TruthRuntimeFinite4(float4 value)
 bool TruthRuntimeReady()
 {
     return TruthRuntimeFinite4(TruthRuntimeStatus)
-        && TruthRuntimeStatus.x == 1.0
+        && (TruthRuntimeStatus.x == 1.0 || TruthRuntimeStatus.x == 1.1)
         && TruthRuntimeStatus.y > 0.5
         && TruthRuntimeStatus.w >= TruthSkyViewMinimumWorldScale
         && TruthRuntimeStatus.w <= TruthSkyViewMaximumWorldScale
         && TruthRuntimeFinite4(TruthRuntimeCameraWorld);
+}
+
+bool TruthRuntimeCelestialReady()
+{
+    float length_squared = dot(
+        TruthRuntimeCelestial.xyz, TruthRuntimeCelestial.xyz);
+    return TruthRuntimeStatus.x >= 1.1
+        && TruthRuntimeFinite4(TruthRuntimeCelestial)
+        && TruthRuntimeCelestial.w > 0.5
+        && TruthRuntimeFinite1(length_squared)
+        && length_squared > 0.0001;
 }
 
 float4x4 TruthRuntimeBuildInverseViewProjection()

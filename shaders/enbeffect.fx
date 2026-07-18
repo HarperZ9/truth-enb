@@ -5,16 +5,16 @@
 #define TRUTH_STAGE_OWNS_MASK 0
 #define TRUTH_STAGE_OWNS_NATIVE_CELESTIAL_VIEW 1
 #define TRUTH_STAGE_OWNS_PREVIOUS_SCALAR_ADAPTATION 1
+#define TRUTH_STAGE_OWNS_BRIDGE_VALUE 0
 #define TRUTH_STAGE_SCRATCH_OWNER TRUTH_SCRATCH_MAIN
 #define TRUTH_STAGE_SCRATCH_READ TRUTH_SCRATCH_NONE
 #define TRUTH_STAGE_OWNS_FULL_FRAME_HISTORY 0
 #define TRUTH_STAGE_OWNS_OBJECT_MOTION 0
 #define TRUTH_STAGE_TREATS_SCRATCH_AS_HISTORY 0
 #define TRUTH_STAGE_CROSS_EFFECT_ALPHA_PACKING 0
-#define TRUTH_STAGE_PARAMETER_SLOT 5
-#include "truth/TruthHostCapabilities.fxh"
-#include "truth/TruthPipelineCommon.fxh"
-#include "truth/TruthStageParameters.fxh"
+#define TRUTH_STAGE_NATIVE_CAPABILITY_AVAILABLE 1
+#define TRUTH_STAGE_BRIDGE_CAPABILITY_AVAILABLE 0
+#define TRUTH_STAGE_SPATIAL_CAPABILITY_AVAILABLE 0
 
 #include "truth/TruthColorCore.fxh"
 #include "truth/TruthAtmosphereCore.fxh"
@@ -23,6 +23,8 @@
 #include "truth/TruthSkyViewAdapter.fxh"
 #include "truth/TruthRuntimeParameters.fxh"
 #include "truth/TruthEffectParameters.fxh"
+#include "truth/TruthHostCapabilities.fxh"
+#include "truth/TruthPipelineCommon.fxh"
 
 #ifndef TRUTH_ENABLE_ATMOSPHERE
 #define TRUTH_ENABLE_ATMOSPHERE 1
@@ -168,9 +170,17 @@ float3 TruthResolveEnbOpticalInput(float2 texcoord)
     return color;
 }
 
+float3 TruthResolveMainCapability(float3 color)
+{
+    float native_available = TruthRuntimeReady() ? 1.0 : 0.0;
+    return TruthResolveCapabilityColor(
+        float4(color, 1.0), native_available, 0.0, 0.0).rgb;
+}
+
 float4 TruthEnbPixelMain(VS_OUTPUT_POST input) : SV_Target
 {
     float3 linear_color = TruthResolveEnbOpticalInput(input.txcoord0);
+    linear_color = TruthResolveMainCapability(linear_color);
     if (!TruthMasterEnabled)
     {
         return float4(saturate(linear_color), 1.0);

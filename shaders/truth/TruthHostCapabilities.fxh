@@ -38,6 +38,18 @@
 #ifndef TRUTH_STAGE_OWNS_PREVIOUS_SCALAR_ADAPTATION
 #error Truth stage must declare previous scalar adaptation ownership before including the contract
 #endif
+#ifndef TRUTH_STAGE_OWNS_BRIDGE_VALUE
+#error Truth stage must declare Bridge value ownership before including the contract
+#endif
+#ifndef TRUTH_STAGE_NATIVE_CAPABILITY_AVAILABLE
+#error Truth stage must declare native capability availability before including the contract
+#endif
+#ifndef TRUTH_STAGE_BRIDGE_CAPABILITY_AVAILABLE
+#error Truth stage must declare Bridge capability availability before including the contract
+#endif
+#ifndef TRUTH_STAGE_SPATIAL_CAPABILITY_AVAILABLE
+#error Truth stage must declare spatial capability availability before including the contract
+#endif
 #ifndef TRUTH_STAGE_SCRATCH_OWNER
 #error Truth stage must declare current-frame scratch ownership before including the contract
 #endif
@@ -77,6 +89,36 @@
 #endif
 #if TRUTH_STAGE_OWNS_PREVIOUS_SCALAR_ADAPTATION < 0 || TRUTH_STAGE_OWNS_PREVIOUS_SCALAR_ADAPTATION > 1
 #error Truth stage previous scalar adaptation ownership must be boolean
+#endif
+#if TRUTH_STAGE_OWNS_BRIDGE_VALUE < 0 || TRUTH_STAGE_OWNS_BRIDGE_VALUE > 1
+#error Truth stage Bridge value ownership must be boolean
+#endif
+#if TRUTH_STAGE_NATIVE_CAPABILITY_AVAILABLE < 0 || TRUTH_STAGE_NATIVE_CAPABILITY_AVAILABLE > 1
+#error Truth stage native capability availability must be boolean
+#endif
+#if TRUTH_STAGE_BRIDGE_CAPABILITY_AVAILABLE < 0 || TRUTH_STAGE_BRIDGE_CAPABILITY_AVAILABLE > 1
+#error Truth stage Bridge capability availability must be boolean
+#endif
+#if TRUTH_STAGE_SPATIAL_CAPABILITY_AVAILABLE < 0 || TRUTH_STAGE_SPATIAL_CAPABILITY_AVAILABLE > 1
+#error Truth stage spatial capability availability must be boolean
+#endif
+#if TRUTH_STAGE_NATIVE_CAPABILITY_AVAILABLE && TRUTH_STAGE_CAPABILITY < TRUTH_CAPABILITY_NATIVE
+#error Truth stage declares a native input below the native capability level
+#endif
+#if TRUTH_STAGE_BRIDGE_CAPABILITY_AVAILABLE && TRUTH_STAGE_CAPABILITY < TRUTH_CAPABILITY_BRIDGE
+#error Truth stage declares a Bridge input below the Bridge capability level
+#endif
+#if TRUTH_STAGE_SPATIAL_CAPABILITY_AVAILABLE && TRUTH_STAGE_CAPABILITY < TRUTH_CAPABILITY_SPATIAL
+#error Truth stage declares a spatial input below the spatial capability level
+#endif
+#if TRUTH_STAGE_NATIVE_CAPABILITY_AVAILABLE && TRUTH_STAGE_OWNS_NATIVE_CELESTIAL_VIEW == 0 && TRUTH_STAGE_OWNS_PREVIOUS_SCALAR_ADAPTATION == 0
+#error Native capability requires a declared native celestial/view or scalar adaptation input
+#endif
+#if TRUTH_STAGE_BRIDGE_CAPABILITY_AVAILABLE && TRUTH_STAGE_OWNS_BRIDGE_VALUE == 0
+#error Bridge capability requires a declared Bridge value
+#endif
+#if TRUTH_STAGE_SPATIAL_CAPABILITY_AVAILABLE && TRUTH_STAGE_OWNS_DEPTH == 0 && TRUTH_STAGE_OWNS_NORMAL == 0 && TRUTH_STAGE_OWNS_MASK == 0
+#error Spatial capability requires a declared depth, normal, or mask input
 #endif
 #if TRUTH_STAGE_SCRATCH_OWNER < TRUTH_SCRATCH_NONE || TRUTH_STAGE_SCRATCH_OWNER > TRUTH_SCRATCH_UNDERWATER
 #error Truth stage scratch owner is not a named current-frame surface

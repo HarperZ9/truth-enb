@@ -60,27 +60,41 @@ TruthStageVSOutput TruthFullscreenVertex(uint vertex_id : SV_VertexID)
 
 struct TruthCapabilityValue
 {
-    float3 radiance;
-    float confidence;
+    float4 color;
+    float availability;
+    uint route;
 };
 
 TruthCapabilityValue TruthNativeCapability(TruthCapabilityValue value)
 {
+    value.route = TRUTH_CAPABILITY_NATIVE;
     return value;
 }
 
 TruthCapabilityValue TruthBridgeCapability(TruthCapabilityValue value)
 {
+    value.route = TRUTH_CAPABILITY_BRIDGE;
     return value;
 }
 
 TruthCapabilityValue TruthSpatialCapability(TruthCapabilityValue value)
 {
+    value.route = TRUTH_CAPABILITY_SPATIAL;
     return value;
 }
 
 TruthCapabilityValue TruthIdentityCapability(TruthCapabilityValue value)
 {
+    value.route = TRUTH_CAPABILITY_IDENTITY;
+    return value;
+}
+
+TruthCapabilityValue TruthMakeCapability(float4 color, float availability)
+{
+    TruthCapabilityValue value;
+    value.color = color;
+    value.availability = saturate(availability);
+    value.route = TRUTH_CAPABILITY_IDENTITY;
     return value;
 }
 
@@ -91,28 +105,49 @@ TruthCapabilityValue TruthResolveCapability(
     TruthCapabilityValue identity_value)
 {
 #if TRUTH_STAGE_CAPABILITY >= TRUTH_CAPABILITY_NATIVE
-    if (native_value.confidence > 0.0)
+#if TRUTH_STAGE_NATIVE_CAPABILITY_AVAILABLE
+    if (native_value.availability > 0.0)
     {
         return TruthNativeCapability(native_value);
     }
 #endif
+#endif
 #if TRUTH_STAGE_CAPABILITY >= TRUTH_CAPABILITY_BRIDGE
-    if (bridge_value.confidence > 0.0)
+#if TRUTH_STAGE_BRIDGE_CAPABILITY_AVAILABLE
+    if (bridge_value.availability > 0.0)
     {
         return TruthBridgeCapability(bridge_value);
     }
 #endif
+#endif
 #if TRUTH_STAGE_CAPABILITY >= TRUTH_CAPABILITY_SPATIAL
-    if (spatial_value.confidence > 0.0)
+#if TRUTH_STAGE_SPATIAL_CAPABILITY_AVAILABLE
+    if (spatial_value.availability > 0.0)
     {
         return TruthSpatialCapability(spatial_value);
     }
 #endif
+#endif
     return TruthIdentityCapability(identity_value);
+}
+
+float4 TruthResolveCapabilityColor(
+    float4 source,
+    float native_availability,
+    float bridge_availability,
+    float spatial_availability)
+{
+    TruthCapabilityValue selected = TruthResolveCapability(
+        TruthMakeCapability(source, native_availability),
+        TruthMakeCapability(source, bridge_availability),
+        TruthMakeCapability(source, spatial_availability),
+        TruthMakeCapability(source, 1.0));
+    return selected.color;
 }
 
 float4 TruthStageIdentity(float4 source, bool stage_enabled, float intensity)
 {
+    float4 selected = TruthResolveCapabilityColor(source, 0.0, 0.0, 0.0);
     if (!stage_enabled || intensity <= 0.0)
     {
         return TruthIdentityColor(source);
@@ -121,7 +156,7 @@ float4 TruthStageIdentity(float4 source, bool stage_enabled, float intensity)
     // Initial public stages are deliberately inert until their bounded effects
     // are introduced. This keeps every stage's default and zero-intensity path
     // an exact authored identity.
-    return TruthIdentityColor(source);
+    return TruthIdentityColor(selected);
 }
 
 #endif

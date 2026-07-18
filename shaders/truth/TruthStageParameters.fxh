@@ -5,11 +5,6 @@
 #error Truth stage must select its parameter slot before including TruthStageParameters.fxh
 #endif
 
-bool TruthMasterEnabled
-<
-    string UIName = "[Truth 00] Master | Enabled";
-> = true;
-
 #if TRUTH_STAGE_PARAMETER_SLOT == 0
 bool TruthPrepassEnabled <string UIName = "[Truth 10] Prepass | Enabled";> = true;
 float TruthPrepassIntensity <string UIName = "[Truth 10] Prepass | Intensity"; string UIWidget = "Spinner"; float UIMin = 0.0; float UIMax = 1.0; float UIStep = 0.01;> = 1.0;
@@ -40,12 +35,6 @@ float TruthLensIntensity <string UIName = "[Truth 50] Lens | Intensity"; string 
 float TruthLensApertureShape <string UIName = "[Truth 50] Lens | Aperture Shape"; string UIWidget = "Spinner"; float UIMin = 0.0; float UIMax = 1.0; float UIStep = 0.01;> = 0.5;
 #define TRUTH_STAGE_ENABLED TruthLensEnabled
 #define TRUTH_STAGE_INTENSITY TruthLensIntensity
-#elif TRUTH_STAGE_PARAMETER_SLOT == 5
-bool TruthMainEffectEnabled <string UIName = "[Truth 60] Main Effect | Enabled";> = true;
-float TruthMainEffectIntensity <string UIName = "[Truth 60] Main Effect | Intensity"; string UIWidget = "Spinner"; float UIMin = 0.0; float UIMax = 1.0; float UIStep = 0.01;> = 1.0;
-float TruthMainEffectShoulderShape <string UIName = "[Truth 60] Main Effect | Shoulder Shape"; string UIWidget = "Spinner"; float UIMin = 0.0; float UIMax = 1.0; float UIStep = 0.01;> = 0.5;
-#define TRUTH_STAGE_ENABLED TruthMainEffectEnabled
-#define TRUTH_STAGE_INTENSITY TruthMainEffectIntensity
 #elif TRUTH_STAGE_PARAMETER_SLOT == 6
 bool TruthPostpassEnabled <string UIName = "[Truth 70] Postpass | Enabled";> = true;
 float TruthPostpassIntensity <string UIName = "[Truth 70] Postpass | Intensity"; string UIWidget = "Spinner"; float UIMin = 0.0; float UIMax = 1.0; float UIStep = 0.01;> = 1.0;
@@ -65,12 +54,12 @@ float TruthUnderwaterDensityShape <string UIName = "[Truth 90] Underwater | Dens
 #define TRUTH_STAGE_ENABLED TruthUnderwaterEnabled
 #define TRUTH_STAGE_INTENSITY TruthUnderwaterIntensity
 #else
-#error Truth stage parameter slot must be in [0,8]
+#error Truth stage parameter slot must be one of 0-4 or 6-8; main reuses its ABI-bound controls
 #endif
 
 bool TruthStageIsActive()
 {
-    return TruthMasterEnabled && TRUTH_STAGE_ENABLED && TRUTH_STAGE_INTENSITY > 0.0;
+    return TRUTH_STAGE_ENABLED && TRUTH_STAGE_INTENSITY > 0.0;
 }
 
 #endif

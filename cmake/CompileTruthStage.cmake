@@ -23,6 +23,51 @@ if(NOT "${TRUTH_QUALITY_TIER}" MATCHES "^[0-4]$")
   message(FATAL_ERROR "TRUTH_QUALITY_TIER must be an integer in [0,4]")
 endif()
 
+function(truth_fxc_diagnostics_allowed diagnostics result_variable)
+  string(REPLACE "\r\n" "\n" normalized_diagnostics "${diagnostics}")
+  string(REPLACE "\r" "\n" normalized_diagnostics "${normalized_diagnostics}")
+  string(REPLACE "\n" ";" diagnostic_lines "${normalized_diagnostics}")
+  set(diagnostics_allowed TRUE)
+  foreach(diagnostic_line IN LISTS diagnostic_lines)
+    if(diagnostic_line STREQUAL
+        "warning X4717: Effects deprecated for D3DCompiler_47")
+      continue()
+    endif()
+    string(TOLOWER "${diagnostic_line}" normalized_line)
+    if(normalized_line MATCHES "warning")
+      set(diagnostics_allowed FALSE)
+    endif()
+  endforeach()
+  set(${result_variable} ${diagnostics_allowed} PARENT_SCOPE)
+endfunction()
+
+# Keep the D3DCompiler_47 effect-profile exception exact. These embedded
+# negatives stop a broad replacement from silently accepting source warnings.
+truth_fxc_diagnostics_allowed(
+  "warning X4717: Effects deprecated for D3DCompiler_47\n"
+  truth_x4717_allowed)
+if(NOT truth_x4717_allowed)
+  message(FATAL_ERROR "The exact FXC X4717 effect-profile diagnostic must be accepted")
+endif()
+truth_fxc_diagnostics_allowed(
+  "C:/stage.fx(1): warning X4717: Effects deprecated for D3DCompiler_47\n"
+  truth_x4717_attributed_allowed)
+if(truth_x4717_attributed_allowed)
+  message(FATAL_ERROR "The FXC X4717 whitelist accepted a file-attributed warning")
+endif()
+truth_fxc_diagnostics_allowed(
+  "warning X4717: Effects deprecated for D3DCompiler_47 extended\n"
+  truth_x4717_extended_allowed)
+if(truth_x4717_extended_allowed)
+  message(FATAL_ERROR "The FXC X4717 whitelist accepted an extended warning")
+endif()
+truth_fxc_diagnostics_allowed("warning X3206: implicit truncation\n"
+  truth_source_warning_allowed)
+if(truth_source_warning_allowed)
+  message(FATAL_ERROR "The FXC diagnostic filter accepted a source warning")
+endif()
+
+get_filename_component(truth_stage_name "${TRUTH_STAGE_SOURCE}" NAME)
 file(READ "${TRUTH_STAGE_SOURCE}" truth_stage_contents)
 foreach(required_token IN ITEMS
     "#define TRUTH_STAGE_CAPABILITY"
@@ -32,6 +77,10 @@ foreach(required_token IN ITEMS
     "#define TRUTH_STAGE_OWNS_MASK"
     "#define TRUTH_STAGE_OWNS_NATIVE_CELESTIAL_VIEW"
     "#define TRUTH_STAGE_OWNS_PREVIOUS_SCALAR_ADAPTATION"
+    "#define TRUTH_STAGE_OWNS_BRIDGE_VALUE"
+    "#define TRUTH_STAGE_NATIVE_CAPABILITY_AVAILABLE"
+    "#define TRUTH_STAGE_BRIDGE_CAPABILITY_AVAILABLE"
+    "#define TRUTH_STAGE_SPATIAL_CAPABILITY_AVAILABLE"
     "#define TRUTH_STAGE_SCRATCH_OWNER"
     "#define TRUTH_STAGE_SCRATCH_READ"
     "#define TRUTH_STAGE_OWNS_FULL_FRAME_HISTORY 0"
@@ -40,7 +89,6 @@ foreach(required_token IN ITEMS
     "#define TRUTH_STAGE_CROSS_EFFECT_ALPHA_PACKING 0"
     "#include \"truth/TruthHostCapabilities.fxh\""
     "#include \"truth/TruthPipelineCommon.fxh\""
-    "#include \"truth/TruthStageParameters.fxh\""
     "technique11 ${TRUTH_STAGE_TECHNIQUE}")
   string(FIND "${truth_stage_contents}" "${required_token}" token_position)
   if(token_position EQUAL -1)
@@ -49,7 +97,26 @@ foreach(required_token IN ITEMS
   endif()
 endforeach()
 
-get_filename_component(truth_stage_name "${TRUTH_STAGE_SOURCE}" NAME)
+if(truth_stage_name STREQUAL "enbeffect.fx")
+  foreach(required_main_token IN ITEMS
+      "#include \"truth/TruthEffectParameters.fxh\""
+      "TruthResolveCapabilityColor")
+    string(FIND "${truth_stage_contents}" "${required_main_token}" main_token_position)
+    if(main_token_position EQUAL -1)
+      message(FATAL_ERROR
+        "Main effect ${TRUTH_STAGE_SOURCE} is missing required capability/ABI token: ${required_main_token}")
+    endif()
+  endforeach()
+else()
+  string(FIND "${truth_stage_contents}"
+    "#include \"truth/TruthStageParameters.fxh\""
+    stage_parameters_position)
+  if(stage_parameters_position EQUAL -1)
+    message(FATAL_ERROR
+      "Identity stage ${TRUTH_STAGE_SOURCE} is missing TruthStageParameters.fxh")
+  endif()
+endif()
+
 if(NOT truth_stage_name STREQUAL "enbeffect.fx")
   string(FIND "${truth_stage_contents}" "TruthStageIdentity" identity_position)
   if(identity_position EQUAL -1)
@@ -61,6 +128,45 @@ string(FIND "${truth_stage_contents}" "ORIGINALPOSTPROCESS" original_postprocess
 if(NOT truth_stage_name STREQUAL "enbeffect.fx" AND NOT original_postprocess_position EQUAL -1)
   message(FATAL_ERROR
     "Only enbeffect.fx may define the ENB-reserved ORIGINALPOSTPROCESS technique")
+endif()
+
+string(REGEX MATCHALL "Texture2D[ \t]+[A-Za-z0-9_]+" truth_texture_declarations
+  "${truth_stage_contents}")
+if(truth_stage_name STREQUAL "enbadaptation.fx")
+  list(LENGTH truth_texture_declarations truth_texture_count)
+  if(NOT truth_texture_count EQUAL 2)
+    message(FATAL_ERROR
+      "Adaptation may declare only TextureCurrent and scalar TexturePrevious in this identity release")
+  endif()
+  foreach(required_texture IN ITEMS "Texture2D TextureCurrent" "Texture2D TexturePrevious")
+    list(FIND truth_texture_declarations "${required_texture}" texture_position)
+    if(texture_position EQUAL -1)
+      message(FATAL_ERROR "Adaptation is missing required scalar-history texture: ${required_texture}")
+    endif()
+  endforeach()
+  string(FIND "${truth_stage_contents}"
+    "#define TRUTH_STAGE_OWNS_PREVIOUS_SCALAR_ADAPTATION 1"
+    truth_scalar_history_owner_position)
+  if(truth_scalar_history_owner_position EQUAL -1)
+    message(FATAL_ERROR "TexturePrevious requires the adaptation scalar-history owner declaration")
+  endif()
+elseif(NOT truth_stage_name STREQUAL "enbeffect.fx")
+  list(LENGTH truth_texture_declarations truth_texture_count)
+  if(NOT truth_texture_count EQUAL 1
+      OR NOT "${truth_texture_declarations}" STREQUAL "Texture2D TextureColor")
+    message(FATAL_ERROR
+      "Identity stage ${truth_stage_name} may declare only the TextureColor source it reads")
+  endif()
+  string(FIND "${truth_stage_contents}" "TexturePrevious" truth_previous_position)
+  if(NOT truth_previous_position EQUAL -1)
+    message(FATAL_ERROR "Only adaptation may declare TexturePrevious scalar history")
+  endif()
+  string(FIND "${truth_stage_contents}"
+    "#define TRUTH_STAGE_OWNS_PREVIOUS_SCALAR_ADAPTATION 1"
+    truth_non_adaptation_history_owner_position)
+  if(NOT truth_non_adaptation_history_owner_position EQUAL -1)
+    message(FATAL_ERROR "Only adaptation may own scalar history")
+  endif()
 endif()
 
 cmake_path(GET TRUTH_OUTPUT PARENT_PATH truth_output_directory)
@@ -85,22 +191,15 @@ execute_process(
   OUTPUT_VARIABLE truth_fxc_stdout
   ERROR_VARIABLE truth_fxc_stderr)
 
-string(TOLOWER "${truth_fxc_stdout}${truth_fxc_stderr}" truth_fxc_output)
 if(NOT truth_fxc_result EQUAL 0)
   message(FATAL_ERROR
     "FXC failed for ${truth_stage_name}, tier ${TRUTH_QUALITY_TIER}, technique ${TRUTH_STAGE_TECHNIQUE} with exit code ${truth_fxc_result}\n"
     "stdout:\n${truth_fxc_stdout}\n"
     "stderr:\n${truth_fxc_stderr}")
 endif()
-# FXC emits X4717 for every valid effect-profile compile with D3DCompiler_47.
-# It is a compiler deprecation notice, not a source diagnostic, and FXC leaves
-# its exit code at zero even with /WX. Every other warning remains fatal.
-string(REGEX REPLACE
-  "warning x4717: effects deprecated for d3dcompiler_47"
-  ""
-  truth_fxc_source_diagnostics
-  "${truth_fxc_output}")
-if(truth_fxc_source_diagnostics MATCHES "warning")
+truth_fxc_diagnostics_allowed("${truth_fxc_stdout}${truth_fxc_stderr}"
+  truth_fxc_diagnostics_are_allowed)
+if(NOT truth_fxc_diagnostics_are_allowed)
   message(FATAL_ERROR
     "FXC emitted a warning for ${truth_stage_name}, tier ${TRUTH_QUALITY_TIER}:\n${truth_fxc_stdout}${truth_fxc_stderr}")
 endif()

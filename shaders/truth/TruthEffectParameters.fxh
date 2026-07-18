@@ -1,9 +1,14 @@
 #ifndef TRUTH_EFFECT_PARAMETERS_FXH
 #define TRUTH_EFFECT_PARAMETERS_FXH
 
+bool TruthMasterEnabled
+<
+    string UIName = "[Truth 00] Master | Enabled";
+> = true;
+
 float TruthManualExposureEv
 <
-    string UIName = "[Truth 01] Exposure | Manual EV";
+    string UIName = "[Truth 60] Main Effect | Manual EV";
     string UIWidget = "Spinner";
     float UIMin = -8.0;
     float UIMax = 8.0;
@@ -12,7 +17,7 @@ float TruthManualExposureEv
 
 float TruthAutoExposureBlend
 <
-    string UIName = "[Truth 01] Exposure | Auto Blend";
+    string UIName = "[Truth 60] Main Effect | Auto Blend";
     string UIWidget = "Spinner";
     float UIMin = 0.0;
     float UIMax = 1.0;

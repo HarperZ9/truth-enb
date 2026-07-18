@@ -1,3 +1,21 @@
+#define TRUTH_STAGE_CAPABILITY TRUTH_CAPABILITY_NATIVE
+#define TRUTH_STAGE_OWNS_COLOR 1
+#define TRUTH_STAGE_OWNS_DEPTH 1
+#define TRUTH_STAGE_OWNS_NORMAL 0
+#define TRUTH_STAGE_OWNS_MASK 0
+#define TRUTH_STAGE_OWNS_NATIVE_CELESTIAL_VIEW 1
+#define TRUTH_STAGE_OWNS_PREVIOUS_SCALAR_ADAPTATION 1
+#define TRUTH_STAGE_SCRATCH_OWNER TRUTH_SCRATCH_MAIN
+#define TRUTH_STAGE_SCRATCH_READ TRUTH_SCRATCH_NONE
+#define TRUTH_STAGE_OWNS_FULL_FRAME_HISTORY 0
+#define TRUTH_STAGE_OWNS_OBJECT_MOTION 0
+#define TRUTH_STAGE_TREATS_SCRATCH_AS_HISTORY 0
+#define TRUTH_STAGE_CROSS_EFFECT_ALPHA_PACKING 0
+#define TRUTH_STAGE_PARAMETER_SLOT 5
+#include "truth/TruthHostCapabilities.fxh"
+#include "truth/TruthPipelineCommon.fxh"
+#include "truth/TruthStageParameters.fxh"
+
 #include "truth/TruthColorCore.fxh"
 #include "truth/TruthAtmosphereCore.fxh"
 #include "truth/TruthSkyFields.fxh"
@@ -163,9 +181,8 @@ float4 TruthEnbPixelMain(VS_OUTPUT_POST input) : SV_Target
         && EInteriorFactor < 0.5)
     {
         float raw_depth = TextureDepth.SampleLevel(Sampler0, input.txcoord0, 0.0).x;
-        float threshold = clamp(TruthSkyDepthThreshold, 0.99, 1.0);
-        float feather = clamp(TruthSkyDepthFeather, 0.00001, 0.005);
-        float sky_mask = smoothstep(threshold, min(threshold + feather, 1.0), raw_depth)
+        float sky_mask = TruthSkyMask(
+                raw_depth, TruthSkyDepthThreshold, TruthSkyDepthFeather)
             * saturate(1.0 - EInteriorFactor);
         if (sky_mask > 0.0)
         {
@@ -195,7 +212,7 @@ float4 TruthEnbPixelMain(VS_OUTPUT_POST input) : SV_Target
         target_exposure_ev,
         saturate(TruthAutoExposureBlend));
     float3 exposed = TruthApplyExposure(linear_color, exposure_ev);
-    return float4(saturate(TruthFilmicToneCurve3(exposed)), 1.0);
+    return float4(saturate(TruthFilmicToneCurve3(TruthFiniteOrBlack(exposed))), 1.0);
 }
 
 float4 TruthEnbFallbackPixel(VS_OUTPUT_POST input) : SV_Target

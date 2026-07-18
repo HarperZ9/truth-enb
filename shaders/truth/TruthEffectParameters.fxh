@@ -1,11 +1,6 @@
 #ifndef TRUTH_EFFECT_PARAMETERS_FXH
 #define TRUTH_EFFECT_PARAMETERS_FXH
 
-bool TruthMasterEnabled
-<
-    string UIName = "[Truth 00] Master | Enabled";
-> = true;
-
 float TruthManualExposureEv
 <
     string UIName = "[Truth 01] Exposure | Manual EV";

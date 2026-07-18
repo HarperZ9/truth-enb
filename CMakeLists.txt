@@ -465,6 +465,18 @@ if(BUILD_TESTING)
   set(TRUTH_FXC_EXECUTABLE
     "C:/Program Files (x86)/Windows Kits/10/bin/10.0.26100.0/x64/fxc.exe"
   )
+  add_test(
+    NAME truth_stage_compile_matrix
+    COMMAND "${CMAKE_COMMAND}"
+      "-DTRUTH_FXC=${TRUTH_FXC_EXECUTABLE}"
+      "-DTRUTH_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}"
+      "-DTRUTH_BINARY_DIR=${CMAKE_CURRENT_BINARY_DIR}"
+      -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/CheckTruthStageMatrix.cmake"
+  )
+  set_tests_properties(truth_stage_compile_matrix PROPERTIES
+    LABELS "shader;fxc;quality;matrix"
+  )
+
   function(add_truth_shader_permutation
       test_name atmosphere_macro_value procedural_sky_macro_value artifact_name)
     add_test(

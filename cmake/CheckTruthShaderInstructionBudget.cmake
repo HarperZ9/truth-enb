@@ -95,7 +95,7 @@ foreach(resolution IN ITEMS "1920;1080" "2560;1440" "3840;2160")
 endforeach()
 
 message(STATUS
-  "Truth aurora quality ${TRUTH_QUALITY}: ${instruction_slots} static instruction slots; "
+  "Truth shader quality ${TRUTH_QUALITY}: ${instruction_slots} static instruction slots; "
   "budget ${TRUTH_MAXIMUM_INSTRUCTION_SLOTS}; report ${TRUTH_REPORT}")
 if(instruction_slots GREATER TRUTH_MAXIMUM_INSTRUCTION_SLOTS)
   message(FATAL_ERROR

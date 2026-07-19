@@ -2,6 +2,7 @@ cmake_minimum_required(VERSION 3.28)
 
 foreach(required_variable IN ITEMS
     TRUTH_EFFECT
+    TRUTH_PREPASS
     TRUTH_ADAPTER
     TRUTH_RUNTIME
     TRUTH_ENB_VANILLA
@@ -15,6 +16,11 @@ foreach(required_variable IN ITEMS
 endforeach()
 
 file(READ "${TRUTH_EFFECT}" effect_source)
+file(READ "${TRUTH_PREPASS}" prepass_source)
+get_filename_component(truth_shader_dir "${TRUTH_PREPASS}" DIRECTORY)
+file(READ "${truth_shader_dir}/truth/TruthPrepassCore.fxh"
+  prepass_core_source)
+string(APPEND prepass_source "\n${prepass_core_source}")
 file(READ "${TRUTH_ADAPTER}" adapter_source)
 file(READ "${TRUTH_RUNTIME}" runtime_source)
 file(READ "${TRUTH_ENB_VANILLA}" enb_vanilla_source)
@@ -37,16 +43,7 @@ foreach(token IN ITEMS "/WX" "/Ges" "/Gis" "/O3")
 endforeach()
 
 set(required_effect_tokens
-  "#include \"truth/TruthSkyViewAdapter.fxh\""
-  "#include \"truth/TruthRuntimeParameters.fxh\""
-  "TruthRuntimeBuildInverseViewProjection"
-  "TruthRuntimeCameraWorld"
-  "TruthAuroraWorldOrigin"
-  "TruthRuntimeStatus.w"
-  "TruthEvaluateSkyViewAdapter"
   "TextureColor"
-  "TextureDepth"
-  "ENightDayFactor"
   "EInteriorFactor"
   "#include \"enb/ENBSeries0504VanillaPostProcess.fxh\""
   "technique11 TRUTHPASSTHROUGH"
@@ -58,6 +55,28 @@ foreach(token IN LISTS required_effect_tokens)
   string(FIND "${effect_source}" "${token}" position)
   if(position EQUAL -1)
     message(FATAL_ERROR "ENB effect is missing sky-view adapter token: ${token}")
+  endif()
+endforeach()
+
+set(required_prepass_tokens
+  "#include \"truth/TruthSkyViewAdapter.fxh\""
+  "#include \"truth/TruthRuntimeParameters.fxh\""
+  "#include \"truth/TruthPrepassCore.fxh\""
+  "TruthRuntimeBuildInverseViewProjection"
+  "TruthRuntimeCameraWorld"
+  "TruthAuroraWorldOrigin"
+  "TruthRuntimeStatus.w"
+  "TruthEvaluateSkyViewAdapter"
+  "TruthRuntimeCelestialReady"
+  "TextureColor"
+  "TextureDepth"
+  "ENightDayFactor"
+  "EInteriorFactor")
+foreach(token IN LISTS required_prepass_tokens)
+  string(FIND "${prepass_source}" "${token}" position)
+  if(position EQUAL -1)
+    message(FATAL_ERROR
+      "ENB prepass is missing sky-view adapter token: ${token}")
   endif()
 endforeach()
 
@@ -83,9 +102,10 @@ set(required_runtime_tokens
   "Truth Runtime | Inverse VP Row 2"
   "Truth Runtime | Inverse VP Row 3"
   "Truth Runtime | Camera World"
+  "Truth Runtime | Celestial"
   "Truth Runtime | Status"
   "int UIHidden = 1"
-  "TruthRuntimeStatus.x == 1.0"
+  "TruthRuntimeStatus.x == 1.0 || TruthRuntimeStatus.x == 1.1"
   "TruthRuntimeStatus.y > 0.5"
 )
 foreach(token IN LISTS required_runtime_tokens)

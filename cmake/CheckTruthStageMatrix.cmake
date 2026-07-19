@@ -306,7 +306,22 @@ foreach(tier RANGE 0 4)
   endforeach()
 endforeach()
 
-message(STATUS "Truth stage matrix compiled 45 strict FXC permutations")
+set(truth_prepass_hashes)
+foreach(tier RANGE 0 4)
+  set(prepass_object "${truth_matrix_root}/${tier}/enbeffectprepass.fxo")
+  file(SHA256 "${prepass_object}" prepass_hash)
+  list(FIND truth_prepass_hashes "${prepass_hash}" duplicate_hash_index)
+  if(NOT duplicate_hash_index EQUAL -1)
+    message(FATAL_ERROR
+      "Truth tier ${tier} produced duplicate HDR-prepass bytecode; "
+      "the canonical quality permutation is not material")
+  endif()
+  list(APPEND truth_prepass_hashes "${prepass_hash}")
+endforeach()
+
+message(STATUS
+  "Truth stage matrix compiled 45 strict FXC permutations with five "
+  "bytecode-distinct HDR prepasses")
 
 set(truth_stage_sources
   shaders/enbeffectprepass.fx

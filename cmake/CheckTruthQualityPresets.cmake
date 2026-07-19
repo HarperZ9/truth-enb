@@ -62,6 +62,15 @@ foreach(tier RANGE 0 4)
     set(uses_volume_clouds 0)
   endif()
   if(tier EQUAL 0)
+    set(lens_ghosts 0)
+  elseif(tier EQUAL 1)
+    set(lens_ghosts 1)
+  elseif(tier LESS 4)
+    set(lens_ghosts 2)
+  else()
+    set(lens_ghosts 3)
+  endif()
+  if(tier EQUAL 0)
     set(quality_branch "#if TRUTH_QUALITY_TIER == ${tier}")
   elseif(tier LESS 4)
     set(quality_branch "#elif TRUTH_QUALITY_TIER == ${tier}")
@@ -77,6 +86,7 @@ foreach(tier RANGE 0 4)
     "static const uint TruthQualityAOSteps = ${ao_steps}u;\n"
     "static const uint TruthQualityDOFRings = ${dof_rings}u;\n"
     "static const uint TruthQualityBloomRadius = ${bloom_radius}u;\n"
+    "static const uint TruthQualityLensGhosts = ${lens_ghosts}u;\n"
     "static const uint TruthQualitySSRSteps = ${ssr_steps}u;\n"
     "static const uint TruthQualityUsesVolumeClouds = ${uses_volume_clouds}u;")
   string(FIND "${quality_include_source}" "${expected_hlsl_branch}"

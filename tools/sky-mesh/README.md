@@ -63,6 +63,8 @@ copied NIF template if those blocks cannot be serialized and read back faithfull
 Source code in `tools/sky-mesh` is licensed under GPL-3.0-or-later so it can link
 to the GPLv3 nifly serializer. nifly remains an external build-time dependency;
 its revision and role are recorded in every manifest.
+The tool and its dependencies are explicitly excluded from the MIT-licensed
+Truth ENB runtime ZIP.
 
 The generated geometry is original numeric output from Truth's deterministic
 Icosphere algorithm and contains no copied peer or Bethesda geometry. The

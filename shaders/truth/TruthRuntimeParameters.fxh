@@ -1,7 +1,7 @@
 #ifndef TRUTH_RUNTIME_PARAMETERS_FXH
 #define TRUTH_RUNTIME_PARAMETERS_FXH
 
-// The probe declaration preserves the exact six-vector runtime ABI in a
+// The probe declaration preserves the exact seven-vector runtime ABI in a
 // reflected constant buffer so WARP can execute the same row builder and
 // readiness gate used by the ENB effect.
 #ifdef TRUTH_RUNTIME_PARAMETER_PROBE

@@ -142,28 +142,54 @@ if(WIN32)
 endif()
 
 if(WIN32 AND TRUTH_BUILD_RUNTIME)
-  set(TRUTH_RELEASE_COMPONENT TruthPrivateRelease)
+  set(TRUTH_RELEASE_COMPONENT TruthPublicRelease)
   # MO2 Root-Builder layout: everything under Root/ maps to the game root, so
   # ENBSeries finds enbseries\ and the .dllplugin where it reads them. The
   # documentation root stays top-level (MO2 shows it, never deploys it).
   set(TRUTH_RELEASE_SHADER_ROOT "Root/enbseries")
   set(TRUTH_RELEASE_DOCUMENTATION_ROOT "Truth ENB Documentation")
   set(TRUTH_RELEASE_SHADER_INCLUDES
+    shaders/truth/TruthAdaptation.fxh
     shaders/truth/TruthAtmosphereCore.fxh
     shaders/truth/TruthAuroraCurtain.fxh
+    shaders/truth/TruthBloom.fxh
     shaders/truth/TruthCloudLighting.fxh
+    shaders/truth/TruthCloudVolume.fxh
     shaders/truth/TruthColorCore.fxh
+    shaders/truth/TruthDepthOfField.fxh
     shaders/truth/TruthEffectParameters.fxh
+    shaders/truth/TruthHostCapabilities.fxh
+    shaders/truth/TruthInteriorLight.fxh
+    shaders/truth/TruthLens.fxh
+    shaders/truth/TruthPipelineCommon.fxh
+    shaders/truth/TruthPostFinish.fxh
+    shaders/truth/TruthPrepassCore.fxh
+    shaders/truth/TruthQuality.fxh
     shaders/truth/TruthRuntimeParameters.fxh
+    shaders/truth/TruthScreenSpace.fxh
     shaders/truth/TruthSkyFields.fxh
     shaders/truth/TruthSkyViewAdapter.fxh
+    shaders/truth/TruthStageParameters.fxh
+    shaders/truth/TruthSunSprite.fxh
+    shaders/truth/TruthUnderwater.fxh
+  )
+  set(TRUTH_RELEASE_STAGES
+    shaders/enbadaptation.fx
+    shaders/enbbloom.fx
+    shaders/enbdepthoffield.fx
+    shaders/enbeffect.fx
+    shaders/enbeffectpostpass.fx
+    shaders/enbeffectprepass.fx
+    shaders/enblens.fx
+    shaders/enbsunsprite.fx
+    shaders/enbunderwater.fx
   )
   set(TRUTH_RELEASE_ENB_CONTRACT
     shaders/enb/ENBSeries0504VanillaPostProcess.fxh
   )
 
   install(
-    FILES shaders/enbeffect.fx
+    FILES ${TRUTH_RELEASE_STAGES}
     DESTINATION "${TRUTH_RELEASE_SHADER_ROOT}"
     COMPONENT "${TRUTH_RELEASE_COMPONENT}"
   )
@@ -188,6 +214,8 @@ if(WIN32 AND TRUTH_BUILD_RUNTIME)
       LICENSE
       runtime/enb-runtime-core.lock
       runtime/enb-upstream.lock
+      CREDITS-AND-PROVENANCE.md
+      THIRD_PARTY_NOTICES.md
     DESTINATION "${TRUTH_RELEASE_DOCUMENTATION_ROOT}"
     COMPONENT "${TRUTH_RELEASE_COMPONENT}"
   )
@@ -205,13 +233,36 @@ if(WIN32 AND TRUTH_BUILD_RUNTIME)
     COMPONENT "${TRUTH_RELEASE_COMPONENT}"
   )
 
+  set(TRUTH_RELEASE_PRESET_ROOT
+    "${CMAKE_CURRENT_BINARY_DIR}/release-presets")
+  execute_process(
+    COMMAND "${CMAKE_COMMAND}"
+      "-DTRUTH_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}"
+      "-DTRUTH_BINARY_DIR=${CMAKE_CURRENT_BINARY_DIR}"
+      "-DTRUTH_OUTPUT_DIR=${TRUTH_RELEASE_PRESET_ROOT}"
+      -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/GenerateTruthQualityPresets.cmake"
+    RESULT_VARIABLE truth_release_preset_result
+    OUTPUT_VARIABLE truth_release_preset_output
+    ERROR_VARIABLE truth_release_preset_error
+  )
+  if(NOT truth_release_preset_result EQUAL 0)
+    message(FATAL_ERROR
+      "Truth release preset generation failed: "
+      "${truth_release_preset_output}${truth_release_preset_error}")
+  endif()
+  install(
+    DIRECTORY "${TRUTH_RELEASE_PRESET_ROOT}/"
+    DESTINATION "Presets"
+    COMPONENT "${TRUTH_RELEASE_COMPONENT}"
+  )
+
   set(CPACK_GENERATOR "ZIP")
-  set(CPACK_PACKAGE_NAME "Truth ENB Private RC")
+  set(CPACK_PACKAGE_NAME "Truth-ENB")
   set(CPACK_PACKAGE_VENDOR "Truth ENB")
   set(CPACK_PACKAGE_DESCRIPTION_SUMMARY
-    "Truth ENB original shader system and native camera bridge private RC")
-  set(CPACK_PACKAGE_VERSION "0.1.0")
-  set(CPACK_PACKAGE_FILE_NAME "Truth-ENB-Private-RC-win64")
+    "Truth ENB original nine-stage shader system and native camera bridge")
+  set(CPACK_PACKAGE_VERSION "1.0.0")
+  set(CPACK_PACKAGE_FILE_NAME "Truth-ENB-1.0.0-win64")
   set(CPACK_INCLUDE_TOPLEVEL_DIRECTORY OFF)
   set(CPACK_COMPONENTS_ALL "${TRUTH_RELEASE_COMPONENT}")
   set(CPACK_THREADS 1)
@@ -437,6 +488,7 @@ if(BUILD_TESTING)
     NAME truth_sky_view_adapter_shader_contract
     COMMAND "${CMAKE_COMMAND}"
       "-DTRUTH_EFFECT=${CMAKE_CURRENT_SOURCE_DIR}/shaders/enbeffect.fx"
+      "-DTRUTH_PREPASS=${CMAKE_CURRENT_SOURCE_DIR}/shaders/enbeffectprepass.fx"
       "-DTRUTH_ADAPTER=${CMAKE_CURRENT_SOURCE_DIR}/shaders/truth/TruthSkyViewAdapter.fxh"
       "-DTRUTH_RUNTIME=${CMAKE_CURRENT_SOURCE_DIR}/shaders/truth/TruthRuntimeParameters.fxh"
       "-DTRUTH_ENB_VANILLA=${CMAKE_CURRENT_SOURCE_DIR}/shaders/enb/ENBSeries0504VanillaPostProcess.fxh"
@@ -481,6 +533,7 @@ if(BUILD_TESTING)
     NAME truth_aurora_default_quality_contract
     COMMAND "${CMAKE_COMMAND}"
       "-DTRUTH_AURORA_SOURCE=${CMAKE_CURRENT_SOURCE_DIR}/shaders/truth/TruthAuroraCurtain.fxh"
+      "-DTRUTH_QUALITY_SOURCE=${CMAKE_CURRENT_SOURCE_DIR}/shaders/truth/TruthQuality.fxh"
       -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/CheckTruthAuroraDefaultContract.cmake"
   )
   set_tests_properties(truth_aurora_default_quality_contract PROPERTIES
@@ -531,27 +584,6 @@ if(BUILD_TESTING)
     LABELS "shader;fxc;quality;matrix"
   )
 
-  function(add_truth_shader_permutation
-      test_name atmosphere_macro_value procedural_sky_macro_value artifact_name)
-    add_test(
-      NAME "${test_name}"
-      COMMAND "${CMAKE_COMMAND}"
-        "-DTRUTH_FXC=${TRUTH_FXC_EXECUTABLE}"
-        "-DTRUTH_SHADER=${CMAKE_CURRENT_SOURCE_DIR}/shaders/enbeffect.fx"
-        "-DTRUTH_REQUIRED_SOURCE=${CMAKE_CURRENT_SOURCE_DIR}/shaders/truth/TruthAtmosphereCore.fxh"
-        "-DTRUTH_REQUIRED_SOURCE_2=${CMAKE_CURRENT_SOURCE_DIR}/shaders/truth/TruthSkyFields.fxh"
-        "-DTRUTH_REQUIRED_SOURCE_3=${CMAKE_CURRENT_SOURCE_DIR}/shaders/truth/TruthCloudLighting.fxh"
-        "-DTRUTH_REQUIRED_SOURCE_4=${CMAKE_CURRENT_SOURCE_DIR}/shaders/truth/TruthAuroraCurtain.fxh"
-        "-DTRUTH_INCLUDE=${CMAKE_CURRENT_SOURCE_DIR}/shaders/truth"
-        "-DTRUTH_DEFINE=TRUTH_ENABLE_ATMOSPHERE=${atmosphere_macro_value}"
-        "-DTRUTH_SECOND_DEFINE=TRUTH_ENABLE_PROCEDURAL_SKY=${procedural_sky_macro_value}"
-        "-DTRUTH_OUTPUT=${CMAKE_CURRENT_BINARY_DIR}/shaders/$<CONFIG>/${artifact_name}.fxo"
-        "-DTRUTH_LISTING=${CMAKE_CURRENT_BINARY_DIR}/shaders/$<CONFIG>/${artifact_name}.asm"
-        -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/CompileTruthShader.cmake"
-    )
-    set_tests_properties("${test_name}" PROPERTIES LABELS "shader;fxc")
-  endfunction()
-
   add_test(
     NAME truth_interior_light_fxc
     COMMAND "${CMAKE_COMMAND}"
@@ -566,179 +598,32 @@ if(BUILD_TESTING)
   )
   set_tests_properties(truth_interior_light_fxc PROPERTIES LABELS "shader;fxc;interior")
 
-  add_truth_shader_permutation(
-    truth_shader_fxc_a0_p0 0 0 TruthA0P0
-  )
-  add_truth_shader_permutation(
-    truth_shader_fxc_a0_p1 0 1 TruthA0P1
-  )
-  add_truth_shader_permutation(
-    truth_shader_fxc_a1_p0 1 0 TruthA1P0
-  )
-  add_truth_shader_permutation(
-    truth_shader_fxc_a1_p1 1 1 TruthA1P1
-  )
-
-  function(add_truth_cloud_volume_permutation
-      test_name volume_macro_value quality_macro_value artifact_name)
-    add_test(
-      NAME "${test_name}"
-      COMMAND "${CMAKE_COMMAND}"
-        "-DTRUTH_FXC=${TRUTH_FXC_EXECUTABLE}"
-        "-DTRUTH_SHADER=${CMAKE_CURRENT_SOURCE_DIR}/shaders/truth/TruthReferenceSky.hlsl"
-        "-DTRUTH_REQUIRED_SOURCE=${CMAKE_CURRENT_SOURCE_DIR}/shaders/truth/TruthCloudVolume.fxh"
-        "-DTRUTH_INCLUDE=${CMAKE_CURRENT_SOURCE_DIR}/shaders/truth"
-        "-DTRUTH_DEFINE=TRUTH_ENABLE_CLOUD_VOLUME=${volume_macro_value}"
-        "-DTRUTH_SECOND_DEFINE=TRUTH_CLOUD_VOLUME_QUALITY=${quality_macro_value}"
-        "-DTRUTH_OUTPUT=${CMAKE_CURRENT_BINARY_DIR}/shaders/$<CONFIG>/${artifact_name}.cso"
-        "-DTRUTH_LISTING=${CMAKE_CURRENT_BINARY_DIR}/shaders/$<CONFIG>/${artifact_name}.asm"
-        -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/CompileTruthReferencePixelShader.cmake"
-    )
-    set_tests_properties("${test_name}" PROPERTIES LABELS "shader;fxc;cloud-volume")
-  endfunction()
-
-  add_truth_cloud_volume_permutation(
-    truth_cloud_volume_fxc_fallback 0 2 TruthCloudFallback
-  )
-  add_truth_cloud_volume_permutation(
-    truth_cloud_volume_fxc_quality_1 1 1 TruthCloudQuality1
-  )
-  add_truth_cloud_volume_permutation(
-    truth_cloud_volume_fxc_quality_2 1 2 TruthCloudQuality2
-  )
-  add_truth_cloud_volume_permutation(
-    truth_cloud_volume_fxc_quality_3 1 3 TruthCloudQuality3
-  )
-
-  function(add_truth_aurora_permutation
-      test_name quality_macro_value artifact_name)
-    add_test(
-      NAME "${test_name}"
-      COMMAND "${CMAKE_COMMAND}"
-        "-DTRUTH_FXC=${TRUTH_FXC_EXECUTABLE}"
-        "-DTRUTH_SHADER=${CMAKE_CURRENT_SOURCE_DIR}/shaders/truth/TruthReferenceSky.hlsl"
-        "-DTRUTH_REQUIRED_SOURCE=${CMAKE_CURRENT_SOURCE_DIR}/shaders/truth/TruthAuroraCurtain.fxh"
-        "-DTRUTH_INCLUDE=${CMAKE_CURRENT_SOURCE_DIR}/shaders/truth"
-        "-DTRUTH_DEFINE=TRUTH_AURORA_QUALITY=${quality_macro_value}"
-        "-DTRUTH_SECOND_DEFINE=TRUTH_ENABLE_CLOUD_VOLUME=1"
-        "-DTRUTH_OUTPUT=${CMAKE_CURRENT_BINARY_DIR}/shaders/$<CONFIG>/${artifact_name}.cso"
-        "-DTRUTH_LISTING=${CMAKE_CURRENT_BINARY_DIR}/shaders/$<CONFIG>/${artifact_name}.asm"
-        -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/CompileTruthReferencePixelShader.cmake"
-    )
-    set_tests_properties("${test_name}" PROPERTIES LABELS "shader;fxc;aurora")
-  endfunction()
-
-  add_truth_aurora_permutation(
-    truth_aurora_fxc_fallback 0 TruthAuroraFallback
-  )
-  add_truth_aurora_permutation(
-    truth_aurora_fxc_quality_1 1 TruthAuroraQuality1
-  )
-  add_truth_aurora_permutation(
-    truth_aurora_fxc_quality_2 2 TruthAuroraQuality2
-  )
-  add_truth_aurora_permutation(
-    truth_aurora_fxc_quality_3 3 TruthAuroraQuality3
-  )
-
   add_test(
-    NAME truth_shader_atmosphere_permutations_distinct
-    COMMAND "${CMAKE_COMMAND}" -E compare_files
-      "${CMAKE_CURRENT_BINARY_DIR}/shaders/$<CONFIG>/TruthA1P1.fxo"
-      "${CMAKE_CURRENT_BINARY_DIR}/shaders/$<CONFIG>/TruthA0P0.fxo"
-  )
-  set_tests_properties(truth_shader_atmosphere_permutations_distinct PROPERTIES
-    DEPENDS "truth_shader_fxc_a1_p1;truth_shader_fxc_a0_p0"
-    LABELS "shader;fxc"
-    WILL_FAIL TRUE
-  )
-
-  add_test(
-    NAME truth_shader_direct_control_permutations_distinct
-    COMMAND "${CMAKE_COMMAND}" -E compare_files
-      "${CMAKE_CURRENT_BINARY_DIR}/shaders/$<CONFIG>/TruthA1P1.fxo"
-      "${CMAKE_CURRENT_BINARY_DIR}/shaders/$<CONFIG>/TruthA1P0.fxo"
-  )
-  set_tests_properties(truth_shader_direct_control_permutations_distinct PROPERTIES
-    DEPENDS "truth_shader_fxc_a1_p1;truth_shader_fxc_a1_p0"
-    LABELS "shader;fxc"
-    WILL_FAIL TRUE
-  )
-
-  add_test(
-    NAME truth_cloud_volume_fallback_is_distinct
-    COMMAND "${CMAKE_COMMAND}" -E compare_files
-      "${CMAKE_CURRENT_BINARY_DIR}/shaders/$<CONFIG>/TruthCloudFallback.cso"
-      "${CMAKE_CURRENT_BINARY_DIR}/shaders/$<CONFIG>/TruthCloudQuality2.cso"
-  )
-  set_tests_properties(truth_cloud_volume_fallback_is_distinct PROPERTIES
-    DEPENDS "truth_cloud_volume_fxc_fallback;truth_cloud_volume_fxc_quality_2"
-    LABELS "shader;fxc;cloud-volume"
-    WILL_FAIL TRUE
-  )
-
-  add_test(
-    NAME truth_cloud_volume_quality_tiers_are_distinct
-    COMMAND "${CMAKE_COMMAND}" -E compare_files
-      "${CMAKE_CURRENT_BINARY_DIR}/shaders/$<CONFIG>/TruthCloudQuality1.cso"
-      "${CMAKE_CURRENT_BINARY_DIR}/shaders/$<CONFIG>/TruthCloudQuality3.cso"
-  )
-  set_tests_properties(truth_cloud_volume_quality_tiers_are_distinct PROPERTIES
-    DEPENDS "truth_cloud_volume_fxc_quality_1;truth_cloud_volume_fxc_quality_3"
-    LABELS "shader;fxc;cloud-volume"
-    WILL_FAIL TRUE
-  )
-
-  add_test(
-    NAME truth_aurora_fallback_is_distinct
-    COMMAND "${CMAKE_COMMAND}" -E compare_files
-      "${CMAKE_CURRENT_BINARY_DIR}/shaders/$<CONFIG>/TruthAuroraFallback.cso"
-      "${CMAKE_CURRENT_BINARY_DIR}/shaders/$<CONFIG>/TruthAuroraQuality2.cso"
-  )
-  set_tests_properties(truth_aurora_fallback_is_distinct PROPERTIES
-    DEPENDS "truth_aurora_fxc_fallback;truth_aurora_fxc_quality_2"
-    LABELS "shader;fxc;aurora"
-    WILL_FAIL TRUE
-  )
-
-  add_test(
-    NAME truth_aurora_quality_tiers_are_distinct
-    COMMAND "${CMAKE_COMMAND}" -E compare_files
-      "${CMAKE_CURRENT_BINARY_DIR}/shaders/$<CONFIG>/TruthAuroraQuality1.cso"
-      "${CMAKE_CURRENT_BINARY_DIR}/shaders/$<CONFIG>/TruthAuroraQuality3.cso"
-  )
-  set_tests_properties(truth_aurora_quality_tiers_are_distinct PROPERTIES
-    DEPENDS "truth_aurora_fxc_quality_1;truth_aurora_fxc_quality_3"
-    LABELS "shader;fxc;aurora"
-    WILL_FAIL TRUE
-  )
-
-  add_test(
-    NAME truth_aurora_default_instruction_budget
+    NAME truth_balanced_prepass_instruction_budget
     COMMAND "${CMAKE_COMMAND}"
       "-DTRUTH_COMPILE_SCRIPT=${CMAKE_CURRENT_SOURCE_DIR}/cmake/CompileTruthShader.cmake"
       "-DTRUTH_FXC=${TRUTH_FXC_EXECUTABLE}"
-      "-DTRUTH_SHADER=${CMAKE_CURRENT_SOURCE_DIR}/shaders/enbeffect.fx"
+      "-DTRUTH_SHADER=${CMAKE_CURRENT_SOURCE_DIR}/shaders/enbeffectprepass.fx"
       "-DTRUTH_REQUIRED_SOURCE=${CMAKE_CURRENT_SOURCE_DIR}/shaders/truth/TruthAtmosphereCore.fxh"
       "-DTRUTH_REQUIRED_SOURCE_2=${CMAKE_CURRENT_SOURCE_DIR}/shaders/truth/TruthSkyFields.fxh"
       "-DTRUTH_REQUIRED_SOURCE_3=${CMAKE_CURRENT_SOURCE_DIR}/shaders/truth/TruthCloudLighting.fxh"
       "-DTRUTH_REQUIRED_SOURCE_4=${CMAKE_CURRENT_SOURCE_DIR}/shaders/truth/TruthAuroraCurtain.fxh"
       "-DTRUTH_INCLUDE=${CMAKE_CURRENT_SOURCE_DIR}/shaders/truth"
-      "-DTRUTH_DEFINE=TRUTH_ENABLE_ATMOSPHERE=1"
-      "-DTRUTH_SECOND_DEFINE=TRUTH_ENABLE_PROCEDURAL_SKY=1"
-      "-DTRUTH_OUTPUT=${CMAKE_CURRENT_BINARY_DIR}/shaders/$<CONFIG>/TruthBudgetA1P1.fxo"
-      "-DTRUTH_LISTING=${CMAKE_CURRENT_BINARY_DIR}/shaders/$<CONFIG>/TruthBudgetA1P1.asm"
-      # IEEE-strict compilation reports 2,443 slots for the ENB-bound path at
-      # this revision. Keep only 21 slots of headroom so camera/depth/optical
-      # correctness cannot hide a material shader-cost regression.
-      "-DTRUTH_MAXIMUM_INSTRUCTION_SLOTS=2464"
+      "-DTRUTH_DEFINE=TRUTH_QUALITY_TIER=1"
+      "-DTRUTH_SECOND_DEFINE=TRUTH_STAGE_BUDGET_WITNESS=1"
+      "-DTRUTH_OUTPUT=${CMAKE_CURRENT_BINARY_DIR}/shaders/$<CONFIG>/TruthBudgetBalancedPrepass.fxo"
+      "-DTRUTH_LISTING=${CMAKE_CURRENT_BINARY_DIR}/shaders/$<CONFIG>/TruthBudgetBalancedPrepass.asm"
+      # IEEE-strict compilation reports 2,917 slots for the complete Balanced
+      # HDR prepass. Keep only 21 slots of headroom so environment and
+      # screen-space correctness cannot hide a material shader-cost regression.
+      "-DTRUTH_MAXIMUM_INSTRUCTION_SLOTS=2938"
       "-DTRUTH_BASELINE_INSTRUCTION_SLOTS=6499"
       "-DTRUTH_BASELINE_REVISION=12776780d4ed3d6ff71b09694dd666f3d07b5cf2"
-      "-DTRUTH_QUALITY=low-default"
-      "-DTRUTH_REPORT=${CMAKE_CURRENT_BINARY_DIR}/reports/$<CONFIG>/truth-aurora-cost-budget.csv"
+      "-DTRUTH_QUALITY=balanced-prepass"
+      "-DTRUTH_REPORT=${CMAKE_CURRENT_BINARY_DIR}/reports/$<CONFIG>/truth-balanced-prepass-cost-budget.csv"
       -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/CheckTruthShaderInstructionBudget.cmake"
   )
-  set_tests_properties(truth_aurora_default_instruction_budget PROPERTIES
+  set_tests_properties(truth_balanced_prepass_instruction_budget PROPERTIES
     LABELS "shader;fxc;aurora;performance"
   )
 
@@ -747,7 +632,7 @@ if(BUILD_TESTING)
       COMMAND "${CMAKE_CTEST_COMMAND}"
         --test-dir "${CMAKE_CURRENT_BINARY_DIR}"
         -C "$<CONFIG>"
-        -R "^(truth_sky_view_adapter_warp|truth_sky_view_adapter_shader_contract|truth_shader_fxc_a1_p1|truth_aurora_default_instruction_budget|truth_runtime_reproducible_release)$"
+        -R "^(truth_quality_presets|truth_sky_view_adapter_warp|truth_sky_view_adapter_shader_contract|truth_scene_contracts|truth_optical_contracts|truth_composition_contracts|truth_aurora_default_quality_contract|truth_stage_compile_matrix|truth_balanced_prepass_instruction_budget|truth_runtime_reproducible_release)$"
         --output-on-failure
         --no-tests=error
       DEPENDS truth_sky_view_adapter_warp_tests truth_enb_runtime_plugin
@@ -755,7 +640,7 @@ if(BUILD_TESTING)
       VERBATIM
     )
 
-    add_custom_target(truth_private_release_package
+    add_custom_target(truth_public_release_package
       COMMAND "${CMAKE_COMMAND}" -E make_directory
         "${CMAKE_CURRENT_BINARY_DIR}/packages/$<CONFIG>"
       COMMAND "${CMAKE_COMMAND}" -E env SOURCE_DATE_EPOCH=946684800
@@ -765,22 +650,23 @@ if(BUILD_TESTING)
         -G ZIP
         -B "${CMAKE_CURRENT_BINARY_DIR}/packages/$<CONFIG>"
       DEPENDS truth_enb_runtime_plugin truth_release_gate
-      COMMENT "Packaging the deterministic Truth ENB private release candidate"
+      COMMENT "Packaging the deterministic Truth ENB public release"
       VERBATIM
     )
 
     add_test(
-      NAME truth_private_release_package_manifest
+      NAME truth_public_release_package_manifest
       COMMAND "${CMAKE_COMMAND}"
         "-DTRUTH_BUILD_ROOT=${CMAKE_CURRENT_BINARY_DIR}"
         "-DTRUTH_CONFIGURATION=$<CONFIG>"
         "-DTRUTH_WORK_ROOT=${CMAKE_CURRENT_BINARY_DIR}/package-validation/$<CONFIG>"
         "-DTRUTH_SOURCE_ROOT=${CMAKE_CURRENT_SOURCE_DIR}"
         "-DTRUTH_RUNTIME_PLUGIN=$<TARGET_FILE:truth_enb_runtime_plugin>"
+        "-DTRUTH_PRESET_ROOT=${TRUTH_RELEASE_PRESET_ROOT}"
         "-DTRUTH_CPACK=${CMAKE_CPACK_COMMAND}"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/CheckTruthReleasePackage.cmake"
     )
-    set_tests_properties(truth_private_release_package_manifest PROPERTIES
+    set_tests_properties(truth_public_release_package_manifest PROPERTIES
       LABELS "install;package;manifest;determinism;release"
     )
   endif()

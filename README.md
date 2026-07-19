@@ -22,20 +22,21 @@ depend on recovered or peer shader source.
   day/interior inputs; replaces only depth-identified exterior sky pixels;
   and retains a Truth-owned safe passthrough beside ENB 0.504's required,
   hash-locked vanilla fallback.
-- `TruthRuntimeParameters.fxh`: a hidden six-vector protocol for the inverse
-  view-projection matrix, camera position, generation, validity, and engine
-  scale. Unwritten, stale, non-finite, or incompatible runtime state keeps the
-  procedural world-space path disabled.
+- `TruthRuntimeParameters.fxh`: a backward-compatible hidden runtime protocol.
+  Version 1.0 carries the four inverse-view-projection rows, camera, and
+  status. Version 1.1 adds a normalized celestial vector. Unwritten, stale,
+  non-finite, or incompatible state keeps the corresponding world-space path
+  disabled.
 - `AtmosphereInput` / `AtmosphereOutput`: a validated analytic sky, cloud,
   fog, and aurora reference with single-pass cloud/fog coupling.
-- `TruthAtmosphereCore.fxh`: the original shader mirror, compiled in live
-  atmosphere-enabled and atmosphere-disabled permutations.
+- `TruthAtmosphereCore.fxh`: the original shader mirror, composed by the HDR
+  prepass across the canonical five quality tiers.
 - `SkyFieldInput` / `SkyFieldOutput`: a deterministic, seamless 3D
   direction-space cloud field with domain-warped body/detail erosion and a
   night-only world-space aurora-curtain reference.
 - `TruthSkyFields.fxh`: the shader mirror; its generated cloud density, detail,
-  and intrinsic aurora radiance feed cloud lighting before exposure, with a
-  macro-off direct-control fallback.
+  and intrinsic aurora radiance feed cloud lighting before exposure. Tiers
+  `0/1` use the bounded analytic path and tiers `2/3/4` add volume clouds.
 - `AuroraCurtainInput` / `AuroraCurtainOutput`: an original bounded emission
   integral that factors a normalized height-dependent energy-deposition
   profile from a horizontally varying electron-flux curtain. The lower
@@ -44,7 +45,7 @@ depend on recovered or peer shader source.
 - `TruthAuroraCurtain.fxh`: the CPU-mirrored world-space shader with broad
   warped arcs, fine ray structure, exact looped motion, camera parallax, a
   bounded view-path gain, shared per-ray field context, empty-ray rejection,
-  and fixed `1/4/7/10` fallback/quality sample budgets.
+  and fixed `1/2/4/7/10` five-tier sample budgets.
 - `SkyViewAdapterInput` / `SkyViewAdapterOutput` and
   `TruthSkyViewAdapter.fxh`: the explicit row-major inverse-view-projection
   boundary that reconstructs a world-space ray, rebases the raw engine camera
@@ -82,14 +83,17 @@ The shader remains usable if the bridge is absent, but its world-space
 procedural replacement fails closed and the ordinary color path remains live.
 
 The bridge writes only ENB shader parameters during ENB callbacks. The public
-protocol is six `float4` values with exact UI keys, exactly protocol version
-`1.0`, and a
-generation counter. Both CPU and D3D11 WARP tests cover the row-major matrix
+protocol uses seven `float4` values with exact UI keys at version `1.1`;
+version `1.0` camera payloads remain readable. The seventh value carries the
+validated sun direction and is committed before `Status.valid`. Both CPU and
+D3D11 WARP tests cover the row-major matrix
 orientation, reflected offsets, readiness gate, camera rebasing, and
 non-finite fallback. The same WARP gate compiles and executes the exact
 production `TruthEnbPixelMain` with optimized strict settings, exercising ENB
-resource bindings, optical mixing, exposure endpoints, sky/interior masks,
-valid and invalid camera state, and non-finite scene, adaptation, and UI input.
+resource bindings, optical mixing, exposure endpoints, runtime color
+neutrality, and non-finite scene, adaptation, and UI input. Separate prepass
+contract, strict 45-permutation, and WARP reference tests cover environment
+composition, sky/interior ownership, and all five tiers.
 
 ## Build and test
 
@@ -101,7 +105,7 @@ cmake --build --preset vs2026-x64-debug
 ctest --preset vs2026-x64-debug --output-on-failure --no-tests=error
 cmake --build --preset vs2026-x64-release
 ctest --preset vs2026-x64-release --output-on-failure --no-tests=error
-cmake --build build --config Release --target truth_private_release_package
+cmake --build build --config Release --target truth_public_release_package
 ```
 
 The C++ assertion executables and FXC objects/listings are generated only
@@ -110,13 +114,13 @@ production effect does not compile as `fx_5_0`, a strict compile emits a
 warning, an expected output is absent/empty, the runtime ABI drifts, or the
 cost ceiling is exceeded.
 
-The package target emits `Truth-ENB-Private-RC-win64.zip` and its SHA-256
+The package target emits `Truth-ENB-1.0.0-win64.zip` and its SHA-256
 sidecar beneath `build/packages/Release`. Its release test performs two clean
 installs and two byte-identical archives, then rejects any file outside the
-exact shader, ENB 0.504 vanilla-fallback, native-plugin, dependency-lock, and
-documentation manifest. This is deliberately a private release candidate:
-the repository's public license and live SE/AE + ENB 0.504 in-game gates must
-be resolved before any public upload.
+exact nine-stage shader suite, five presets, ENB 0.504 vanilla fallback,
+native plugin, dependency locks, and documentation manifest. The repository is
+MIT licensed. Public upload remains blocked until the live SE/AE + ENB 0.504
+acceptance rows in `docs/release-validation.md` are actually executed.
 
 `runtime/enb-upstream.lock` records the exact current official ENB 0.504
 archive, wrapper, compiler, shader, SDK archive, and SDK-header hashes used by
@@ -149,21 +153,18 @@ parity, aurora luminance/color budgets, star preservation, and cloud
 extinction. Captures, shader objects, and executables remain under ignored
 build paths.
 
-`TRUTH_CLOUD_VOLUME_QUALITY` selects fixed `primary/light` sample budgets of
-`16/4`, `20/5`, or `24/6`. All three tiers are compiled in CI-style CTests.
-`TRUTH_ENABLE_CLOUD_VOLUME=0` retains the bounded procedural cloud-lighting
-fallback and is compiled as a separate, bytecode-distinct permutation.
+`TRUTH_QUALITY_TIER` is the only compile-time quality selector. Tiers `0..4`
+use cloud `primary/light` budgets of `0/0`, `0/0`, `8/2`, `12/3`, and `16/4`,
+and aurora budgets of `1`, `2`, `4`, `7`, and `10` samples. Balanced (`1`) is
+the authored default. The strict matrix compiles all nine stages at all five
+tiers and requires five bytecode-distinct HDR prepasses.
 
-`TRUTH_AURORA_QUALITY` selects fixed curtain integration budgets of `1`, `4`,
-`7`, or `10` samples. The one-sample path is the explicit fallback; the
-four-sample low tier is the practical default. All four paths compile with
-strict FXC warnings-as-errors, remain CPU/WARP aligned, and converge toward the
-high-tier reference. The IEEE-strict ENB-bound default effect is held below a
-`2,464` static FXC instruction-slot ceiling; the current witness is `2,443`.
-The CSV at
-`build/reports/<configuration>/truth-aurora-cost-budget.csv` records that
-static compile metric and a clearly labelled slot-pixel estimate at 1080p,
-1440p, and 4K. It is not presented as a dynamic executed-instruction count.
+The complete IEEE-strict Balanced HDR prepass is held below a `2,938` static
+FXC instruction-slot ceiling; the current witness is `2,917`. The CSV at
+`build/reports/<configuration>/truth-balanced-prepass-cost-budget.csv`
+records that static compile metric and a clearly labelled slot-pixel estimate
+at 1080p, 1440p, and 4K. It is not presented as a dynamic
+executed-instruction count.
 
 The enabled effect adds unified atmosphere composite radiance to scene-linear
 color before exposure. The sky and precomputed procedural aurora are attenuated
@@ -208,5 +209,5 @@ verification evidence.
 
 ## License
 
-No license has been selected. `LICENSE` is a placeholder notice and grants no
-rights.
+Truth ENB is licensed under the MIT License. The optional `tools/sky-mesh`
+source is separately GPL-3.0-or-later and is excluded from the runtime ZIP.

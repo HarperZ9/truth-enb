@@ -76,6 +76,7 @@ struct ProbeResult {
 struct RuntimeProbeParameters {
   SkyViewMatrix inverse_view_projection;
   Float4 camera_world;
+  Float4 celestial;
   Float4 status;
 };
 
@@ -87,10 +88,11 @@ static_assert(offsetof(ProbeParameters, camera_world_x) == 80U);
 static_assert(offsetof(ProbeParameters, aurora_origin_world_x) == 96U);
 static_assert(offsetof(ProbeParameters, engine_world_units_per_aurora_unit) == 108U);
 static_assert(sizeof(ProbeResult) == 32U);
-static_assert(sizeof(RuntimeProbeParameters) == 96U);
+static_assert(sizeof(RuntimeProbeParameters) == 112U);
 static_assert(offsetof(RuntimeProbeParameters, inverse_view_projection) == 0U);
 static_assert(offsetof(RuntimeProbeParameters, camera_world) == 64U);
-static_assert(offsetof(RuntimeProbeParameters, status) == 80U);
+static_assert(offsetof(RuntimeProbeParameters, celestial) == 80U);
+static_assert(offsetof(RuntimeProbeParameters, status) == 96U);
 
 struct TestCase {
   std::string label;
@@ -303,14 +305,15 @@ void ValidateRuntimeReflection(ID3D11ShaderReflection& reflection) {
   D3D11_SHADER_BUFFER_DESC description{};
   CheckHr(buffer->GetDesc(&description), "runtime constant-buffer reflection");
   if (description.Size != sizeof(RuntimeProbeParameters)) {
-    Fail("runtime probe constant-buffer size drifted from the six-vector ABI");
+    Fail("runtime probe constant-buffer size drifted from the seven-vector ABI");
   }
   ValidateVariable(*buffer, "TruthRuntimeInverseViewProjectionRow0", 0U, 16U);
   ValidateVariable(*buffer, "TruthRuntimeInverseViewProjectionRow1", 16U, 16U);
   ValidateVariable(*buffer, "TruthRuntimeInverseViewProjectionRow2", 32U, 16U);
   ValidateVariable(*buffer, "TruthRuntimeInverseViewProjectionRow3", 48U, 16U);
   ValidateVariable(*buffer, "TruthRuntimeCameraWorld", 64U, 16U);
-  ValidateVariable(*buffer, "TruthRuntimeStatus", 80U, 16U);
+  ValidateVariable(*buffer, "TruthRuntimeCelestial", 80U, 16U);
+  ValidateVariable(*buffer, "TruthRuntimeStatus", 96U, 16U);
 }
 
 struct WarpDevice {
@@ -635,17 +638,10 @@ struct ReflectedBuffer {
   ID3D11ShaderReflectionConstantBuffer* reflection{};
 };
 
-struct Float3 {
-  float x;
-  float y;
-  float z;
-};
-
 struct ProductionTextures {
   Float4 color{0.18F, 0.62F, 2.0F, 1.0F};
   Float4 bloom{};
   Float4 lens{};
-  Float4 depth{};
   Float4 adaptation{1.0F, 0.0F, 0.0F, 0.0F};
 };
 
@@ -799,8 +795,18 @@ class ProductionIncludeResolver final : public ID3DInclude {
   if (buffer == nullptr) Fail("production $Globals is absent");
   D3D11_SHADER_BUFFER_DESC description{};
   CheckHr(buffer->GetDesc(&description), "production $Globals reflection");
-  if (description.Size != 448U) {
-    Fail("production $Globals size drifted from 448 bytes");
+  if (description.Size != 368U) {
+    std::string layout = "production $Globals reflected "
+        + std::to_string(description.Size) + " bytes:";
+    for (UINT index = 0U; index < description.Variables; ++index) {
+      D3D11_SHADER_VARIABLE_DESC variable_description{};
+      CheckHr(buffer->GetVariableByIndex(index)->GetDesc(&variable_description),
+              "production variable diagnostic reflection");
+      layout += " " + std::string{variable_description.Name}
+          + "@" + std::to_string(variable_description.StartOffset)
+          + "+" + std::to_string(variable_description.Size);
+    }
+    Fail(layout);
   }
   ReflectedBuffer result{
       binding.BindPoint,
@@ -821,14 +827,13 @@ class ProductionIncludeResolver final : public ID3DInclude {
   ValidateVariable(*buffer, "TruthRuntimeInverseViewProjectionRow0", 0U, 16U);
   ValidateVariable(*buffer, "TruthRuntimeInverseViewProjectionRow3", 48U, 16U);
   ValidateVariable(*buffer, "TruthRuntimeCameraWorld", 64U, 16U);
-  ValidateVariable(*buffer, "TruthRuntimeStatus", 80U, 16U);
-  ValidateVariable(*buffer, "TruthMasterEnabled", 96U, 4U);
-  ValidateVariable(*buffer, "TruthAuroraWorldOrigin", 176U, 12U);
-  ValidateVariable(*buffer, "Timer", 192U, 16U);
-  ValidateVariable(*buffer, "Weather", 240U, 16U);
-  ValidateVariable(*buffer, "ENightDayFactor", 288U, 4U);
-  ValidateVariable(*buffer, "EInteriorFactor", 292U, 4U);
-  ValidateVariable(*buffer, "ENBParams01", 432U, 16U);
+  ValidateVariable(*buffer, "TruthRuntimeCelestial", 80U, 16U);
+  ValidateVariable(*buffer, "TruthRuntimeStatus", 96U, 16U);
+  ValidateVariable(*buffer, "TruthMasterEnabled", 112U, 4U);
+  ValidateVariable(*buffer, "TruthAuroraWorldOrigin", 192U, 12U);
+  ValidateVariable(*buffer, "Timer", 208U, 16U);
+  ValidateVariable(*buffer, "EInteriorFactor", 224U, 4U);
+  ValidateVariable(*buffer, "ENBParams01", 352U, 16U);
   return result;
 }
 
@@ -863,8 +868,7 @@ void ValidateProductionResources(ID3D11ShaderReflection& reflection) {
       {"TextureColor", D3D_SIT_TEXTURE, 0U},
       {"TextureBloom", D3D_SIT_TEXTURE, 1U},
       {"TextureLens", D3D_SIT_TEXTURE, 2U},
-      {"TextureDepth", D3D_SIT_TEXTURE, 3U},
-      {"TextureAdaptation", D3D_SIT_TEXTURE, 4U},
+      {"TextureAdaptation", D3D_SIT_TEXTURE, 3U},
   };
   for (const auto& resource : expected) {
     D3D11_SHADER_INPUT_BIND_DESC binding{};
@@ -986,14 +990,13 @@ struct ProductionRenderer {
     const ReflectedBuffer& globals,
     const ProductionTextures& textures) {
   const auto globals_buffer = UploadGlobals(warp, globals);
-  std::array<ComPtr<ID3D11ShaderResourceView>, 5U> owned_views{
+  std::array<ComPtr<ID3D11ShaderResourceView>, 4U> owned_views{
       UploadTexture(warp, textures.color),
       UploadTexture(warp, textures.bloom),
       UploadTexture(warp, textures.lens),
-      UploadTexture(warp, textures.depth),
       UploadTexture(warp, textures.adaptation),
   };
-  std::array<ID3D11ShaderResourceView*, 5U> views{};
+  std::array<ID3D11ShaderResourceView*, 4U> views{};
   for (std::size_t index = 0U; index < views.size(); ++index) {
     views[index] = owned_views[index].Get();
   }
@@ -1018,7 +1021,7 @@ struct ProductionRenderer {
   warp.context->Draw(3U, 0U);
   warp.context->CopyResource(renderer.staging.Get(), renderer.target.Get());
 
-  std::array<ID3D11ShaderResourceView*, 5U> null_views{};
+  std::array<ID3D11ShaderResourceView*, 4U> null_views{};
   ID3D11Buffer* null_buffer = nullptr;
   warp.context->PSSetShaderResources(0U, static_cast<UINT>(null_views.size()),
                                      null_views.data());
@@ -1039,8 +1042,6 @@ struct ProductionRenderer {
 
 void ConfigureProductionFrame(ReflectedBuffer& globals) {
   SetVariable(globals, "Timer", Float4{0.25F, 60.0F, 0.0F, 1.0F / 60.0F});
-  SetVariable(globals, "Weather", Float4{0.0F, 0.0F, 0.0F, 0.0F});
-  SetVariable(globals, "ENightDayFactor", 0.0F);
   SetVariable(globals, "EInteriorFactor", 0.0F);
   SetVariable(globals, "ENBParams01", Float4{});
   SetBool(globals, "TruthUseEnbBloom", false);
@@ -1090,9 +1091,10 @@ void EnableRuntime(ReflectedBuffer& globals) {
   SetVariable(globals, "TruthRuntimeInverseViewProjectionRow3",
               Float4{0.0F, 0.0F, 0.0F, 1.0F});
   SetVariable(globals, "TruthRuntimeCameraWorld", Float4{});
+  SetVariable(globals, "TruthRuntimeCelestial",
+              Float4{0.0F, 0.0F, 1.0F, 1.0F});
   SetVariable(globals, "TruthRuntimeStatus",
-              Float4{1.0F, 1.0F, 17.0F, 1.0F});
-  SetVariable(globals, "TruthAuroraWorldOrigin", Float3{});
+              Float4{1.1F, 1.0F, 17.0F, 1.0F});
 }
 
 void ExerciseProductionPixel(Report& report,
@@ -1143,54 +1145,41 @@ void ExerciseProductionPixel(Report& report,
                                      optical_textures),
                     Float4{0.5F, 0.5F, 0.5F, 1.0F});
 
-  ProductionTextures sky_textures = textures;
-  sky_textures.depth = {1.0F, 0.0F, 0.0F, 0.0F};
   const Float4 invalid_runtime_pixel = RenderProduction(
-      warp, renderer, globals, sky_textures);
-  CompareProduction(report, "missing runtime fail-closed",
+      warp, renderer, globals, textures);
+  CompareProduction(report, "missing runtime remains color-neutral",
                     invalid_runtime_pixel, default_pixel);
 
   ReflectedBuffer valid_runtime_globals = globals;
   EnableRuntime(valid_runtime_globals);
-  ProductionTextures non_sky_textures = sky_textures;
-  non_sky_textures.depth.x = 0.0F;
-  CompareProduction(report, "non-sky depth preservation",
+  CompareProduction(report, "valid runtime remains color-neutral",
                     RenderProduction(warp, renderer, valid_runtime_globals,
-                                     non_sky_textures),
+                                     textures),
                     default_pixel);
 
   ReflectedBuffer interior_globals = valid_runtime_globals;
   SetVariable(interior_globals, "EInteriorFactor", 1.0F);
-  CompareProduction(report, "interior preservation",
+  CompareProduction(report, "interior runtime remains color-neutral",
                     RenderProduction(warp, renderer, interior_globals,
-                                     sky_textures),
+                                     textures),
                     default_pixel);
-
-  const Float4 procedural_sky = RenderProduction(
-      warp, renderer, valid_runtime_globals, sky_textures);
-  ExpectFiniteBounded(report, "procedural production sky", procedural_sky);
-  const float sky_difference = std::fabs(procedural_sky.x - default_pixel.x)
-      + std::fabs(procedural_sky.y - default_pixel.y)
-      + std::fabs(procedural_sky.z - default_pixel.z);
-  report.Expect(sky_difference > 1.0e-4F,
-                "valid runtime did not activate procedural sky replacement");
 
   ReflectedBuffer invalid_status_globals = globals;
   SetVariable(invalid_status_globals, "TruthRuntimeStatus",
               Float4{1.0F, 1.0F,
                      std::numeric_limits<float>::quiet_NaN(), 1.0F});
-  CompareProduction(report, "non-finite runtime status fail-closed",
+  CompareProduction(report, "non-finite runtime status remains color-neutral",
                     RenderProduction(warp, renderer, invalid_status_globals,
-                                     sky_textures),
+                                     textures),
                     default_pixel);
 
   ReflectedBuffer unsupported_protocol_globals = valid_runtime_globals;
   SetVariable(unsupported_protocol_globals, "TruthRuntimeStatus",
               Float4{1.5F, 1.0F, 17.0F, 1.0F});
-  CompareProduction(report, "undocumented runtime protocol fail-closed",
+  CompareProduction(report, "undocumented protocol remains color-neutral",
                     RenderProduction(warp, renderer,
                                      unsupported_protocol_globals,
-                                     sky_textures),
+                                     textures),
                     default_pixel);
 
   const float nan = std::numeric_limits<float>::quiet_NaN();
@@ -1234,9 +1223,9 @@ void ExerciseProductionPixel(Report& report,
     ReflectedBuffer invalid_parameter_globals = valid_runtime_globals;
     SetVariable(invalid_parameter_globals, parameter, nan);
     ExpectFiniteBounded(
-        report, std::string{"active-sky non-finite UI parameter "} + parameter,
+        report, std::string{"prepass-owned parameter isolation "} + parameter,
         RenderProduction(warp, renderer, invalid_parameter_globals,
-                         sky_textures));
+                         textures));
   }
 }
 

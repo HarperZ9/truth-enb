@@ -99,7 +99,7 @@ to `build/shaders/<configuration>/`.
   bit-pattern preservation for rejected NaN-containing state.
 - The shader test compiles the real effect, not a mock or syntax-only surrogate.
 - The D3D11 WARP ABI test executes the production row builder and sky-view
-  adapter, reflects all six runtime vectors and their exact offsets, and
+  adapter, reflects the runtime vectors and their exact offsets, and
   compares asymmetric row-major transforms against the CPU reference.
 - That gate also executes the exact optimized `TruthEnbPixelMain` against five
   ENB-shaped textures. It covers defaults, manual-exposure endpoints, master
@@ -157,9 +157,10 @@ and intrinsic radiance.
 row-major inverse view-projection matrix, rebases the raw engine camera around
 an explicit aurora origin, and converts engine units to artist units before the
 field is evaluated. The resulting cloud density, detail erosion, and intrinsic
-aurora radiance feed cloud lighting before exposure.
-`TRUTH_ENABLE_PROCEDURAL_SKY=0` retains the direct cloud-density and
-aurora-mask inputs as an explicit fallback.
+aurora radiance feed cloud lighting before exposure. The canonical
+`TRUTH_QUALITY_TIER` contract keeps tiers `0/1` on the analytic path and enables
+bounded volume clouds for tiers `2/3/4`; invalid runtime state preserves the
+authored scene.
 
 ## ENB runtime bridge
 
@@ -170,14 +171,16 @@ implicit shader assumption:
 Address Library database -> world-root camera relocation
                          -> inverse view-projection + camera
                          -> ENB callback parameter writes
-                         -> six hidden float4 values
+                         -> seven hidden float4 values
                          -> readiness gate -> sky-view adapter
 ```
 
-Exactly protocol `1.0` carries four row vectors, one camera vector, and one status vector
-containing protocol version, valid flag, generation, and engine-world-units per
-aurora unit. Default status is zero, so a missing bridge cannot accidentally
-enable the replacement. The effect checks version, validity, scale, camera,
+Protocol `1.0` carries four row vectors, one camera vector, and one status
+vector. Protocol `1.1` adds a normalized celestial vector before status while
+remaining compatible with 1.0 camera payloads. Status contains protocol
+version, valid flag, generation, and engine-world-units per aurora unit.
+Default status is zero, so a missing bridge cannot accidentally enable the
+replacement. The effect checks version, validity, scale, camera, celestial,
 matrix arithmetic, homogeneous division, direction length, and rebased camera
 bounds before it replaces a sky pixel. Interior pixels and non-sky depth retain
 the ordinary ENB color path.
@@ -203,15 +206,15 @@ fixed samples then use analytic curved-sheet and filament terms, compact-support
 deposition windows, and bounded accumulation. View-angle path length is capped;
 horizon visibility is softened; phase follows an exact sinusoidal loop; camera
 translation moves the world-space sheet without altering direction-space
-clouds. CPU and HLSL use fixed `1/4/7/10` sample budgets and expose the same
-fallback, low, balanced, and high tiers. Low (`4`) is the default, while tests
-require cumulative error to decrease from fallback through low and balanced
-toward high.
+clouds. CPU and HLSL use fixed `1/2/4/7/10` sample budgets for Performance,
+Balanced, Quality, Ultra, and Cinematic. Balanced (`2`) is the authored
+default, while tests require cumulative error to decrease toward the
+high-tier reference.
 
-The full ENB-bound effect is budgeted, not just the isolated helper. FXC
-listing inspection rejects a default build above `2,464` static instruction
-slots; the IEEE-strict effect is currently `2,443`. Its report records the static count and a
-labelled slot-pixel estimate at 1080p, 1440p, and 4K, not a dynamic
+The complete Balanced HDR prepass is budgeted, not just the isolated helper.
+FXC listing inspection rejects a build above `2,938` static instruction slots;
+the IEEE-strict witness is currently `2,917`. Its report records the static
+count and a labelled slot-pixel estimate at 1080p, 1440p, and 4K, not a dynamic
 executed-instruction upper bound. Activity zero, daylight, below-slab rays, and
 coarse-rejected empty rays return exact positive zero with zero integration
 samples.
@@ -249,7 +252,6 @@ The procedural aurora already contains its activity, curtain, night, and hue
 modulation; cloud lighting does not reconstruct or rescale that color. It only
 forces exact black when daylight is complete or the declared night factor is
 zero, then applies cloud/fog attenuation once. `TruthCloudLighting.fxh` mirrors
-the CPU formulas. The effect routes `SkyFieldOutput::aurora_intrinsic_radiance`
-directly into it, while `TRUTH_ENABLE_PROCEDURAL_SKY=0` synthesizes the prior
-direct-control aurora as an explicit fallback. FXC compiles all four atmosphere
-and procedural-sky macro combinations as `fx_5_0`.
+the CPU formulas. The prepass routes
+`SkyFieldOutput::aurora_intrinsic_radiance` directly into it. FXC compiles the
+nine-stage suite at all five canonical quality tiers as `fx_5_0`.

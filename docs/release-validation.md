@@ -2,7 +2,7 @@
 
 Truth supports ENBSeries as a peer; it never redistributes ENB binaries. Because
 Skyrim SE builds retain the `0.504` version number across silent updates, the
-private release candidate records the exact official upstream bytes used for
+public release candidate records the exact official upstream bytes used for
 development in `enb-upstream.lock`.
 
 On 2026-07-14 America/Los_Angeles, the current archive was downloaded directly
@@ -35,7 +35,7 @@ Authoritative upstream pages:
 The Release build must pass the CPU suites, optimized D3D11 WARP production
 pixel test, exact ENB fallback contract, strict FXC permutations, static shader
 budget, runtime plugin binary/ABI tests, and deterministic install/ZIP manifest.
-The private package target runs the production shader subset plus two clean,
+The public package target runs the complete production shader suite plus two clean,
 independent static-runtime Release builds before archiving; their plugin bytes
 must match each other and the plugin entering the archive exactly.
 
@@ -45,8 +45,8 @@ Run these checks on both Skyrim SE 1.5.97 and the supported AE build using the
 locked ENB archive:
 
 1. Confirm the native plugin resolves the host and exact Address Library file.
-2. Confirm all six hidden runtime values can be read and written only inside
-   ENB callbacks, with `Status.valid` committed last.
+2. Confirm all seven hidden runtime values can be read and written only inside
+   ENB callbacks, with celestial committed before `Status.valid`.
 3. Rotate, pitch, translate, change FOV, enter interiors, open menus, and load
    saves; the world-space sky must remain stable and interior/depth masks must
    preserve the original scene.
@@ -59,5 +59,6 @@ locked ENB archive:
    ENB LOD shadows, horizon fog, map suppression, save/load, and exterior to
    interior transitions. Truth must remain functional without it.
 
-Public upload stays blocked until these live gates pass and a public repository
-license is selected.
+Public upload stays blocked until these live gates pass. The repository license
+is MIT; the optional GPL-3.0-or-later sky-mesh tool is excluded from the
+runtime ZIP.

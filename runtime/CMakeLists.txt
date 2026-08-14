@@ -11,9 +11,16 @@ set(
     "Absolute build-time path to the enb-runtime-core sibling"
 )
 
+#  Pinned to enb-runtime-core's live head. The previous pin,
+#  e84e42b2053551e677ea00ad1400501117ccfa7c, was a pre-rewrite hash for
+#  "chore: adopt MIT license" and now survives only on that repository's
+#  preserve/pre-replay-chore-bootstrap-runtime branch, so configure failed with
+#  a revision mismatch. The trees are identical apart from .gitignore, which
+#  gained the .env / .envrc / dist / CLAUDE.local.md rules on 2026-07-26. The
+#  runtime contract is unchanged.
 set(
     TRUTH_ENB_RUNTIME_CORE_REVISION
-    "e84e42b2053551e677ea00ad1400501117ccfa7c"
+    "543392f02ff3506d54590193f64a892ead523970"
 )
 
 file(STRINGS

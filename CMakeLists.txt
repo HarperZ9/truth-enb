@@ -572,6 +572,7 @@ if(BUILD_TESTING)
     target_link_libraries(truth_reference_renderer_tests PRIVATE
       truth_reference_renderer_core
       truth_cloud_volume
+      truth_interior_light
       truth_sky_fields
     )
     set_property(TARGET truth_reference_renderer_tests PROPERTY VS_GLOBAL_VcpkgApplocalDeps false)

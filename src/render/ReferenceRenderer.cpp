@@ -498,18 +498,65 @@ std::string_view ReferenceSceneName(const ReferenceScene scene) noexcept {
   return nullptr;
 }
 
+[[nodiscard]] const char* QualityTierDefine(const QualityTier tier) noexcept {
+  switch (tier) {
+    case QualityTier::performance:
+      return "0";
+    case QualityTier::balanced:
+      return "1";
+    case QualityTier::quality:
+      return "2";
+    case QualityTier::ultra:
+      return "3";
+    case QualityTier::cinematic:
+      return "4";
+  }
+  return nullptr;
+}
+
+std::string_view QualityTierName(const QualityTier tier) noexcept {
+  switch (tier) {
+    case QualityTier::performance:
+      return "performance";
+    case QualityTier::balanced:
+      return "balanced";
+    case QualityTier::quality:
+      return "quality";
+    case QualityTier::ultra:
+      return "ultra";
+    case QualityTier::cinematic:
+      return "cinematic";
+  }
+  return {};
+}
+
 ReferenceRenderResult RenderWarpReference(
     const ReferenceScene scene,
     const std::filesystem::path& shader_path,
     const std::uint32_t width,
     const std::uint32_t height) noexcept {
+  return RenderWarpReference(
+      scene, shader_path, width, height, QualityTier::quality);
+}
+
+ReferenceRenderResult RenderWarpReference(
+    const ReferenceScene scene,
+    const std::filesystem::path& shader_path,
+    const std::uint32_t width,
+    const std::uint32_t height,
+    const QualityTier tier) noexcept {
+  const char* const define = QualityTierDefine(tier);
+  if (define == nullptr) {
+    return Fail(ReferenceRenderStatus::invalid_request,
+                "unknown Truth quality tier");
+  }
   return RenderWarpPass(
       scene,
       shader_path,
       width,
       height,
       "TruthReferencePixelMain",
-      "2");
+      define);
 }
 
 ReferenceRenderResult RenderWarpSkyFieldScalars(

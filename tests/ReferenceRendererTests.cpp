@@ -1,6 +1,7 @@
 #include "truth/render/ReferenceRenderer.hpp"
 #include "truth/render/AuroraCurtain.hpp"
 #include "truth/render/CloudVolume.hpp"
+#include "truth/render/InteriorLight.hpp"
 #include "truth/render/SkyFields.hpp"
 
 #include <algorithm>
@@ -13,6 +14,7 @@
 #include <fstream>
 #include <iostream>
 #include <iterator>
+#include <limits>
 #include <set>
 #include <string>
 #include <string_view>
@@ -759,6 +761,147 @@ void VolumeShowsParallaxAndInteriorShading(
                   "cloud body lacked lit-edge/darker-core interior shading");
 }
 
+// Renders the reference pass at every shipped tier and asserts the tiers are
+// actually distinct images.
+//
+// TierAndIdentityReferences below greps the shader sources for the tier tokens.
+// That catches a deleted budget constant, but it passes just as happily if the
+// tier define never reaches the compiler, or reaches it and changes nothing.
+// These cases compile and render each tier and compare the resulting hashes, so
+// a tier that is declared but inert fails here.
+void RenderedTierReferences(
+    TestContext& context,
+    const std::filesystem::path& shader_path) {
+  using truth::render::QualityTier;
+
+  constexpr std::array<QualityTier, 5U> tiers{
+      QualityTier::performance, QualityTier::balanced, QualityTier::quality,
+      QualityTier::ultra, QualityTier::cinematic};
+
+  std::array<std::string, 5U> hashes{};
+  for (std::size_t index = 0U; index < tiers.size(); ++index) {
+    const auto render = truth::render::RenderWarpReference(
+        truth::render::ReferenceScene::cloudy_night_aurora,
+        shader_path, 128U, 64U, tiers[index]);
+    const std::string tier_name{truth::render::QualityTierName(tiers[index])};
+    context.expect(render.status == truth::render::ReferenceRenderStatus::rendered,
+                   "tier " + tier_name + " did not render: " + render.diagnostic);
+    context.expect(render.sha256_hex.size() == 64U,
+                   "tier " + tier_name + " produced no content hash");
+    hashes[index] = render.sha256_hex;
+  }
+
+  // Tiers 0 and 1 compile volume marching out; 2, 3 and 4 march at 8/2, 12/3
+  // and 16/4. An analytic tier that matches a marching tier means the define is
+  // not reaching the volume path.
+  for (std::size_t analytic = 0U; analytic < 2U; ++analytic) {
+    for (std::size_t volume = 2U; volume < tiers.size(); ++volume) {
+      context.expect(
+          hashes[analytic] != hashes[volume],
+          std::string{truth::render::QualityTierName(tiers[analytic])}
+              + "-analytic vs "
+              + std::string{truth::render::QualityTierName(tiers[volume])}
+              + "-volume-cloud: analytic and marching tiers rendered "
+                "identically, so TRUTH_QUALITY_TIER is not reaching the "
+                "volume path");
+    }
+  }
+
+  // The three marching tiers carry different step budgets, so they must not
+  // collapse onto one another either.
+  context.expect(hashes[2] != hashes[3],
+                 "quality-volume-cloud vs ultra-volume-cloud: the 8/2 and 12/3 "
+                 "budgets rendered identically");
+  context.expect(hashes[3] != hashes[4],
+                 "ultra-volume-cloud vs cinematic-volume-cloud: the 12/3 and "
+                 "16/4 budgets rendered identically");
+  context.expect(hashes[2] != hashes[4],
+                 "quality-volume-cloud vs cinematic-volume-cloud: the 8/2 and "
+                 "16/4 budgets rendered identically");
+
+  // Rendering is deterministic, so the same tier twice must agree. Without
+  // this, the inequalities above could be satisfied by frame noise.
+  const auto repeat = truth::render::RenderWarpReference(
+      truth::render::ReferenceScene::cloudy_night_aurora,
+      shader_path, 128U, 64U, QualityTier::ultra);
+  context.expect(repeat.status == truth::render::ReferenceRenderStatus::rendered,
+                 "ultra-volume-cloud: repeat render failed");
+  context.expect(repeat.sha256_hex == hashes[3],
+                 "ultra-volume-cloud: the same tier rendered twice disagreed, "
+                 "so the tier inequalities above prove nothing");
+}
+
+// sealed-interior and invalid-runtime-preserves-scene, against the real
+// InteriorLight reference rather than a restatement of the expected answer.
+void SealedInteriorAndInvalidRuntimeAreExact(TestContext& context) {
+  using truth::render::InteriorLightDiagnostic;
+  using truth::render::InteriorLightInput;
+  using truth::render::InteriorLightOutput;
+  using truth::render::InteriorLightStatus;
+
+  // sealed-interior: fully occluded, with a wide open aperture present so the
+  // exclusion cannot be an artefact of having no aperture at all.
+  {
+    InteriorLightInput sealed{};
+    sealed.exterior_sky_luminance = 5000.0F;
+    sealed.ambient_floor = 0.125F;
+    sealed.occlusion = 1.0F;
+    sealed.aperture_count = 1U;
+    sealed.apertures[0] = {1.0F, 1.0F};
+
+    InteriorLightOutput output{};
+    const auto result = truth::render::EvaluateInteriorLight(output, sealed);
+    context.expect(result.status == InteriorLightStatus::evaluated,
+                   "sealed-interior: a fully occluded cell was rejected");
+    context.expect(output.exterior_daylight == 0.0F,
+                   "sealed-interior: exterior daylight must be exactly zero, not "
+                   "merely small");
+    context.expect(output.exterior_excluded,
+                   "sealed-interior: exterior_excluded was not set");
+    context.expect(output.interior_light == sealed.ambient_floor,
+                   "sealed-interior: a sealed cell must return its own ambient "
+                   "floor unchanged");
+  }
+
+  // invalid-runtime-preserves-scene: the contract is that a rejected input
+  // leaves the caller's output bit-for-bit intact. Seed the output with a
+  // sentinel and prove every field survives.
+  {
+    InteriorLightOutput sentinel{};
+    sentinel.interior_light = 0.21F;
+    sentinel.exterior_daylight = 0.34F;
+    sentinel.effective_aperture = 0.55F;
+    sentinel.exterior_excluded = true;
+    const InteriorLightOutput before = sentinel;
+
+    InteriorLightInput invalid{};
+    invalid.exterior_sky_luminance
+        = std::numeric_limits<float>::quiet_NaN();
+    invalid.ambient_floor = 0.125F;
+    invalid.occlusion = 0.5F;
+    invalid.aperture_count = 1U;
+    invalid.apertures[0] = {0.5F, 0.5F};
+
+    const auto result = truth::render::EvaluateInteriorLight(sentinel, invalid);
+    context.expect(result.status == InteriorLightStatus::rejected,
+                   "invalid-runtime-preserves-scene: a non-finite runtime value "
+                   "was accepted");
+    context.expect(result.diagnostic
+                       == InteriorLightDiagnostic::exterior_sky_luminance_non_finite,
+                   "invalid-runtime-preserves-scene: rejection did not name the "
+                   "offending field");
+    context.expect(std::bit_cast<std::uint32_t>(sentinel.interior_light)
+                           == std::bit_cast<std::uint32_t>(before.interior_light)
+                       && std::bit_cast<std::uint32_t>(sentinel.exterior_daylight)
+                           == std::bit_cast<std::uint32_t>(before.exterior_daylight)
+                       && std::bit_cast<std::uint32_t>(sentinel.effective_aperture)
+                           == std::bit_cast<std::uint32_t>(before.effective_aperture)
+                       && sentinel.exterior_excluded == before.exterior_excluded,
+                   "invalid-runtime-preserves-scene: a rejected evaluation "
+                   "modified the caller's output");
+  }
+}
+
 void TierAndIdentityReferences(
     TestContext& context,
     const std::filesystem::path& shader_path) {
@@ -818,12 +961,10 @@ void TierAndIdentityReferences(
                      != std::string::npos,
                  "sealed-interior: shader no longer preserves exact exterior exclusion");
 
-  const ReferenceColor scene{0.21F, 0.34F, 0.55F};
-  const auto preserve_scene = [](const ReferenceColor input, const bool runtime_valid) {
-    return runtime_valid ? ReferenceColor{0.44F, 0.33F, 0.22F} : input;
-  };
-  context.expect(SameColor(preserve_scene(scene, false), scene),
-                 "invalid-runtime-preserves-scene: invalid runtime changed scene color");
+  // The identity contracts for sealed interiors and invalid runtime payloads
+  // are asserted against the real InteriorLight reference in
+  // SealedInteriorAndInvalidRuntimeAreExact. They used to live here as a
+  // lambda that returned its own argument, which could not fail.
 
   context.expect(screen_space.find("if (occlusion <= 0.0 || sample_count <= 0.0)")
                      != std::string::npos
@@ -927,7 +1068,15 @@ int main(int argc, char** argv) {
 
     TierAndIdentityReferences(context, shader_path);
     ++passed;
-    std::cout << "[PASS] named tier and identity references\n";
+    std::cout << "[PASS] tier and identity source contracts\n";
+
+    RenderedTierReferences(context, shader_path);
+    ++passed;
+    std::cout << "[PASS] rendered tier references are distinct\n";
+
+    SealedInteriorAndInvalidRuntimeAreExact(context);
+    ++passed;
+    std::cout << "[PASS] sealed interior and invalid runtime are exact\n";
 
     CpuAndHlslSkyFieldsRemainAligned(context, shader_path);
     ++passed;

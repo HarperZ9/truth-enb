@@ -453,6 +453,30 @@ if(BUILD_TESTING)
       LABELS "gpu;warp;shader;capability"
     )
 
+    add_executable(truth_screen_space_warp_tests
+      tests/ScreenSpaceWarpTests.cpp
+    )
+    target_compile_features(truth_screen_space_warp_tests PRIVATE cxx_std_23)
+    target_link_libraries(truth_screen_space_warp_tests PRIVATE
+      d3d11
+      d3dcompiler
+    )
+    set_property(TARGET truth_screen_space_warp_tests
+      PROPERTY VS_GLOBAL_VcpkgApplocalDeps false)
+    if(MSVC)
+      target_compile_options(truth_screen_space_warp_tests PRIVATE
+        /W4 /WX /permissive- /EHsc /utf-8
+      )
+    endif()
+    add_test(
+      NAME truth_screen_space_warp
+      COMMAND truth_screen_space_warp_tests
+        "${CMAKE_CURRENT_SOURCE_DIR}/shaders/truth/TruthScreenSpaceWarpProbe.hlsl"
+    )
+    set_tests_properties(truth_screen_space_warp PROPERTIES
+      LABELS "gpu;warp;shader;scene;screen-space"
+    )
+
     add_executable(truth_sky_view_adapter_warp_tests
       tests/SkyViewAdapterWarpTests.cpp
     )

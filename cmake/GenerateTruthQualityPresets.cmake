@@ -200,6 +200,341 @@ set(truth_stage_files
   enbsunsprite.fx
   enbunderwater.fx)
 
+function(set_truth_preset_values tier)
+  if(tier EQUAL 0)
+    set(preset_master_enabled true)
+    set(preset_manual_exposure_ev 0.0)
+    set(preset_auto_exposure_blend 0.15)
+    set(preset_use_enb_bloom false)
+    set(preset_use_enb_lens false)
+    set(preset_procedural_sky_enabled true)
+    set(preset_sky_replacement_strength 0.50)
+    set(preset_sky_depth_threshold 0.9998)
+    set(preset_sky_depth_feather 0.0002)
+    set(preset_sky_radiance_scale 0.85)
+    set(preset_weather_density 0.18)
+    set(preset_cloud_coverage 0.30)
+    set(preset_cloud_density 0.38)
+    set(preset_fog_density 0.08)
+    set(preset_aurora_activity 0.12)
+    set(preset_aurora_mask 0.70)
+    set(preset_sky_wind_x 0.62)
+    set(preset_sky_wind_y -0.27)
+    set(preset_prepass_enabled true)
+    set(preset_prepass_intensity 0.40)
+    set(preset_prepass_depth_shape 0.30)
+    set(preset_dof_enabled false)
+    set(preset_dof_intensity 0.0)
+    set(preset_dof_focus_shape 0.45)
+    set(preset_bloom_enabled false)
+    set(preset_bloom_intensity 0.0)
+    set(preset_bloom_threshold_shape 1.20)
+    set(preset_adaptation_enabled true)
+    set(preset_adaptation_intensity 0.35)
+    set(preset_adaptation_response_shape 0.35)
+    set(preset_lens_enabled false)
+    set(preset_lens_intensity 0.0)
+    set(preset_lens_aperture_shape 0.35)
+    set(preset_postpass_enabled true)
+    set(preset_postpass_intensity 0.35)
+    set(preset_sun_sprite_enabled true)
+    set(preset_sun_sprite_intensity 0.12)
+    set(preset_sun_sprite_disc_shape 0.40)
+    set(preset_underwater_enabled true)
+    set(preset_underwater_intensity 0.25)
+    set(preset_underwater_density_shape 0.20)
+  elseif(tier EQUAL 1)
+    set(preset_master_enabled true)
+    set(preset_manual_exposure_ev 0.0)
+    set(preset_auto_exposure_blend 0.25)
+    set(preset_use_enb_bloom true)
+    set(preset_use_enb_lens false)
+    set(preset_procedural_sky_enabled true)
+    set(preset_sky_replacement_strength 0.62)
+    set(preset_sky_depth_threshold 0.9998)
+    set(preset_sky_depth_feather 0.0002)
+    set(preset_sky_radiance_scale 1.0)
+    set(preset_weather_density 0.25)
+    set(preset_cloud_coverage 0.45)
+    set(preset_cloud_density 0.62)
+    set(preset_fog_density 0.12)
+    set(preset_aurora_activity 0.25)
+    set(preset_aurora_mask 0.80)
+    set(preset_sky_wind_x 0.62)
+    set(preset_sky_wind_y -0.27)
+    set(preset_prepass_enabled true)
+    set(preset_prepass_intensity 0.52)
+    set(preset_prepass_depth_shape 0.50)
+    set(preset_dof_enabled false)
+    set(preset_dof_intensity 0.12)
+    set(preset_dof_focus_shape 0.50)
+    set(preset_bloom_enabled true)
+    set(preset_bloom_intensity 0.20)
+    set(preset_bloom_threshold_shape 1.15)
+    set(preset_adaptation_enabled true)
+    set(preset_adaptation_intensity 0.50)
+    set(preset_adaptation_response_shape 0.50)
+    set(preset_lens_enabled false)
+    set(preset_lens_intensity 0.08)
+    set(preset_lens_aperture_shape 0.45)
+    set(preset_postpass_enabled true)
+    set(preset_postpass_intensity 0.45)
+    set(preset_sun_sprite_enabled true)
+    set(preset_sun_sprite_intensity 0.18)
+    set(preset_sun_sprite_disc_shape 0.50)
+    set(preset_underwater_enabled true)
+    set(preset_underwater_intensity 0.32)
+    set(preset_underwater_density_shape 0.25)
+  elseif(tier EQUAL 2)
+    set(preset_master_enabled true)
+    set(preset_manual_exposure_ev 0.0)
+    set(preset_auto_exposure_blend 0.25)
+    set(preset_use_enb_bloom true)
+    set(preset_use_enb_lens false)
+    set(preset_procedural_sky_enabled true)
+    set(preset_sky_replacement_strength 0.66)
+    set(preset_sky_depth_threshold 0.9998)
+    set(preset_sky_depth_feather 0.0002)
+    set(preset_sky_radiance_scale 1.02)
+    set(preset_weather_density 0.27)
+    set(preset_cloud_coverage 0.48)
+    set(preset_cloud_density 0.64)
+    set(preset_fog_density 0.13)
+    set(preset_aurora_activity 0.32)
+    set(preset_aurora_mask 0.90)
+    set(preset_sky_wind_x 0.62)
+    set(preset_sky_wind_y -0.27)
+    set(preset_prepass_enabled true)
+    set(preset_prepass_intensity 0.58)
+    set(preset_prepass_depth_shape 0.52)
+    set(preset_dof_enabled true)
+    set(preset_dof_intensity 0.18)
+    set(preset_dof_focus_shape 0.52)
+    set(preset_bloom_enabled true)
+    set(preset_bloom_intensity 0.24)
+    set(preset_bloom_threshold_shape 1.12)
+    set(preset_adaptation_enabled true)
+    set(preset_adaptation_intensity 0.55)
+    set(preset_adaptation_response_shape 0.52)
+    set(preset_lens_enabled true)
+    set(preset_lens_intensity 0.10)
+    set(preset_lens_aperture_shape 0.48)
+    set(preset_postpass_enabled true)
+    set(preset_postpass_intensity 0.52)
+    set(preset_sun_sprite_enabled true)
+    set(preset_sun_sprite_intensity 0.24)
+    set(preset_sun_sprite_disc_shape 0.52)
+    set(preset_underwater_enabled true)
+    set(preset_underwater_intensity 0.40)
+    set(preset_underwater_density_shape 0.27)
+  elseif(tier EQUAL 3)
+    set(preset_master_enabled true)
+    set(preset_manual_exposure_ev 0.0)
+    set(preset_auto_exposure_blend 0.25)
+    set(preset_use_enb_bloom true)
+    set(preset_use_enb_lens false)
+    set(preset_procedural_sky_enabled true)
+    set(preset_sky_replacement_strength 0.70)
+    set(preset_sky_depth_threshold 0.9998)
+    set(preset_sky_depth_feather 0.0002)
+    set(preset_sky_radiance_scale 1.05)
+    set(preset_weather_density 0.30)
+    set(preset_cloud_coverage 0.50)
+    set(preset_cloud_density 0.66)
+    set(preset_fog_density 0.14)
+    set(preset_aurora_activity 0.40)
+    set(preset_aurora_mask 0.92)
+    set(preset_sky_wind_x 0.62)
+    set(preset_sky_wind_y -0.27)
+    set(preset_prepass_enabled true)
+    set(preset_prepass_intensity 0.64)
+    set(preset_prepass_depth_shape 0.55)
+    set(preset_dof_enabled true)
+    set(preset_dof_intensity 0.25)
+    set(preset_dof_focus_shape 0.55)
+    set(preset_bloom_enabled true)
+    set(preset_bloom_intensity 0.30)
+    set(preset_bloom_threshold_shape 1.08)
+    set(preset_adaptation_enabled true)
+    set(preset_adaptation_intensity 0.60)
+    set(preset_adaptation_response_shape 0.55)
+    set(preset_lens_enabled true)
+    set(preset_lens_intensity 0.16)
+    set(preset_lens_aperture_shape 0.52)
+    set(preset_postpass_enabled true)
+    set(preset_postpass_intensity 0.58)
+    set(preset_sun_sprite_enabled true)
+    set(preset_sun_sprite_intensity 0.30)
+    set(preset_sun_sprite_disc_shape 0.55)
+    set(preset_underwater_enabled true)
+    set(preset_underwater_intensity 0.46)
+    set(preset_underwater_density_shape 0.30)
+  elseif(tier EQUAL 4)
+    set(preset_master_enabled true)
+    set(preset_manual_exposure_ev 0.0)
+    set(preset_auto_exposure_blend 0.25)
+    set(preset_use_enb_bloom true)
+    set(preset_use_enb_lens true)
+    set(preset_procedural_sky_enabled true)
+    set(preset_sky_replacement_strength 0.76)
+    set(preset_sky_depth_threshold 0.9998)
+    set(preset_sky_depth_feather 0.0002)
+    set(preset_sky_radiance_scale 1.08)
+    set(preset_weather_density 0.32)
+    set(preset_cloud_coverage 0.52)
+    set(preset_cloud_density 0.68)
+    set(preset_fog_density 0.16)
+    set(preset_aurora_activity 0.48)
+    set(preset_aurora_mask 0.95)
+    set(preset_sky_wind_x 0.62)
+    set(preset_sky_wind_y -0.27)
+    set(preset_prepass_enabled true)
+    set(preset_prepass_intensity 0.70)
+    set(preset_prepass_depth_shape 0.58)
+    set(preset_dof_enabled true)
+    set(preset_dof_intensity 0.34)
+    set(preset_dof_focus_shape 0.58)
+    set(preset_bloom_enabled true)
+    set(preset_bloom_intensity 0.36)
+    set(preset_bloom_threshold_shape 1.02)
+    set(preset_adaptation_enabled true)
+    set(preset_adaptation_intensity 0.65)
+    set(preset_adaptation_response_shape 0.58)
+    set(preset_lens_enabled true)
+    set(preset_lens_intensity 0.22)
+    set(preset_lens_aperture_shape 0.55)
+    set(preset_postpass_enabled true)
+    set(preset_postpass_intensity 0.64)
+    set(preset_sun_sprite_enabled true)
+    set(preset_sun_sprite_intensity 0.38)
+    set(preset_sun_sprite_disc_shape 0.58)
+    set(preset_underwater_enabled true)
+    set(preset_underwater_intensity 0.50)
+    set(preset_underwater_density_shape 0.32)
+  else()
+    message(FATAL_ERROR "Unexpected Truth quality tier: ${tier}")
+  endif()
+
+  foreach(preset_variable IN ITEMS
+      preset_master_enabled
+      preset_manual_exposure_ev
+      preset_auto_exposure_blend
+      preset_use_enb_bloom
+      preset_use_enb_lens
+      preset_procedural_sky_enabled
+      preset_sky_replacement_strength
+      preset_sky_depth_threshold
+      preset_sky_depth_feather
+      preset_sky_radiance_scale
+      preset_weather_density
+      preset_cloud_coverage
+      preset_cloud_density
+      preset_fog_density
+      preset_aurora_activity
+      preset_aurora_mask
+      preset_sky_wind_x
+      preset_sky_wind_y
+      preset_prepass_enabled
+      preset_prepass_intensity
+      preset_prepass_depth_shape
+      preset_dof_enabled
+      preset_dof_intensity
+      preset_dof_focus_shape
+      preset_bloom_enabled
+      preset_bloom_intensity
+      preset_bloom_threshold_shape
+      preset_adaptation_enabled
+      preset_adaptation_intensity
+      preset_adaptation_response_shape
+      preset_lens_enabled
+      preset_lens_intensity
+      preset_lens_aperture_shape
+      preset_postpass_enabled
+      preset_postpass_intensity
+      preset_sun_sprite_enabled
+      preset_sun_sprite_intensity
+      preset_sun_sprite_disc_shape
+      preset_underwater_enabled
+      preset_underwater_intensity
+      preset_underwater_density_shape)
+    set(${preset_variable} "${${preset_variable}}" PARENT_SCOPE)
+  endforeach()
+endfunction()
+
+function(write_truth_stage_ini output_dir stage_file host_vignette_strength host_grain_shape)
+  string(TOUPPER "${stage_file}" stage_section)
+  string(CONCAT stage_contents
+    "; Generated Truth ENB stage settings.\n"
+    "[${stage_section}]\n")
+
+  if(stage_file STREQUAL "enbeffectprepass.fx")
+    string(APPEND stage_contents
+      "[Truth 10] Prepass | Enabled=${preset_prepass_enabled}\n"
+      "[Truth 10] Prepass | Intensity=${preset_prepass_intensity}\n"
+      "[Truth 10] Prepass | Depth Shape=${preset_prepass_depth_shape}\n")
+  elseif(stage_file STREQUAL "enbdepthoffield.fx")
+    string(APPEND stage_contents
+      "[Truth 20] Depth of Field | Enabled=${preset_dof_enabled}\n"
+      "[Truth 20] Depth of Field | Intensity=${preset_dof_intensity}\n"
+      "[Truth 20] Depth of Field | Focus Shape=${preset_dof_focus_shape}\n")
+  elseif(stage_file STREQUAL "enbbloom.fx")
+    string(APPEND stage_contents
+      "[Truth 30] Bloom | Enabled=${preset_bloom_enabled}\n"
+      "[Truth 30] Bloom | Intensity=${preset_bloom_intensity}\n"
+      "[Truth 30] Bloom | Threshold Shape=${preset_bloom_threshold_shape}\n")
+  elseif(stage_file STREQUAL "enbadaptation.fx")
+    string(APPEND stage_contents
+      "[Truth 40] Adaptation | Enabled=${preset_adaptation_enabled}\n"
+      "[Truth 40] Adaptation | Intensity=${preset_adaptation_intensity}\n"
+      "[Truth 40] Adaptation | Response Shape=${preset_adaptation_response_shape}\n")
+  elseif(stage_file STREQUAL "enblens.fx")
+    string(APPEND stage_contents
+      "[Truth 50] Lens | Enabled=${preset_lens_enabled}\n"
+      "[Truth 50] Lens | Intensity=${preset_lens_intensity}\n"
+      "[Truth 50] Lens | Aperture Shape=${preset_lens_aperture_shape}\n")
+  elseif(stage_file STREQUAL "enbeffect.fx")
+    string(APPEND stage_contents
+      "[Truth 00] Master | Enabled=${preset_master_enabled}\n"
+      "[Truth 02] Optical | ENB Bloom=${preset_use_enb_bloom}\n"
+      "[Truth 02] Optical | ENB Lens=${preset_use_enb_lens}\n"
+      "[Truth 10] Sky | Procedural Replacement=${preset_procedural_sky_enabled}\n"
+      "[Truth 10] Sky | Replacement Strength=${preset_sky_replacement_strength}\n"
+      "[Truth 10] Sky | Depth Threshold=${preset_sky_depth_threshold}\n"
+      "[Truth 10] Sky | Depth Feather=${preset_sky_depth_feather}\n"
+      "[Truth 10] Sky | Radiance Scale=${preset_sky_radiance_scale}\n"
+      "[Truth 11] Weather | Density=${preset_weather_density}\n"
+      "[Truth 12] Clouds | Coverage=${preset_cloud_coverage}\n"
+      "[Truth 12] Clouds | Density=${preset_cloud_density}\n"
+      "[Truth 13] Atmosphere | Fog Density=${preset_fog_density}\n"
+      "[Truth 14] Aurora | Activity=${preset_aurora_activity}\n"
+      "[Truth 14] Aurora | Weather Mask=${preset_aurora_mask}\n"
+      "[Truth 15] Motion | Wind X=${preset_sky_wind_x}\n"
+      "[Truth 15] Motion | Wind Y=${preset_sky_wind_y}\n"
+      "[Truth 60] Main Effect | Manual EV=${preset_manual_exposure_ev}\n"
+      "[Truth 60] Main Effect | Auto Blend=${preset_auto_exposure_blend}\n")
+  elseif(stage_file STREQUAL "enbeffectpostpass.fx")
+    string(APPEND stage_contents
+      "[Truth 70] Postpass | Enabled=${preset_postpass_enabled}\n"
+      "[Truth 70] Postpass | Intensity=${preset_postpass_intensity}\n"
+      "[Truth 70] Postpass | Grain Shape=${host_grain_shape}\n"
+      "[Truth 70] Postpass | Vignette Strength=${host_vignette_strength}\n")
+  elseif(stage_file STREQUAL "enbsunsprite.fx")
+    string(APPEND stage_contents
+      "[Truth 80] Sun Sprite | Enabled=${preset_sun_sprite_enabled}\n"
+      "[Truth 80] Sun Sprite | Intensity=${preset_sun_sprite_intensity}\n"
+      "[Truth 80] Sun Sprite | Disc Shape=${preset_sun_sprite_disc_shape}\n")
+  elseif(stage_file STREQUAL "enbunderwater.fx")
+    string(APPEND stage_contents
+      "[Truth 90] Underwater | Enabled=${preset_underwater_enabled}\n"
+      "[Truth 90] Underwater | Intensity=${preset_underwater_intensity}\n"
+      "[Truth 90] Underwater | Density Shape=${preset_underwater_density_shape}\n")
+  else()
+    message(FATAL_ERROR "Unexpected Truth stage file: ${stage_file}")
+  endif()
+
+  file(WRITE "${output_dir}/${stage_file}.ini" "${stage_contents}")
+endfunction()
+
 foreach(host_index RANGE 0 1)
   set(host_fields "${truth_host_row_${host_index}}")
   list(GET host_fields 1 host_id)
@@ -207,14 +542,6 @@ foreach(host_index RANGE 0 1)
   list(GET host_fields 3 host_postpass_intensity)
   list(GET host_fields 4 host_vignette_strength)
   list(GET host_fields 5 host_grain_shape)
-
-  string(CONCAT host_values
-    "[TRUTH HOST]\n"
-    "Host=${host_id}\n"
-    "HostLabel=${host_label}\n"
-    "TruthPostpassIntensity=${host_postpass_intensity}\n"
-    "TruthPostpassVignetteStrength=${host_vignette_strength}\n"
-    "TruthPostpassGrainShape=${host_grain_shape}\n")
 
 foreach(tier RANGE 0 4)
   set(quality_fields "${truth_quality_row_${tier}}")
@@ -229,15 +556,20 @@ foreach(tier RANGE 0 4)
   list(GET quality_fields 9 dof_rings)
   list(GET quality_fields 10 bloom_radius)
   list(GET quality_fields 11 ssr_steps)
+  set_truth_preset_values(${tier})
 
   set(tier_enbseries_dir "${truth_output_dir}/${host_id}/${tier_id}/ROOT/enbseries")
-  file(MAKE_DIRECTORY "${tier_enbseries_dir}")
-  set(tier_header
-    "; Generated from config/quality-tiers.csv and config/hosts.csv\n; Product=Truth ENB\n; Host=${host_id}\n; Tier=${tier_id}\n")
+  file(MAKE_DIRECTORY "${tier_enbseries_dir}/truth")
   string(CONCAT tier_quality_values
-    "[TRUTH QUALITY]\n"
-    "TRUTH_QUALITY_TIER=${tier}\n"
-    "Label=${tier_label}\n"
+    "; Generated from config/quality-tiers.csv and config/hosts.csv\n"
+    "; Human-readable metadata only; shader tier selection is in truth/TruthQualityPresetOverride.fxh.\n"
+    "[Truth Quality]\n"
+    "Product=Truth ENB\n"
+    "Host=${host_id}\n"
+    "HostLabel=${host_label}\n"
+    "Tier=${tier}\n"
+    "TierId=${tier_id}\n"
+    "TierLabel=${tier_label}\n"
     "CloudMode=${cloud_mode}\n"
     "CloudPrimarySteps=${cloud_primary_steps}\n"
     "CloudLightSteps=${cloud_light_steps}\n"
@@ -247,12 +579,31 @@ foreach(tier RANGE 0 4)
     "DOFRings=${dof_rings}\n"
     "BloomRadius=${bloom_radius}\n"
     "SSRSteps=${ssr_steps}\n")
+  string(CONCAT tier_override_contents
+    "#ifndef TRUTH_QUALITY_PRESET_OVERRIDE_FXH\n"
+    "#define TRUTH_QUALITY_PRESET_OVERRIDE_FXH\n"
+    "\n"
+    "// Generated Truth ENB quality preset override.\n"
+    "// Host: ${host_id}\n"
+    "// Tier: ${tier_id} (${tier})\n"
+    "// Command-line /DTRUTH_QUALITY_TIER=N remains authoritative.\n"
+    "\n"
+    "#ifndef TRUTH_QUALITY_TIER\n"
+    "#define TRUTH_QUALITY_TIER ${tier}\n"
+    "#endif\n"
+    "\n"
+    "#endif  // TRUTH_QUALITY_PRESET_OVERRIDE_FXH\n")
 
   file(WRITE "${tier_enbseries_dir}/truth-quality.ini"
-    "${tier_header}\n${tier_quality_values}\n${host_values}")
+    "${tier_quality_values}")
+  file(WRITE "${tier_enbseries_dir}/truth/TruthQualityPresetOverride.fxh"
+    "${tier_override_contents}")
   foreach(stage_file IN LISTS truth_stage_files)
-    file(WRITE "${tier_enbseries_dir}/${stage_file}.ini"
-      "${tier_header}\n${tier_quality_values}\n${host_values}\n[TRUTH STAGE]\nName=${stage_file}\n")
+    write_truth_stage_ini(
+      "${tier_enbseries_dir}"
+      "${stage_file}"
+      "${host_vignette_strength}"
+      "${host_grain_shape}")
   endforeach()
 endforeach()
 endforeach()

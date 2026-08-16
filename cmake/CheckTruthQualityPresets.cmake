@@ -17,15 +17,33 @@ file(REAL_PATH "${TRUTH_SOURCE_DIR}" truth_source_dir)
 file(REAL_PATH "${TRUTH_BINARY_DIR}" truth_binary_dir)
 set(truth_generator "${truth_source_dir}/cmake/GenerateTruthQualityPresets.cmake")
 set(truth_quality_include "${truth_source_dir}/shaders/truth/TruthQuality.fxh")
+set(truth_stage_parameters "${truth_source_dir}/shaders/truth/TruthStageParameters.fxh")
+set(truth_effect_parameters "${truth_source_dir}/shaders/truth/TruthEffectParameters.fxh")
 if(NOT EXISTS "${truth_generator}")
   message(FATAL_ERROR "Truth quality generator is absent: ${truth_generator}")
 endif()
 if(NOT EXISTS "${truth_quality_include}")
   message(FATAL_ERROR "Truth quality include is absent: ${truth_quality_include}")
 endif()
+foreach(required_parameter_file IN ITEMS
+    "${truth_stage_parameters}"
+    "${truth_effect_parameters}")
+  if(NOT EXISTS "${required_parameter_file}")
+    message(FATAL_ERROR
+      "Truth quality preset check requires parameter source: ${required_parameter_file}")
+  endif()
+endforeach()
+
+function(require_truth_source_contains source_contents required_text context)
+  string(FIND "${source_contents}" "${required_text}" required_position)
+  if(required_position EQUAL -1)
+    message(FATAL_ERROR "${context} is missing required text: ${required_text}")
+  endif()
+endfunction()
 
 file(READ "${truth_quality_include}" quality_include_source)
 foreach(required_token IN ITEMS
+    "#include \"truth/TruthQualityPresetOverride.fxh\""
     "#define TRUTH_QUALITY_TIER 1"
     "#error TRUTH_QUALITY_TIER must be in [0,4]"
     "static const uint TruthQualityTier = TRUTH_QUALITY_TIER;"
@@ -37,6 +55,138 @@ foreach(required_token IN ITEMS
     message(FATAL_ERROR "Truth quality include is missing required contract token: ${required_token}")
   endif()
 endforeach()
+
+file(READ "${truth_stage_parameters}" stage_parameter_source)
+require_truth_source_contains("${stage_parameter_source}"
+  [=[TruthPrepassIntensity <string UIName = "[Truth 10] Prepass | Intensity"; string UIWidget = "Spinner"; float UIMin = 0.0; float UIMax = 1.0; float UIStep = 0.01;> = 0.52;]=]
+  "Truth stage parameter defaults must match the Balanced preset")
+require_truth_source_contains("${stage_parameter_source}"
+  [=[bool TruthDepthOfFieldEnabled <string UIName = "[Truth 20] Depth of Field | Enabled";> = false;]=]
+  "Truth stage parameter defaults must match the Balanced preset")
+require_truth_source_contains("${stage_parameter_source}"
+  [=[TruthDepthOfFieldIntensity <string UIName = "[Truth 20] Depth of Field | Intensity"; string UIWidget = "Spinner"; float UIMin = 0.0; float UIMax = 1.0; float UIStep = 0.01;> = 0.12;]=]
+  "Truth stage parameter defaults must match the Balanced preset")
+require_truth_source_contains("${stage_parameter_source}"
+  [=[TruthBloomIntensity <string UIName = "[Truth 30] Bloom | Intensity"; string UIWidget = "Spinner"; float UIMin = 0.0; float UIMax = 1.0; float UIStep = 0.01;> = 0.20;]=]
+  "Truth stage parameter defaults must match the Balanced preset")
+require_truth_source_contains("${stage_parameter_source}"
+  [=[TruthBloomThresholdShape <string UIName = "[Truth 30] Bloom | Threshold Shape"; string UIWidget = "Spinner"; float UIMin = 0.0; float UIMax = 4.0; float UIStep = 0.01;> = 1.15;]=]
+  "Truth stage parameter defaults must match the Balanced preset")
+require_truth_source_contains("${stage_parameter_source}"
+  [=[TruthAdaptationIntensity <string UIName = "[Truth 40] Adaptation | Intensity"; string UIWidget = "Spinner"; float UIMin = 0.0; float UIMax = 1.0; float UIStep = 0.01;> = 0.50;]=]
+  "Truth stage parameter defaults must match the Balanced preset")
+require_truth_source_contains("${stage_parameter_source}"
+  [=[bool TruthLensEnabled <string UIName = "[Truth 50] Lens | Enabled";> = false;]=]
+  "Truth stage parameter defaults must match the Balanced preset")
+require_truth_source_contains("${stage_parameter_source}"
+  [=[TruthLensIntensity <string UIName = "[Truth 50] Lens | Intensity"; string UIWidget = "Spinner"; float UIMin = 0.0; float UIMax = 1.0; float UIStep = 0.01;> = 0.08;]=]
+  "Truth stage parameter defaults must match the Balanced preset")
+require_truth_source_contains("${stage_parameter_source}"
+  [=[TruthPostpassIntensity <string UIName = "[Truth 70] Postpass | Intensity"; string UIWidget = "Spinner"; float UIMin = 0.0; float UIMax = 1.0; float UIStep = 0.01;> = 0.45;]=]
+  "Truth stage parameter defaults must match the Balanced preset")
+require_truth_source_contains("${stage_parameter_source}"
+  [=[TruthSunSpriteIntensity <string UIName = "[Truth 80] Sun Sprite | Intensity"; string UIWidget = "Spinner"; float UIMin = 0.0; float UIMax = 1.0; float UIStep = 0.01;> = 0.18;]=]
+  "Truth stage parameter defaults must match the Balanced preset")
+require_truth_source_contains("${stage_parameter_source}"
+  [=[TruthUnderwaterIntensity <string UIName = "[Truth 90] Underwater | Intensity"; string UIWidget = "Spinner"; float UIMin = 0.0; float UIMax = 1.0; float UIStep = 0.01;> = 0.32;]=]
+  "Truth stage parameter defaults must match the Balanced preset")
+
+file(READ "${truth_effect_parameters}" effect_parameter_source)
+require_truth_source_contains("${effect_parameter_source}" [=[
+float TruthAutoExposureBlend
+<
+    string UIName = "[Truth 60] Main Effect | Auto Blend";
+    string UIWidget = "Spinner";
+    float UIMin = 0.0;
+    float UIMax = 1.0;
+    float UIStep = 0.01;
+> = 0.25;
+]=]
+  "Truth effect parameter defaults must match the Balanced preset")
+require_truth_source_contains("${effect_parameter_source}" [=[
+bool TruthUseEnbLens
+<
+    string UIName = "[Truth 02] Optical | ENB Lens";
+> = false;
+]=]
+  "Truth effect parameter defaults must match the Balanced preset")
+require_truth_source_contains("${effect_parameter_source}" [=[
+float TruthSkyReplacementStrength
+<
+    string UIName = "[Truth 10] Sky | Replacement Strength";
+    string UIWidget = "Spinner";
+    float UIMin = 0.0;
+    float UIMax = 1.0;
+    float UIStep = 0.01;
+> = 0.62;
+]=]
+  "Truth effect parameter defaults must match the Balanced preset")
+require_truth_source_contains("${effect_parameter_source}" [=[
+float TruthWeatherDensity
+<
+    string UIName = "[Truth 11] Weather | Density";
+    string UIWidget = "Spinner";
+    float UIMin = 0.0;
+    float UIMax = 1.0;
+    float UIStep = 0.01;
+> = 0.25;
+]=]
+  "Truth effect parameter defaults must match the Balanced preset")
+require_truth_source_contains("${effect_parameter_source}" [=[
+float TruthCloudCoverage
+<
+    string UIName = "[Truth 12] Clouds | Coverage";
+    string UIWidget = "Spinner";
+    float UIMin = 0.0;
+    float UIMax = 1.0;
+    float UIStep = 0.01;
+> = 0.45;
+]=]
+  "Truth effect parameter defaults must match the Balanced preset")
+require_truth_source_contains("${effect_parameter_source}" [=[
+float TruthCloudDensity
+<
+    string UIName = "[Truth 12] Clouds | Density";
+    string UIWidget = "Spinner";
+    float UIMin = 0.0;
+    float UIMax = 1.0;
+    float UIStep = 0.01;
+> = 0.62;
+]=]
+  "Truth effect parameter defaults must match the Balanced preset")
+require_truth_source_contains("${effect_parameter_source}" [=[
+float TruthFogDensity
+<
+    string UIName = "[Truth 13] Atmosphere | Fog Density";
+    string UIWidget = "Spinner";
+    float UIMin = 0.0;
+    float UIMax = 1.0;
+    float UIStep = 0.01;
+> = 0.12;
+]=]
+  "Truth effect parameter defaults must match the Balanced preset")
+require_truth_source_contains("${effect_parameter_source}" [=[
+float TruthAuroraActivity
+<
+    string UIName = "[Truth 14] Aurora | Activity";
+    string UIWidget = "Spinner";
+    float UIMin = 0.0;
+    float UIMax = 1.0;
+    float UIStep = 0.01;
+> = 0.25;
+]=]
+  "Truth effect parameter defaults must match the Balanced preset")
+require_truth_source_contains("${effect_parameter_source}" [=[
+float TruthAuroraMask
+<
+    string UIName = "[Truth 14] Aurora | Weather Mask";
+    string UIWidget = "Spinner";
+    float UIMin = 0.0;
+    float UIMax = 1.0;
+    float UIStep = 0.01;
+> = 0.80;
+]=]
+  "Truth effect parameter defaults must match the Balanced preset")
 
 set(canonical_quality_rows
   "0,performance,Performance,analytic,0,0,1,4,2,0,2,0"
@@ -211,6 +361,122 @@ if(NOT first_ini_count EQUAL 100)
   message(FATAL_ERROR "Truth quality presets must contain exactly 100 INI files; found ${first_ini_count}")
 endif()
 
+file(GLOB_RECURSE first_override_files
+  LIST_DIRECTORIES false
+  RELATIVE "${first_output}"
+  "${first_output}/*/*/ROOT/enbseries/truth/TruthQualityPresetOverride.fxh")
+list(LENGTH first_override_files first_override_count)
+if(NOT first_override_count EQUAL 10)
+  message(FATAL_ERROR
+    "Truth quality presets must contain exactly 10 tier override includes; found ${first_override_count}")
+endif()
+
+function(require_truth_ini_contains contents required_text context)
+  string(FIND "${contents}" "${required_text}" required_position)
+  if(required_position EQUAL -1)
+    message(FATAL_ERROR "${context} is missing required text: ${required_text}")
+  endif()
+endfunction()
+
+function(reject_truth_ini_contains contents rejected_text context)
+  string(FIND "${contents}" "${rejected_text}" rejected_position)
+  if(NOT rejected_position EQUAL -1)
+    message(FATAL_ERROR "${context} contains forbidden text: ${rejected_text}")
+  endif()
+endfunction()
+
+function(require_truth_stage_ini_contract stage_file contents context)
+  string(TOUPPER "${stage_file}" stage_section)
+  require_truth_ini_contains("${contents}" "[${stage_section}]" "${context}")
+  foreach(forbidden_text IN ITEMS
+      "[TRUTH QUALITY]"
+      "[TRUTH HOST]"
+      "[TRUTH STAGE]"
+      "TRUTH_QUALITY_TIER="
+      "TruthPostpassIntensity="
+      "TruthPostpassVignetteStrength="
+      "TruthPostpassGrainShape="
+      "TruthBloomIntensity="
+      "TruthCloudDensity=")
+    reject_truth_ini_contains("${contents}" "${forbidden_text}" "${context}")
+  endforeach()
+  if("${contents}" MATCHES "(^|\n)Truth[A-Za-z0-9_]+=")
+    message(FATAL_ERROR
+      "${context} contains an HLSL identifier key instead of an ENB UIName key")
+  endif()
+  if(NOT stage_file STREQUAL "enbeffectpostpass.fx")
+    reject_truth_ini_contains("${contents}" "[Truth 70] Postpass |" "${context}")
+  endif()
+
+  if(stage_file STREQUAL "enbeffectprepass.fx")
+    set(required_keys
+      "[Truth 10] Prepass | Enabled="
+      "[Truth 10] Prepass | Intensity="
+      "[Truth 10] Prepass | Depth Shape=")
+  elseif(stage_file STREQUAL "enbdepthoffield.fx")
+    set(required_keys
+      "[Truth 20] Depth of Field | Enabled="
+      "[Truth 20] Depth of Field | Intensity="
+      "[Truth 20] Depth of Field | Focus Shape=")
+  elseif(stage_file STREQUAL "enbbloom.fx")
+    set(required_keys
+      "[Truth 30] Bloom | Enabled="
+      "[Truth 30] Bloom | Intensity="
+      "[Truth 30] Bloom | Threshold Shape=")
+  elseif(stage_file STREQUAL "enbadaptation.fx")
+    set(required_keys
+      "[Truth 40] Adaptation | Enabled="
+      "[Truth 40] Adaptation | Intensity="
+      "[Truth 40] Adaptation | Response Shape=")
+  elseif(stage_file STREQUAL "enblens.fx")
+    set(required_keys
+      "[Truth 50] Lens | Enabled="
+      "[Truth 50] Lens | Intensity="
+      "[Truth 50] Lens | Aperture Shape=")
+  elseif(stage_file STREQUAL "enbeffect.fx")
+    set(required_keys
+      "[Truth 00] Master | Enabled="
+      "[Truth 02] Optical | ENB Bloom="
+      "[Truth 02] Optical | ENB Lens="
+      "[Truth 10] Sky | Procedural Replacement="
+      "[Truth 10] Sky | Replacement Strength="
+      "[Truth 10] Sky | Depth Threshold="
+      "[Truth 10] Sky | Depth Feather="
+      "[Truth 10] Sky | Radiance Scale="
+      "[Truth 11] Weather | Density="
+      "[Truth 12] Clouds | Coverage="
+      "[Truth 12] Clouds | Density="
+      "[Truth 13] Atmosphere | Fog Density="
+      "[Truth 14] Aurora | Activity="
+      "[Truth 14] Aurora | Weather Mask="
+      "[Truth 15] Motion | Wind X="
+      "[Truth 15] Motion | Wind Y="
+      "[Truth 60] Main Effect | Manual EV="
+      "[Truth 60] Main Effect | Auto Blend=")
+  elseif(stage_file STREQUAL "enbeffectpostpass.fx")
+    set(required_keys
+      "[Truth 70] Postpass | Enabled="
+      "[Truth 70] Postpass | Intensity="
+      "[Truth 70] Postpass | Grain Shape="
+      "[Truth 70] Postpass | Vignette Strength=")
+  elseif(stage_file STREQUAL "enbsunsprite.fx")
+    set(required_keys
+      "[Truth 80] Sun Sprite | Enabled="
+      "[Truth 80] Sun Sprite | Intensity="
+      "[Truth 80] Sun Sprite | Disc Shape=")
+  elseif(stage_file STREQUAL "enbunderwater.fx")
+    set(required_keys
+      "[Truth 90] Underwater | Enabled="
+      "[Truth 90] Underwater | Intensity="
+      "[Truth 90] Underwater | Density Shape=")
+  else()
+    message(FATAL_ERROR "Unexpected Truth stage file in preset contract: ${stage_file}")
+  endif()
+  foreach(required_key IN LISTS required_keys)
+    require_truth_ini_contains("${contents}" "${required_key}" "${context}")
+  endforeach()
+endfunction()
+
 # Effects 11 injects no preprocessor defines into preset shaders, so a preset
 # cannot detect its host at compile time. Host selection travels through these
 # generated INIs instead, which is why the tier axis gained a host axis rather
@@ -228,25 +494,154 @@ foreach(host_name IN LISTS expected_hosts)
       message(FATAL_ERROR
         "Truth quality host ${host_name} tier ${tier_name} must contain nine stage INIs and truth-quality.ini")
     endif()
-    foreach(tier_ini_file IN LISTS tier_ini_files)
-      file(READ "${tier_ini_file}" tier_ini_contents)
-      set(expected_header
-        "; Generated from config/quality-tiers.csv and config/hosts.csv\n; Product=Truth ENB\n; Host=${host_name}\n; Tier=${tier_name}\n")
-      string(LENGTH "${expected_header}" expected_header_length)
-      string(SUBSTRING "${tier_ini_contents}" 0 ${expected_header_length} actual_header)
-      if(NOT actual_header STREQUAL expected_header)
-        message(FATAL_ERROR "Truth quality preset has an invalid header: ${tier_ini_file}")
-      endif()
-    endforeach()
     file(READ "${first_output}/${host_name}/${tier_name}/ROOT/enbseries/truth-quality.ini"
       truth_quality_contents)
-    set(expected_quality_values
-      "[TRUTH QUALITY]\nTRUTH_QUALITY_TIER=${tier_index}\n")
-    string(FIND "${truth_quality_contents}" "${expected_quality_values}"
-      quality_values_position)
-    if(quality_values_position EQUAL -1)
+    require_truth_ini_contains("${truth_quality_contents}" "[Truth Quality]\n"
+      "Truth quality metadata for host ${host_name} tier ${tier_name}")
+    require_truth_ini_contains("${truth_quality_contents}" "Tier=${tier_index}\n"
+      "Truth quality metadata for host ${host_name} tier ${tier_name}")
+    require_truth_ini_contains("${truth_quality_contents}" "TierId=${tier_name}\n"
+      "Truth quality metadata for host ${host_name} tier ${tier_name}")
+    reject_truth_ini_contains("${truth_quality_contents}" "TRUTH_QUALITY_TIER="
+      "Truth quality metadata for host ${host_name} tier ${tier_name}")
+    reject_truth_ini_contains("${truth_quality_contents}" "Postpass"
+      "Truth quality metadata for host ${host_name} tier ${tier_name}")
+    require_truth_ini_contains("${truth_quality_contents}" "Host=${host_name}\n"
+      "Truth quality metadata for host ${host_name} tier ${tier_name}")
+
+    set(tier_override
+      "${first_output}/${host_name}/${tier_name}/ROOT/enbseries/truth/TruthQualityPresetOverride.fxh")
+    if(NOT EXISTS "${tier_override}")
       message(FATAL_ERROR
-        "Truth quality metadata is not written as active INI values for host ${host_name} tier ${tier_name}")
+        "Truth quality preset override is absent for host ${host_name} tier ${tier_name}: ${tier_override}")
+    endif()
+    file(READ "${tier_override}" tier_override_contents)
+    require_truth_ini_contains("${tier_override_contents}"
+      "// Generated Truth ENB quality preset override."
+      "Truth quality preset override for host ${host_name} tier ${tier_name}")
+    require_truth_ini_contains("${tier_override_contents}"
+      "#ifndef TRUTH_QUALITY_TIER\n#define TRUTH_QUALITY_TIER ${tier_index}\n#endif"
+      "Truth quality preset override for host ${host_name} tier ${tier_name}")
+    reject_truth_ini_contains("${tier_override_contents}" "; Generated"
+      "Truth quality preset override for host ${host_name} tier ${tier_name}")
+
+    foreach(stage_file IN LISTS truth_stage_files)
+      file(READ
+        "${first_output}/${host_name}/${tier_name}/ROOT/enbseries/${stage_file}.ini"
+        stage_ini_contents)
+      require_truth_stage_ini_contract("${stage_file}" "${stage_ini_contents}"
+        "Truth quality stage INI for host ${host_name} tier ${tier_name} stage ${stage_file}")
+    endforeach()
+
+    set(tier_stage_root
+      "${first_output}/${host_name}/${tier_name}/ROOT/enbseries")
+    if(tier_name STREQUAL "performance")
+      file(READ "${tier_stage_root}/enbdepthoffield.fx.ini" performance_dof)
+      file(READ "${tier_stage_root}/enbbloom.fx.ini" performance_bloom)
+      file(READ "${tier_stage_root}/enblens.fx.ini" performance_lens)
+      file(READ "${tier_stage_root}/enbeffect.fx.ini" performance_main)
+      require_truth_ini_contains("${performance_dof}"
+        "[Truth 20] Depth of Field | Enabled=false\n"
+        "Performance depth-of-field preset")
+      require_truth_ini_contains("${performance_bloom}"
+        "[Truth 30] Bloom | Enabled=false\n"
+        "Performance bloom preset")
+      require_truth_ini_contains("${performance_lens}"
+        "[Truth 50] Lens | Enabled=false\n"
+        "Performance lens preset")
+      require_truth_ini_contains("${performance_main}"
+        "[Truth 02] Optical | ENB Bloom=false\n"
+        "Performance main-effect preset")
+      require_truth_ini_contains("${performance_main}"
+        "[Truth 02] Optical | ENB Lens=false\n"
+        "Performance main-effect preset")
+      require_truth_ini_contains("${performance_main}"
+        "[Truth 10] Sky | Replacement Strength=0.50\n"
+        "Performance main-effect preset")
+      require_truth_ini_contains("${performance_main}"
+        "[Truth 14] Aurora | Activity=0.12\n"
+        "Performance main-effect preset")
+    elseif(tier_name STREQUAL "balanced")
+      file(READ "${tier_stage_root}/enbeffectprepass.fx.ini" balanced_prepass)
+      file(READ "${tier_stage_root}/enbdepthoffield.fx.ini" balanced_dof)
+      file(READ "${tier_stage_root}/enbbloom.fx.ini" balanced_bloom)
+      file(READ "${tier_stage_root}/enblens.fx.ini" balanced_lens)
+      file(READ "${tier_stage_root}/enbeffectpostpass.fx.ini" balanced_postpass)
+      file(READ "${tier_stage_root}/enbsunsprite.fx.ini" balanced_sun)
+      file(READ "${tier_stage_root}/enbunderwater.fx.ini" balanced_underwater)
+      file(READ "${tier_stage_root}/enbeffect.fx.ini" balanced_main)
+      require_truth_ini_contains("${balanced_prepass}"
+        "[Truth 10] Prepass | Intensity=0.52\n"
+        "Balanced prepass preset")
+      require_truth_ini_contains("${balanced_dof}"
+        "[Truth 20] Depth of Field | Enabled=false\n"
+        "Balanced depth-of-field preset")
+      require_truth_ini_contains("${balanced_dof}"
+        "[Truth 20] Depth of Field | Intensity=0.12\n"
+        "Balanced depth-of-field preset")
+      require_truth_ini_contains("${balanced_bloom}"
+        "[Truth 30] Bloom | Intensity=0.20\n"
+        "Balanced bloom preset")
+      require_truth_ini_contains("${balanced_lens}"
+        "[Truth 50] Lens | Enabled=false\n"
+        "Balanced lens preset")
+      require_truth_ini_contains("${balanced_lens}"
+        "[Truth 50] Lens | Intensity=0.08\n"
+        "Balanced lens preset")
+      require_truth_ini_contains("${balanced_postpass}"
+        "[Truth 70] Postpass | Intensity=0.45\n"
+        "Balanced postpass preset")
+      require_truth_ini_contains("${balanced_sun}"
+        "[Truth 80] Sun Sprite | Intensity=0.18\n"
+        "Balanced sun-sprite preset")
+      require_truth_ini_contains("${balanced_underwater}"
+        "[Truth 90] Underwater | Intensity=0.32\n"
+        "Balanced underwater preset")
+      require_truth_ini_contains("${balanced_main}"
+        "[Truth 02] Optical | ENB Lens=false\n"
+        "Balanced main-effect preset")
+      require_truth_ini_contains("${balanced_main}"
+        "[Truth 10] Sky | Replacement Strength=0.62\n"
+        "Balanced main-effect preset")
+      require_truth_ini_contains("${balanced_main}"
+        "[Truth 14] Aurora | Activity=0.25\n"
+        "Balanced main-effect preset")
+      require_truth_ini_contains("${balanced_main}"
+        "[Truth 60] Main Effect | Auto Blend=0.25\n"
+        "Balanced main-effect preset")
+    elseif(tier_name STREQUAL "cinematic")
+      file(READ "${tier_stage_root}/enbeffectprepass.fx.ini" cinematic_prepass)
+      file(READ "${tier_stage_root}/enbbloom.fx.ini" cinematic_bloom)
+      file(READ "${tier_stage_root}/enblens.fx.ini" cinematic_lens)
+      file(READ "${tier_stage_root}/enbsunsprite.fx.ini" cinematic_sun)
+      file(READ "${tier_stage_root}/enbunderwater.fx.ini" cinematic_underwater)
+      file(READ "${tier_stage_root}/enbeffect.fx.ini" cinematic_main)
+      require_truth_ini_contains("${cinematic_prepass}"
+        "[Truth 10] Prepass | Intensity=0.70\n"
+        "Cinematic prepass preset")
+      require_truth_ini_contains("${cinematic_bloom}"
+        "[Truth 30] Bloom | Intensity=0.36\n"
+        "Cinematic bloom preset")
+      require_truth_ini_contains("${cinematic_lens}"
+        "[Truth 50] Lens | Intensity=0.22\n"
+        "Cinematic lens preset")
+      require_truth_ini_contains("${cinematic_sun}"
+        "[Truth 80] Sun Sprite | Intensity=0.38\n"
+        "Cinematic sun-sprite preset")
+      require_truth_ini_contains("${cinematic_underwater}"
+        "[Truth 90] Underwater | Intensity=0.50\n"
+        "Cinematic underwater preset")
+      require_truth_ini_contains("${cinematic_main}"
+        "[Truth 10] Sky | Replacement Strength=0.76\n"
+        "Cinematic main-effect preset")
+      reject_truth_ini_contains("${cinematic_prepass}" "Intensity=1.0\n"
+        "Cinematic preset boundedness")
+      reject_truth_ini_contains("${cinematic_bloom}" "Intensity=1.0\n"
+        "Cinematic preset boundedness")
+      reject_truth_ini_contains("${cinematic_lens}" "Intensity=1.0\n"
+        "Cinematic preset boundedness")
+      reject_truth_ini_contains("${cinematic_main}" "Intensity=1.0\n"
+        "Cinematic preset boundedness")
     endif()
   endforeach()
 endforeach()
@@ -259,13 +654,13 @@ foreach(tier_name IN LISTS expected_tiers)
     enbseries_postpass_contents)
   file(READ "${first_output}/effects11/${tier_name}/ROOT/enbseries/enbeffectpostpass.fx.ini"
     effects11_postpass_contents)
-  string(FIND "${enbseries_postpass_contents}" "TruthPostpassVignetteStrength=0.18"
+  string(FIND "${enbseries_postpass_contents}" "[Truth 70] Postpass | Vignette Strength=0.18"
     enbseries_vignette_position)
   if(enbseries_vignette_position EQUAL -1)
     message(FATAL_ERROR
       "The ENBSeries variant must keep its vignette at 0.18 for tier ${tier_name}")
   endif()
-  string(FIND "${effects11_postpass_contents}" "TruthPostpassVignetteStrength=0.0"
+  string(FIND "${effects11_postpass_contents}" "[Truth 70] Postpass | Vignette Strength=0.0"
     effects11_vignette_position)
   if(effects11_vignette_position EQUAL -1)
     message(FATAL_ERROR

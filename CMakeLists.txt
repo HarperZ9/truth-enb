@@ -165,6 +165,7 @@ if(WIN32 AND TRUTH_BUILD_RUNTIME)
     shaders/truth/TruthPostFinish.fxh
     shaders/truth/TruthPrepassCore.fxh
     shaders/truth/TruthQuality.fxh
+    shaders/truth/TruthQualityPresetOverride.fxh
     shaders/truth/TruthRuntimeParameters.fxh
     shaders/truth/TruthScreenSpace.fxh
     shaders/truth/TruthSkyFields.fxh
@@ -272,6 +273,10 @@ if(WIN32 AND TRUTH_BUILD_RUNTIME)
 endif()
 
 if(BUILD_TESTING)
+  set(TRUTH_FXC_EXECUTABLE
+    "C:/Program Files (x86)/Windows Kits/10/bin/10.0.26100.0/x64/fxc.exe"
+  )
+
   add_test(
     NAME truth_quality_presets
     COMMAND "${CMAKE_COMMAND}"
@@ -281,6 +286,18 @@ if(BUILD_TESTING)
   )
   set_tests_properties(truth_quality_presets PROPERTIES
     LABELS "shader;quality;presets;determinism"
+  )
+
+  add_test(
+    NAME truth_quality_preset_semantics
+    COMMAND "${CMAKE_COMMAND}"
+      "-DTRUTH_FXC=${TRUTH_FXC_EXECUTABLE}"
+      "-DTRUTH_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}"
+      "-DTRUTH_BINARY_DIR=${CMAKE_CURRENT_BINARY_DIR}"
+      -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/CheckTruthQualityPresetSemantics.cmake"
+  )
+  set_tests_properties(truth_quality_preset_semantics PROPERTIES
+    LABELS "shader;quality;presets;semantics;fxc"
   )
 
   add_executable(truth_master_look_tests
@@ -628,9 +645,6 @@ if(BUILD_TESTING)
     )
   endif()
 
-  set(TRUTH_FXC_EXECUTABLE
-    "C:/Program Files (x86)/Windows Kits/10/bin/10.0.26100.0/x64/fxc.exe"
-  )
   add_test(
     NAME truth_stage_compile_matrix
     COMMAND "${CMAKE_COMMAND}"
@@ -649,7 +663,7 @@ if(BUILD_TESTING)
       "-DTRUTH_FXC=${TRUTH_FXC_EXECUTABLE}"
       "-DTRUTH_SHADER=${CMAKE_CURRENT_SOURCE_DIR}/shaders/truth/TruthInteriorLightProbe.fx"
       "-DTRUTH_REQUIRED_SOURCE=${CMAKE_CURRENT_SOURCE_DIR}/shaders/truth/TruthInteriorLight.fxh"
-      "-DTRUTH_INCLUDE=${CMAKE_CURRENT_SOURCE_DIR}/shaders/truth"
+      "-DTRUTH_INCLUDE=${CMAKE_CURRENT_SOURCE_DIR}/shaders"
       "-DTRUTH_DEFINE=TRUTH_INTERIOR_LIGHT_PROBE=1"
       "-DTRUTH_OUTPUT=${CMAKE_CURRENT_BINARY_DIR}/shaders/$<CONFIG>/TruthInteriorLightProbe.fxo"
       "-DTRUTH_LISTING=${CMAKE_CURRENT_BINARY_DIR}/shaders/$<CONFIG>/TruthInteriorLightProbe.asm"
@@ -667,7 +681,7 @@ if(BUILD_TESTING)
       "-DTRUTH_REQUIRED_SOURCE_2=${CMAKE_CURRENT_SOURCE_DIR}/shaders/truth/TruthSkyFields.fxh"
       "-DTRUTH_REQUIRED_SOURCE_3=${CMAKE_CURRENT_SOURCE_DIR}/shaders/truth/TruthCloudLighting.fxh"
       "-DTRUTH_REQUIRED_SOURCE_4=${CMAKE_CURRENT_SOURCE_DIR}/shaders/truth/TruthAuroraCurtain.fxh"
-      "-DTRUTH_INCLUDE=${CMAKE_CURRENT_SOURCE_DIR}/shaders/truth"
+      "-DTRUTH_INCLUDE=${CMAKE_CURRENT_SOURCE_DIR}/shaders"
       "-DTRUTH_DEFINE=TRUTH_QUALITY_TIER=1"
       "-DTRUTH_SECOND_DEFINE=TRUTH_STAGE_BUDGET_WITNESS=1"
       "-DTRUTH_OUTPUT=${CMAKE_CURRENT_BINARY_DIR}/shaders/$<CONFIG>/TruthBudgetBalancedPrepass.fxo"
@@ -691,7 +705,7 @@ if(BUILD_TESTING)
       COMMAND "${CMAKE_CTEST_COMMAND}"
         --test-dir "${CMAKE_CURRENT_BINARY_DIR}"
         -C "$<CONFIG>"
-        -R "^(truth_quality_presets|truth_sky_view_adapter_warp|truth_sky_view_adapter_shader_contract|truth_scene_contracts|truth_optical_contracts|truth_composition_contracts|truth_aurora_default_quality_contract|truth_stage_compile_matrix|truth_balanced_prepass_instruction_budget|truth_runtime_reproducible_release)$"
+        -R "^(truth_quality_presets|truth_quality_preset_semantics|truth_sky_view_adapter_warp|truth_sky_view_adapter_shader_contract|truth_scene_contracts|truth_optical_contracts|truth_composition_contracts|truth_aurora_default_quality_contract|truth_stage_compile_matrix|truth_balanced_prepass_instruction_budget|truth_runtime_reproducible_release)$"
         --output-on-failure
         --no-tests=error
       DEPENDS truth_sky_view_adapter_warp_tests truth_enb_runtime_plugin

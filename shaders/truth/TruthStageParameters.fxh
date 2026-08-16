@@ -39,6 +39,7 @@ float TruthLensApertureShape <string UIName = "[Truth 50] Lens | Aperture Shape"
 bool TruthPostpassEnabled <string UIName = "[Truth 70] Postpass | Enabled";> = true;
 float TruthPostpassIntensity <string UIName = "[Truth 70] Postpass | Intensity"; string UIWidget = "Spinner"; float UIMin = 0.0; float UIMax = 1.0; float UIStep = 0.01;> = 1.0;
 float TruthPostpassGrainShape <string UIName = "[Truth 70] Postpass | Grain Shape"; string UIWidget = "Spinner"; float UIMin = 0.0; float UIMax = 1.0; float UIStep = 0.01;> = 0.0;
+float TruthPostpassVignetteStrength <string UIName = "[Truth 70] Postpass | Vignette Strength"; string UIWidget = "Spinner"; float UIMin = 0.0; float UIMax = 1.0; float UIStep = 0.01;> = 0.18;
 #define TRUTH_STAGE_ENABLED TruthPostpassEnabled
 #define TRUTH_STAGE_INTENSITY TruthPostpassIntensity
 #elif TRUTH_STAGE_PARAMETER_SLOT == 7

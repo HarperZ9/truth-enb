@@ -23,9 +23,12 @@
 
 `TruthFinishLdr` early-returns when `TruthPostpassIntensity <= 0.0`, which skips vignette, grain, and `TruthTriangularDither` together. Vignette strength is the hardcoded literal `0.18`. The Effects 11 variant needs vignette and grain off while dithering stays on, so strength needs its own uniform. Default `0.18` preserves current output exactly.
 
+**Correction, 2026-08-15.** The first draft of this task tested through `RenderWarpReference`. That was wrong twice. `RenderWarpReference` compiles the entry point `TruthReferencePixelMain` from `shaders/truth/TruthReferenceSky.hlsl`, which exercises the sky stack. `TruthFinishLdr` is called from `enbeffectpostpass.fx:42` and is never reached on that path, so the test would have passed identically before and after the change. It also asserted against a sha256 baseline, which pins a number without stating a behaviour. The corrected task follows the probe pattern already established by `tests/ScreenSpaceWarpTests.cpp` and `shaders/truth/TruthScreenSpaceWarpProbe.hlsl`, and asserts behaviour.
+
 **Files:**
 - Modify: `shaders/truth/TruthStageParameters.fxh:41`
-- Modify: `shaders/truth/TruthPostFinish.fxh:26-28`
+- Modify: `shaders/truth/TruthPostFinish.fxh:28-31`
+- Create: `shaders/truth/TruthPostFinishWarpProbe.hlsl`
 - Create: `tests/PostFinishWarpTests.cpp`
 - Modify: `CMakeLists.txt`
 
@@ -33,121 +36,48 @@
 - Consumes: nothing from earlier tasks.
 - Produces: HLSL uniform `float TruthPostpassVignetteStrength`, range `0.0` to `1.0`, default `0.18`. Task 2 writes this key into generated ini files.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
-Create `tests/PostFinishWarpTests.cpp`. It follows the probe pattern in `tests/ScreenSpaceWarpTests.cpp`: compile a small HLSL probe that includes the real header, run it on WARP, read back texels.
+Two files, following the probe pattern established by `shaders/truth/TruthScreenSpaceWarpProbe.hlsl` and `tests/ScreenSpaceWarpTests.cpp`.
 
-```cpp
-// PostFinishWarpTests.cpp — rendered contracts for TruthPostFinish.fxh
-//
-// Vignette strength must be independently controllable from the postpass gate,
-// so a host variant can disable vignette and grain while dithering survives.
+`shaders/truth/TruthPostFinishWarpProbe.hlsl` declares the four globals the header reads in an explicit `cbuffer TruthPostFinishProbeParams : register(b0)`, includes `TruthPostFinish.fxh`, and writes two outputs per probe point: `TruthFinishLdr(uv, colour)` and `TruthTriangularDither(uv, colour)`. Emitting both is what lets case 3 assert the stage collapses to dither alone rather than merely changing.
 
-#include <cmath>
-#include <cstdint>
-#include <cstdlib>
-#include <filesystem>
-#include <iostream>
-#include <string>
+`tests/PostFinishWarpTests.cpp` stands up a WARP device, compiles the probe with `D3DCOMPILE_ENABLE_STRICTNESS | D3DCOMPILE_WARNINGS_ARE_ERRORS | D3DCOMPILE_IEEE_STRICTNESS | D3DCOMPILE_OPTIMIZATION_LEVEL3`, and dispatches two probe points: the centre at uv `(0.5, 0.5)`, where `dot(centered, centered)` is zero so no vignette applies, and the corner at uv `(0.0, 0.0)`, where it is strongest. Both carry 0.5 grey, which keeps every result clear of the `saturate` clamps.
 
-#include "truth/render/ReferenceRenderer.hpp"
+Three cases, all relations rather than golden values:
 
-namespace {
+1. At the shipped default of `0.18` the corner is darker than the centre by more than the dither floor. This is the regression lock and must hold before and after.
+2. At strength `0.0` the corner and centre differ by no more than two 255ths, which is the dither bound.
+3. At strength `0.0` and grain `0.0` the stage output equals the dither-only output exactly, at every probe point. This is the contract the Effects 11 variant depends on, and it is what forbids reaching the same result by zeroing `TruthPostpassIntensity`.
 
-using truth::render::QualityTier;
-using truth::render::ReferenceScene;
-using truth::render::ReferenceRenderStatus;
-using truth::render::RenderWarpReference;
+Register the target in `CMakeLists.txt` after the `truth_screen_space_warp` block, linking `d3d11` and `d3dcompiler`, with labels `gpu;warp;shader;postpass`.
 
-int failures = 0;
-
-void Check(bool condition, const std::string& message)
-{
-    if (!condition) {
-        std::cerr << "FAIL: " << message << "\n";
-        ++failures;
-    }
-}
-
-}  // namespace
-
-int main(int argc, char** argv)
-{
-    if (argc < 2) {
-        std::cerr << "usage: truth_post_finish_warp_tests <shader-root>\n";
-        return 2;
-    }
-    const std::filesystem::path shader_root{argv[1]};
-    const auto shader = shader_root / "enbeffect.fx";
-
-    // Case 1: the default render is reproducible. Two renders of the same
-    // scene and tier must agree, so later inequality assertions cannot be
-    // satisfied by nondeterminism.
-    const auto first = RenderWarpReference(
-        ReferenceScene::day, shader, 64U, 64U, QualityTier::quality);
-    const auto second = RenderWarpReference(
-        ReferenceScene::day, shader, 64U, 64U, QualityTier::quality);
-
-    Check(first.status == ReferenceRenderStatus::rendered,
-        "the default render did not succeed: " + first.diagnostic);
-    Check(first.sha256_hex == second.sha256_hex,
-        "the same scene and tier rendered twice did not agree");
-
-    // Case 2: the uniform exists and its declared default is 0.18, so the
-    // rendered output is unchanged by this task. The baseline below is
-    // captured in Step 2 from the pre-change build.
-    const std::string baseline = std::getenv("TRUTH_POSTFINISH_BASELINE")
-        ? std::getenv("TRUTH_POSTFINISH_BASELINE")
-        : "";
-    Check(!baseline.empty(),
-        "TRUTH_POSTFINISH_BASELINE must be set to the pre-change sha256");
-    Check(first.sha256_hex == baseline,
-        "adding the vignette-strength uniform moved the default render; "
-        "expected " + baseline + " got " + first.sha256_hex);
-
-    if (failures == 0) {
-        std::cout << "truth_post_finish_warp_tests: all cases passed\n";
-    }
-    return failures == 0 ? 0 : 1;
-}
-```
-
-Register it in `CMakeLists.txt`, directly after the `truth_screen_space_warp_tests` block:
-
-```cmake
-  add_executable(truth_post_finish_warp_tests
-    tests/PostFinishWarpTests.cpp)
-  target_link_libraries(truth_post_finish_warp_tests PRIVATE truth_render)
-  add_test(
-    NAME truth_post_finish_warp
-    COMMAND truth_post_finish_warp_tests "${CMAKE_CURRENT_SOURCE_DIR}/shaders")
-```
-
-- [ ] **Step 2: Capture the baseline and run the test to verify it fails**
-
-Capture the pre-change hash first, before touching any shader:
+- [x] **Step 2: Run the test to verify it fails**
 
 ```bash
-cmake --preset vs2026-x64 && cmake --build --preset vs2026-x64-debug --target truth_reference_renderer
-```
-
-Run the renderer on the clear-day scene at tier 2 and record the printed sha256. Export it, then build and run the new test:
-
-```bash
+cmake --preset vs2026-x64
+cmake --build --preset vs2026-x64-debug --target truth_post_finish_warp_tests
 ctest --preset vs2026-x64-debug -R truth_post_finish_warp --output-on-failure
 ```
 
-Expected: FAIL. The build succeeds and Case 1 and Case 2 pass, because the shader is unchanged. This run exists to prove the harness works and to lock the baseline constant. Record the hash in the commit message.
+Expected, and observed: case 1 passes, cases 2 and 3 fail.
 
-- [ ] **Step 3: Add the uniform and replace the literal**
+```
+at zero strength the corner and centre must differ only by dither; corner=0.473320 centre=0.501561
+with strength and grain at zero the stage must equal dither alone at probe point 1; finished=0.473320 dither_only=0.498070
+```
 
-In `shaders/truth/TruthStageParameters.fxh`, add after line 41:
+The corner sitting at 0.473 against a centre of 0.502 is the hardcoded `0.18` ignoring the uniform, which is exactly the defect.
+
+- [x] **Step 3: Add the uniform and replace the literal**
+
+In `shaders/truth/TruthStageParameters.fxh`, after `TruthPostpassGrainShape` in the `TRUTH_STAGE_PARAMETER_SLOT == 6` block:
 
 ```hlsl
 float TruthPostpassVignetteStrength <string UIName = "[Truth 70] Postpass | Vignette Strength"; string UIWidget = "Spinner"; float UIMin = 0.0; float UIMax = 1.0; float UIStep = 0.01;> = 0.18;
 ```
 
-In `shaders/truth/TruthPostFinish.fxh`, replace the hardcoded literal:
+In `shaders/truth/TruthPostFinish.fxh`, replace the literal:
 
 ```hlsl
     float3 finished = lerp(
@@ -156,24 +86,39 @@ In `shaders/truth/TruthPostFinish.fxh`, replace the hardcoded literal:
         TruthPostpassVignetteStrength * saturate(TruthPostpassIntensity));
 ```
 
-- [ ] **Step 4: Run the test to verify it still passes**
+- [x] **Step 4: Run the test to verify it passes**
 
 ```bash
 ctest --preset vs2026-x64-debug -R truth_post_finish_warp --output-on-failure
 ```
 
-Expected: PASS, with the same sha256 as the baseline. A default of `0.18` multiplied by the same intensity reproduces the previous literal exactly. If the hash moved, the default was mistyped.
+Observed: `Passed`. A default of `0.18` multiplied by the same intensity reproduces the previous literal exactly.
 
-- [ ] **Step 5: Verify by mutation, then revert**
+- [x] **Step 5: Verify by mutation, then revert**
 
-Temporarily change the default to `0.30` and re-run. Expected: FAIL with "adding the vignette-strength uniform moved the default render". Revert to `0.18` and confirm PASS. A test that cannot fail is not a test.
+Replace the final `return TruthTriangularDither(uv, finished);` with `return finished;`, which is the failure the design exists to prevent. Observed: case 3 fails at both probe points.
 
-- [ ] **Step 6: Commit**
+```
+with strength and grain at zero the stage must equal dither alone at probe point 0; finished=0.500000 dither_only=0.501561
+with strength and grain at zero the stage must equal dither alone at probe point 1; finished=0.500000 dither_only=0.498070
+```
+
+Revert and confirm the suite is green.
+
+- [x] **Step 6: Run the full suite, then commit**
 
 ```bash
-git add shaders/truth/TruthStageParameters.fxh shaders/truth/TruthPostFinish.fxh tests/PostFinishWarpTests.cpp CMakeLists.txt
+cmake --build --preset vs2026-x64-debug
+ctest --preset vs2026-x64-debug
+```
+
+Observed: 33 of 33 pass, no compiler or fxc warnings. The production shader now reads a uniform where it read a literal, so the whole suite runs rather than the one new test.
+
+```bash
+git add shaders/truth/TruthStageParameters.fxh shaders/truth/TruthPostFinish.fxh shaders/truth/TruthPostFinishWarpProbe.hlsl tests/PostFinishWarpTests.cpp CMakeLists.txt
 git commit -m "feat: give postpass vignette its own strength uniform"
 ```
+
 
 ---
 

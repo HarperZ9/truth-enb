@@ -28,7 +28,7 @@ float3 TruthFinishLdr(float2 uv, float3 display_color)
     float3 finished = lerp(
         display_color,
         display_color * vignette,
-        0.18 * saturate(TruthPostpassIntensity));
+        TruthPostpassVignetteStrength * saturate(TruthPostpassIntensity));
     float grain = (TruthFinishHash(
         floor(uv * max(ScreenSize.xy, 1.0.xx)) + 71.0) - 0.5)
         * (TruthPostpassGrainShape / 255.0);

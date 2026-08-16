@@ -510,6 +510,7 @@ function(write_truth_stage_ini output_dir stage_file host_vignette_strength host
       "[Truth 14] Aurora | Weather Mask=${preset_aurora_mask}\n"
       "[Truth 15] Motion | Wind X=${preset_sky_wind_x}\n"
       "[Truth 15] Motion | Wind Y=${preset_sky_wind_y}\n"
+      "[Truth 16] World | Aurora Origin=0,0,0\n"
       "[Truth 60] Main Effect | Manual EV=${preset_manual_exposure_ev}\n"
       "[Truth 60] Main Effect | Auto Blend=${preset_auto_exposure_blend}\n")
   elseif(stage_file STREQUAL "enbeffectpostpass.fx")

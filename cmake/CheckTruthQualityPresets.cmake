@@ -316,6 +316,16 @@ endif()
 set(expected_tiers performance balanced quality ultra cinematic)
 set(canonical_tiers ${expected_tiers})
 list(SORT expected_tiers)
+set(truth_stage_files
+  enbeffectprepass.fx
+  enbdepthoffield.fx
+  enbbloom.fx
+  enbadaptation.fx
+  enblens.fx
+  enbeffect.fx
+  enbeffectpostpass.fx
+  enbsunsprite.fx
+  enbunderwater.fx)
 
 # The root now holds hosts, and each host holds the five tiers.
 set(canonical_hosts enbseries effects11)
@@ -385,6 +395,80 @@ function(reject_truth_ini_contains contents rejected_text context)
   endif()
 endfunction()
 
+set(truth_visible_preset_ui_names
+  "[Truth 00] Master | Enabled"
+  "[Truth 02] Optical | ENB Bloom"
+  "[Truth 02] Optical | ENB Lens"
+  "[Truth 10] Prepass | Enabled"
+  "[Truth 10] Prepass | Intensity"
+  "[Truth 10] Prepass | Depth Shape"
+  "[Truth 10] Sky | Procedural Replacement"
+  "[Truth 10] Sky | Replacement Strength"
+  "[Truth 10] Sky | Depth Threshold"
+  "[Truth 10] Sky | Depth Feather"
+  "[Truth 10] Sky | Radiance Scale"
+  "[Truth 11] Weather | Density"
+  "[Truth 12] Clouds | Coverage"
+  "[Truth 12] Clouds | Density"
+  "[Truth 13] Atmosphere | Fog Density"
+  "[Truth 14] Aurora | Activity"
+  "[Truth 14] Aurora | Weather Mask"
+  "[Truth 15] Motion | Wind X"
+  "[Truth 15] Motion | Wind Y"
+  "[Truth 16] World | Aurora Origin"
+  "[Truth 20] Depth of Field | Enabled"
+  "[Truth 20] Depth of Field | Intensity"
+  "[Truth 20] Depth of Field | Focus Shape"
+  "[Truth 30] Bloom | Enabled"
+  "[Truth 30] Bloom | Intensity"
+  "[Truth 30] Bloom | Threshold Shape"
+  "[Truth 40] Adaptation | Enabled"
+  "[Truth 40] Adaptation | Intensity"
+  "[Truth 40] Adaptation | Response Shape"
+  "[Truth 50] Lens | Enabled"
+  "[Truth 50] Lens | Intensity"
+  "[Truth 50] Lens | Aperture Shape"
+  "[Truth 60] Main Effect | Manual EV"
+  "[Truth 60] Main Effect | Auto Blend"
+  "[Truth 70] Postpass | Enabled"
+  "[Truth 70] Postpass | Intensity"
+  "[Truth 70] Postpass | Grain Shape"
+  "[Truth 70] Postpass | Vignette Strength"
+  "[Truth 80] Sun Sprite | Enabled"
+  "[Truth 80] Sun Sprite | Intensity"
+  "[Truth 80] Sun Sprite | Disc Shape"
+  "[Truth 90] Underwater | Enabled"
+  "[Truth 90] Underwater | Intensity"
+  "[Truth 90] Underwater | Density Shape")
+list(LENGTH truth_visible_preset_ui_names truth_visible_preset_ui_count)
+if(NOT truth_visible_preset_ui_count EQUAL 44)
+  message(FATAL_ERROR
+    "Truth preset checker must cover exactly 44 visible UI controls; "
+    "found ${truth_visible_preset_ui_count}")
+endif()
+
+string(REGEX MATCHALL "string UIName = \"[^\"]+\""
+  truth_source_ui_matches
+  "${stage_parameter_source}\n${effect_parameter_source}")
+set(truth_source_ui_names)
+foreach(truth_source_ui_match IN LISTS truth_source_ui_matches)
+  string(REGEX REPLACE "^string UIName = \"([^\"]+)\"$" "\\1"
+    truth_source_ui_name "${truth_source_ui_match}")
+  list(APPEND truth_source_ui_names "${truth_source_ui_name}")
+endforeach()
+list(SORT truth_source_ui_names)
+list(REMOVE_DUPLICATES truth_source_ui_names)
+set(truth_expected_ui_names ${truth_visible_preset_ui_names})
+list(SORT truth_expected_ui_names)
+if(NOT truth_source_ui_names STREQUAL truth_expected_ui_names)
+  string(JOIN "\n  " expected_ui_names_text ${truth_expected_ui_names})
+  string(JOIN "\n  " source_ui_names_text ${truth_source_ui_names})
+  message(FATAL_ERROR
+    "Truth preset checker UIName coverage no longer matches shader controls\n"
+    "Expected:\n  ${expected_ui_names_text}\n"
+    "Source:\n  ${source_ui_names_text}")
+endif()
+
 function(require_truth_stage_ini_contract stage_file contents context)
   string(TOUPPER "${stage_file}" stage_section)
   require_truth_ini_contains("${contents}" "[${stage_section}]" "${context}")
@@ -451,6 +535,7 @@ function(require_truth_stage_ini_contract stage_file contents context)
       "[Truth 14] Aurora | Weather Mask="
       "[Truth 15] Motion | Wind X="
       "[Truth 15] Motion | Wind Y="
+      "[Truth 16] World | Aurora Origin="
       "[Truth 60] Main Effect | Manual EV="
       "[Truth 60] Main Effect | Auto Blend=")
   elseif(stage_file STREQUAL "enbeffectpostpass.fx")
@@ -475,6 +560,11 @@ function(require_truth_stage_ini_contract stage_file contents context)
   foreach(required_key IN LISTS required_keys)
     require_truth_ini_contains("${contents}" "${required_key}" "${context}")
   endforeach()
+  if(stage_file STREQUAL "enbeffect.fx")
+    require_truth_ini_contains("${contents}"
+      "[Truth 16] World | Aurora Origin=0,0,0\n"
+      "${context}")
+  endif()
 endfunction()
 
 # Effects 11 injects no preprocessor defines into preset shaders, so a preset

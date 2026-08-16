@@ -107,6 +107,19 @@ if(truth_stage_name STREQUAL "enbeffect.fx")
         "Main effect ${TRUTH_STAGE_SOURCE} is missing required capability/ABI token: ${required_main_token}")
     endif()
   endforeach()
+elseif(truth_stage_name STREQUAL "enbeffectprepass.fx")
+  foreach(required_prepass_parameter_token IN ITEMS
+      "#include \"truth/TruthEnvironmentParameters.fxh\""
+      "#include \"truth/TruthStageParameters.fxh\"")
+    string(FIND "${truth_stage_contents}"
+      "${required_prepass_parameter_token}"
+      prepass_parameter_position)
+    if(prepass_parameter_position EQUAL -1)
+      message(FATAL_ERROR
+        "HDR prepass is missing its parameter owner: "
+        "${required_prepass_parameter_token}")
+    endif()
+  endforeach()
 else()
   string(FIND "${truth_stage_contents}"
     "#include \"truth/TruthStageParameters.fxh\""

@@ -81,12 +81,13 @@ on its numeric domain, and never reaches white for a finite value below `4.0`.
 `TruthMasterLookState`, unified luminance, target EV, bounded adaptation,
 exposure application, and the filmic curve using original Truth names.
 `shaders/enbeffect.fx` supplies the production ENBSeries 0.504 vertex/pixel
-effect. ENB-owned scene, bloom, lens, depth, adaptation, weather, time, and
-day/interior inputs are named exactly at this boundary. The Truth-owned
-`TRUTHPASSTHROUGH` technique is a safe scene-color fallback. Separately, the
-official ENB 0.504 `PS_DrawOriginal` and reserved `ORIGINALPOSTPROCESS`
-technique are retained unchanged as the required vanilla fallback and locked
-by source hash; Truth rendering never substitutes its own code under that name.
+effect. It names the scene, bloom, lens, adaptation, time, and interior inputs;
+the preceding `enbeffectprepass.fx` owns depth, weather, day/interior, and sky
+composition. The Truth-owned `TRUTHPASSTHROUGH` technique is a safe scene-color
+fallback. The ENB-reserved
+`ORIGINALPOSTPROCESS` name points to the same independently authored identity
+path. Truth does not redistribute ENB or Bethesda shader source, and does not
+present this safety path as a reproduction of their vanilla post-processing.
 
 CTest invokes only the exact x64 FXC selected by the project, with target
 `fx_5_0`. The compile script rejects missing inputs, a nonzero compiler result,
@@ -207,8 +208,8 @@ deposition windows, and bounded accumulation. View-angle path length is capped;
 horizon visibility is softened; phase follows an exact sinusoidal loop; camera
 translation moves the world-space sheet without altering direction-space
 clouds. CPU and HLSL use fixed `1/2/4/7/10` sample budgets for Performance,
-Balanced, Quality, Ultra, and Cinematic. Balanced (`2`) is the authored
-default, while tests require cumulative error to decrease toward the
+Balanced, Quality, Ultra, and Cinematic. Balanced (tier `1`, two samples) is the
+authored default, while tests require cumulative error to decrease toward the
 high-tier reference.
 
 The complete Balanced HDR prepass is budgeted, not just the isolated helper.

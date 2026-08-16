@@ -10,7 +10,7 @@
 #include "truth/TruthAtmosphereCore.fxh"
 #include "truth/TruthSkyViewAdapter.fxh"
 #include "truth/TruthRuntimeParameters.fxh"
-#include "truth/TruthEffectParameters.fxh"
+#include "truth/TruthEnvironmentParameters.fxh"
 #include "truth/TruthPipelineCommon.fxh"
 #include "truth/TruthSkyFields.fxh"
 #include "truth/TruthCloudLighting.fxh"

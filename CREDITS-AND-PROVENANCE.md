@@ -2,14 +2,13 @@
 
 Truth ENB is an independently authored MIT-licensed implementation. Its
 runtime ZIP contains Truth source, generated configuration, the Truth runtime
-plugin, and the exact ENB 0.504 vanilla fallback source required by ENB's
-reserved `ORIGINALPOSTPROCESS` technique. It does not redistribute ENB
-binaries, Bethesda assets, or peer preset source.
+plugin, and a Truth-owned identity fallback under ENB's reserved
+`ORIGINALPOSTPROCESS` technique name. It does not redistribute ENB binaries,
+ENB/Bethesda shader source, Bethesda assets, or peer preset source.
 
 ## Platform and community lineage
 
-- Boris Vorontsov — ENBSeries, the ENB shader/runtime interface, and the
-  upstream vanilla fallback retained byte-for-byte.
+- Boris Vorontsov — ENBSeries and the ENB shader/runtime interface.
 - Kitsuune / LonelyKitsuune — interoperability context for multi-stage ENB
   shader layouts. Truth compatibility is independently authored.
 - kingeric1992, Adyss, TreyM, l00ping, TheSandvichMaker / ReforgedUI, and
@@ -27,6 +26,12 @@ mapping, circle-of-confusion depth of field, bloom, and screen-space
 confidence rejection are independently implemented and bounded for ENB's
 fixed render stages.
 
-The immutable upstream hashes used for verification are recorded in
-`enb-upstream.lock`; the runtime-core revision is recorded in
+Maxime Heckel's
+[sky, sunset, and planet rendering article](https://blog.maximeheckel.com/posts/on-rendering-the-sky-sunsets-and-planets/)
+was an accessible design reference for atmospheric scattering, celestial-disc
+geometry, and ray/sphere reasoning. Truth's implementation, constants, stage
+integration, and fallbacks are independently authored.
+
+The upstream hashes retained as a manual provenance ledger are recorded in
+`enb-upstream.lock`; the runtime-core source pin is recorded in
 `enb-runtime-core.lock`.

@@ -17,11 +17,11 @@ depend on recovered or peer shader source.
 - `FilmicToneCurve`: a finite, monotonic CPU reference curve that maps black to
   black and reaches display white only at the declared linear white point.
 - `TruthColorCore.fxh`: original shader-side exposure and filmic helpers.
-- `enbeffect.fx`: the ENBSeries 0.504-facing master pass. It consumes ENB's
-  native scene, bloom, lens, depth, adaptation, time, weather, and
-  day/interior inputs; replaces only depth-identified exterior sky pixels;
-  and retains a Truth-owned safe passthrough beside ENB 0.504's required,
-  hash-locked vanilla fallback.
+- `enbeffect.fx`: the ENBSeries 0.504-facing master pass. It consumes the
+  scene, bloom, lens, adaptation, and interior inputs and owns optical mixing,
+  exposure, tone mapping, and display gamut. The earlier prepass owns
+  depth/weather/day-driven sky composition. Truth provides its own identity
+  fallbacks without redistributing ENB or Bethesda shader source.
 - `TruthRuntimeParameters.fxh`: a backward-compatible hidden runtime protocol.
   Version 1.0 carries the four inverse-view-projection rows, camera, and
   status. Version 1.1 adds a normalized celestial vector. Unwritten, stale,
@@ -66,6 +66,48 @@ depend on recovered or peer shader source.
   deterministic interleaved jitter, early transmittance termination,
   distance-aware night detail LOD, and fixed performance budgets.
 
+## Install the release archive
+
+Truth does not redistribute ENBSeries, Community Shaders, Effects 11, or
+Address Library. Choose one shader host: ENBSeries `0.504`, or Community
+Shaders with Effects 11. Do not install both. Under ENBSeries, install the
+Address Library database that exactly matches the Skyrim SE/AE runtime when
+using Truth's native world-space camera path. The Address Library database is
+not bundled. SkyrimBridge is optional for the base optical suite, but its
+versioned `SkyrimBridge_GameState` celestial vector is required for the current
+procedural sky and sun path; those features fail closed when the mapping is
+absent.
+
+The archive uses a Mod Organizer 2 Root Builder layout. Its top-level `Root/`
+directory is the common nine-stage shader/runtime payload. Before enabling the
+mod, choose exactly one overlay from
+`Presets/<host>/<tier>/ROOT/` and merge that overlay over the common `Root/`
+directory. Do not combine overlays: each one supplies all nine exact ENB UIName
+configuration files, its metadata, and the quality include that selects the
+real shader tier.
+
+Choose the host that owns the shader pipeline:
+
+- `enbseries` is the ENBSeries `0.504` configuration.
+- `effects11` is a partial optical/post compatibility configuration. It
+  suppresses overlapping finish controls, but the current Effects 11 path has
+  no compatible camera publisher, so world-space prepass composition remains
+  fail-closed. Truth's native bridge remains ENBSeries-only.
+
+Choose one of the five bounded quality tiers:
+
+- `performance` (`0`) minimizes costly optics and sampling.
+- `balanced` (`1`) is the restrained default and recommended starting point.
+- `quality` (`2`) enables the first bounded volumetric sampling budget.
+- `ultra` (`3`) raises sampling quality without changing the look's ownership.
+- `cinematic` (`4`) uses the highest bounded budgets; it is not an invitation
+  to stack additional bloom, lens, grain, or depth-of-field effects.
+
+The installed render order is prepass, depth of field, bloom, adaptation,
+lens, main effect, postpass, sun sprite, and underwater. Public upload remains
+blocked until the recorded live SE/AE and host acceptance rows pass; the
+archive is a release candidate, not evidence of those unrun checks.
+
 ## Toolchain
 
 - CMake 3.30 or newer (verified with 4.2.0)
@@ -84,8 +126,9 @@ procedural replacement fails closed and the ordinary color path remains live.
 
 The bridge writes only ENB shader parameters during ENB callbacks. The public
 protocol uses seven `float4` values with exact UI keys at version `1.1`;
-version `1.0` camera payloads remain readable. The seventh value carries the
-validated sun direction and is committed before `Status.valid`. Both CPU and
+version `1.0` camera payloads remain readable. The sixth value reserves the
+validated celestial direction; the seventh is Status and is committed last.
+Both CPU and
 D3D11 WARP tests cover the row-major matrix
 orientation, reflected offsets, readiness gate, camera rebasing, and
 non-finite fallback. The same WARP gate compiles and executes the exact
@@ -117,16 +160,19 @@ cost ceiling is exceeded.
 The package target emits `Truth-ENB-1.0.0-win64.zip` and its SHA-256
 sidecar beneath `build/packages/Release`. Its release test performs two clean
 installs and two byte-identical archives, then rejects any file outside the
-exact nine-stage shader suite, five presets, ENB 0.504 vanilla fallback,
-native plugin, dependency locks, and documentation manifest. The repository is
-MIT licensed. Public upload remains blocked until the live SE/AE + ENB 0.504
+exact nine-stage shader suite, five tiers across ten host-tier overlays,
+Truth-owned safe fallback, native plugin, dependency locks, and documentation
+manifest. The public archive's
+Truth-authored code, configuration, plugin, and documentation are MIT licensed.
+Public upload remains blocked until the live SE/AE + ENB 0.504
 Performance, Balanced, Cinematic, and no-runtime/fail-closed acceptance rows in
 `docs/release-validation.md` are actually executed and recorded.
 
 `runtime/enb-upstream.lock` records the exact current official ENB 0.504
 archive, wrapper, compiler, shader, SDK archive, and SDK-header hashes used by
-this release candidate. This catches upstream silent replacement without
-redistributing any ENB binary; `docs/release-validation.md` defines the live
+this release candidate. It is an evidence ledger/manual pin for detecting
+upstream drift; the public archive redistributes no ENB binary or shader source.
+`docs/release-validation.md` defines the live
 SE/AE, shader, runtime, UI, and compatibility acceptance matrix.
 
 The package target also rebuilds the native runtime in two clean, independent
@@ -210,5 +256,8 @@ verification evidence.
 
 ## License
 
-Truth ENB is licensed under the MIT License. The optional `tools/sky-mesh`
-source is separately GPL-3.0-or-later and is excluded from the runtime ZIP.
+Truth-authored code, configuration, plugin, and documentation are licensed
+under the MIT License. The optional `tools/sky-mesh` source is separately
+GPL-3.0-or-later and is excluded from the runtime ZIP. ENBSeries, Address
+Library, Bethesda assets, the sky-mesh tool, and generated meshes are not part
+of the MIT public archive.

@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.30)
 
-project(truth-enb-runtime VERSION 0.1.0 LANGUAGES CXX)
+project(truth-enb-runtime VERSION 1.0.0 LANGUAGES CXX)
 
 include(CTest)
 

@@ -15,15 +15,19 @@ to paste into the mod-page description field.
 ## Requirements (add these on the mod page)
 
 - Skyrim Special Edition or Anniversary Edition
-- ENBSeries 0.504
-- Bundled `TruthENBRuntime.dllplugin`, installed under `enbseries`, for native
-  camera/world-state publishing
-- The matching Address Library database for your runtime under
-  `Data/SKSE/Plugins` (`version-1-5-97-0.bin` on SE 1.5.97, or the matching
-  `versionlib-<major>-<minor>-<patch>-<build>.bin` on AE 1.6.x)
-- Optional: SkyrimBridge-compatible external state for setups that publish the
-  same shader parameter names. It is not required for Truth's native
-  camera/world-state path.
+- Choose one shader host:
+  - ENBSeries 0.504 for the full currently implemented suite; or
+  - Community Shaders with Effects 11 for the partial optical/post
+    compatibility path.
+- ENBSeries host only: the bundled `TruthENBRuntime.dllplugin`, installed under
+  `enbseries`, publishes native camera state and requires the matching Address
+  Library database under `Data/SKSE/Plugins` (`version-1-5-97-0.bin` on SE
+  1.5.97, or the matching
+  `versionlib-<major>-<minor>-<patch>-<build>.bin` on AE 1.6.x).
+- SkyrimBridge is optional for the base optical suite, but required by the
+  current procedural sky and sun path for its versioned
+  `SkyrimBridge_GameState` celestial vector. Truth's native camera path does
+  not require it.
 
 ## Description (BBCode)
 
@@ -70,9 +74,10 @@ compiled out entirely, not stepped down.
 8/2, 12/3, and 16/4 step budgets.
 [/list]
 
-Each tier is a complete preset tree, and the difference is enforced rather than
-assumed: the five tiers are rendered on a software device and compared by content
-hash, so a tier that is declared but produces an identical image fails the build.
+Each tier is a complete preset tree. An installed-tree compile probe proves the
+overlay selects its intended tier without command-line defines, and the strict
+shader matrix requires five bytecode-distinct HDR prepasses. Those are compile
+and integration facts, not claims about unrecorded in-game appearance.
 
 [size=4]What is verified, and how[/size]
 
@@ -104,42 +109,67 @@ yours, and feedback with screenshots is the most useful thing you can send.
 
 [size=4]Native runtime and SkyrimBridge compatibility[/size]
 
-Truth's native live-state path is its bundled ENB external plugin,
+Truth's native camera path is its bundled ENB external plugin,
 `TruthENBRuntime.dllplugin`. It reads the matching Address Library database from
-`Data/SKSE/Plugins` and publishes camera/world-state shader parameters without
+`Data/SKSE/Plugins` and publishes camera shader parameters without
 requiring SKSE, CommonLib, or SkyrimBridge.
 
-SkyrimBridge remains an optional compatibility surface. If your setup publishes
-compatible weather, celestial, camera, or interior shader parameters, Truth can
-consume them, but SkyrimBridge is not required for the native camera/world-state
-path above.
+SkyrimBridge is optional for the base optical suite and required for the current
+procedural sky and sun path. Truth reads only the validated sun vector from the
+versioned `SkyrimBridge_GameState` mapping; it does not claim SkyrimBridge
+weather, camera, or interior bindings here. If the mapping is absent or invalid,
+the procedural sky and sun sprite fail closed while the base optical suite and
+native camera path remain independent.
+
+The Effects 11 overlay is currently a partial optical/post compatibility path.
+Effects 11 does not expose the ENB SDK host used by Truth's native camera
+publisher, so world-space prepass composition remains fail-closed there. This
+release does not claim feature parity between the two hosts.
 
 [size=4]Credits[/size]
 
 Truth's shaders are original, and the work still stands on named prior authors:
-Boris Vorontsov and ENBSeries, kingeric1992, Adyss, TreyM, l00ping,
+Boris Vorontsov and ENBSeries; Kitsuune / LonelyKitsuune for interoperability
+context, not copied or reverse-engineered implementation; kingeric1992, Adyss,
+TreyM, l00ping,
 TheSandvichMaker and ReforgedUI, and Marty McFly. Reliance is by technique,
-format, or citation, never copied source. Every credit is preserved in the
-shader headers and in [font=Courier New]CREDITS-AND-PROVENANCE.md[/font], and
-must stay there in any redistribution.
+format, or citation, never copied source. The complete attribution record is in
+[font=Courier New]CREDITS-AND-PROVENANCE.md[/font] and must stay with any
+redistribution.
 
-The ENB 0.504 vanilla fallback is kept byte-immutable so the original post-process
-path is always recoverable.
+Maxime Heckel's sky-rendering article is credited as an accessible reference
+for atmospheric scattering and ray/sphere reasoning; Truth's implementation is
+independently authored.
+
+No ENB or Bethesda shader source is redistributed. The reserved fallback name
+uses a Truth-owned scene-color identity path.
 
 [size=4]Install[/size]
 
 [list=1]
-[*]Install ENBSeries and its binaries into your game root first.
+[*]Choose one host. Install either ENBSeries 0.504 and its binaries into the
+game root for the full currently implemented suite, or install Community
+Shaders with Effects 11 for the partial optical/post compatibility path. Do not
+install both.
 [*]Install this mod with a mod manager, or copy the [font=Courier New]Root[/font]
 folder contents into your game root next to the executable.
-[*]Pick a tier from [font=Courier New]Presets[/font] and copy its
-[font=Courier New]ROOT/enbseries[/font] contents over your enbseries folder.
-[*]Launch, and press End in game to confirm ENB is active.
+[*]Pick exactly one host and tier from
+[font=Courier New]Presets/<host>/<tier>[/font], then copy that overlay's
+[font=Courier New]ROOT[/font] contents over the common [font=Courier New]Root[/font]
+tree before deployment. Match the overlay host to the host selected in step 1;
+Balanced is the recommended starting tier.
+[*]ENBSeries host only: install the exact matching, non-bundled Address Library
+database under [font=Courier New]Data/SKSE/Plugins[/font] for the selected
+Skyrim runtime. Effects 11 does not use Truth's native runtime bridge.
+[*]Launch and confirm the selected shader host is active.
 [/list]
 
 [size=4]Source and license[/size]
 
-MIT licensed. Source and the full build and verification pipeline:
+Truth-authored shaders, configuration, runtime plugin, and documentation in the
+public archive are MIT licensed. ENBSeries, Address Library, Bethesda assets,
+the separately GPL sky-mesh tool, and generated meshes are not included. Source
+and the full build and verification pipeline:
 https://github.com/HarperZ9/truth-enb
 
 ## Permissions (open, MIT-aligned)
@@ -150,6 +180,6 @@ https://github.com/HarperZ9/truth-enb
 - Others can use assets in this file with credit, without permission: yes
 - Upload to other sites: yes, with credit
 
-State on the page: this mod is MIT licensed; use it, modify it, patch it, and
-build presets on it, with credit. Prior shader-author attribution in the headers
-is not waived by that licence and must be preserved.
+State on the page: the Truth-authored public archive is MIT licensed; use it,
+modify it, patch it, and build presets on it, with credit. Third-party projects
+named for platform, scientific, or interoperability context are not relicensed.

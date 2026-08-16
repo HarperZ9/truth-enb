@@ -1,2 +1,3 @@
+kind=source-pin
 repository=https://github.com/HarperZ9/enb-runtime-core.git
 revision=543392f02ff3506d54590193f64a892ead523970

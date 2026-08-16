@@ -2,15 +2,15 @@
 
 Truth supports ENBSeries as a peer; it never redistributes ENB binaries. Because
 Skyrim SE builds retain the `0.504` version number across silent updates, the
-public release candidate records the exact official upstream bytes used for
-development in `enb-upstream.lock`.
+public release candidate records hashes of the exact official upstream bytes
+used for development in `enb-upstream.lock`; it redistributes none of them.
 
 On 2026-07-14 America/Los_Angeles, the current archive was downloaded directly
 from `http://enbdev.com/enbseries_skyrimse_v0504.zip`. Its SHA-256 was
 `f8cc7b824c18736195d461d099cdd791f09789e6da7106962dde4b8a12d06e78`.
-All 30 extracted files were byte-identical to the protected current-source
-snapshot used by the automated contract tests. The wrapper reports file and
-product version `0.5.0.4`; exact component hashes are in the lock file.
+The wrapper reports file and product version `0.5.0.4`; exact component hashes
+are in the lock file. The public shader uses a Truth-owned identity safety
+fallback rather than embedding the upstream vanilla shader.
 
 This pin matters for three current behaviors:
 
@@ -36,7 +36,7 @@ Truth ENB public page:
 ## Automated gates
 
 The Release build must pass the CPU suites, optimized D3D11 WARP production
-pixel test, exact ENB fallback contract, strict FXC permutations, static shader
+pixel test, reserved fallback-interface contract, strict FXC permutations, static shader
 budget, runtime plugin binary/ABI tests, and deterministic install/ZIP manifest.
 The public package target runs the complete production shader suite plus two clean,
 independent static-runtime Release builds before archiving; their plugin bytes
@@ -47,14 +47,25 @@ manifest are recorded for that specific release artifact.
 
 ## Live gates before public upload
 
-Run these checks on both Skyrim SE 1.5.97 and the supported AE build using the
-locked ENB archive:
+Run these checks on both Skyrim SE 1.5.97 and the selected AE build. Use the
+locked ENB archive for ENBSeries rows; record the exact Community Shaders and
+Effects 11 versions for Effects 11 rows, with ENB absent.
 
 The final integrated live matrix is not recorded here yet. Public upload remains
 blocked until Performance, Balanced, and Cinematic are run and recorded, along
 with the no-runtime/fail-closed path. An isolated main-menu shader compile smoke
 is compile-smoke evidence only; without a recorded row and artifact, it is not
 visual, gameplay, tier-integration, or upload-acceptance evidence.
+
+| Host | Native runtime | Preset | Host version | SE 1.5.97 DB | SE result / evidence | AE build / DB | AE result / evidence |
+|---|---|---|---|---|---|---|---|
+| ENBSeries | Enabled | Performance | locked 0.504 | `version-1-5-97-0.bin` | Pending / TBD | build TBD / DB TBD | Pending / TBD |
+| ENBSeries | Enabled | Balanced | locked 0.504 | `version-1-5-97-0.bin` | Pending / TBD | build TBD / DB TBD | Pending / TBD |
+| ENBSeries | Enabled | Cinematic | locked 0.504 | `version-1-5-97-0.bin` | Pending / TBD | build TBD / DB TBD | Pending / TBD |
+| ENBSeries | Removed | Balanced fail-closed | locked 0.504 | N/A | Pending / TBD | build TBD / N/A | Pending / TBD |
+| Effects 11 (partial optical/post) | Inactive by design | Performance | version TBD | N/A | Pending / TBD | build TBD / N/A | Pending / TBD |
+| Effects 11 (partial optical/post) | Inactive by design | Balanced | version TBD | N/A | Pending / TBD | build TBD / N/A | Pending / TBD |
+| Effects 11 (partial optical/post) | Inactive by design | Cinematic | version TBD | N/A | Pending / TBD | build TBD / N/A | Pending / TBD |
 
 1. Confirm the native plugin resolves the host and exact Address Library file.
 2. Confirm all seven hidden runtime values can be read and written only inside

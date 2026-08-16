@@ -19,6 +19,8 @@ set(truth_generator "${truth_source_dir}/cmake/GenerateTruthQualityPresets.cmake
 set(truth_quality_include "${truth_source_dir}/shaders/truth/TruthQuality.fxh")
 set(truth_stage_parameters "${truth_source_dir}/shaders/truth/TruthStageParameters.fxh")
 set(truth_effect_parameters "${truth_source_dir}/shaders/truth/TruthEffectParameters.fxh")
+set(truth_environment_parameters
+  "${truth_source_dir}/shaders/truth/TruthEnvironmentParameters.fxh")
 if(NOT EXISTS "${truth_generator}")
   message(FATAL_ERROR "Truth quality generator is absent: ${truth_generator}")
 endif()
@@ -27,7 +29,8 @@ if(NOT EXISTS "${truth_quality_include}")
 endif()
 foreach(required_parameter_file IN ITEMS
     "${truth_stage_parameters}"
-    "${truth_effect_parameters}")
+    "${truth_effect_parameters}"
+    "${truth_environment_parameters}")
   if(NOT EXISTS "${required_parameter_file}")
     message(FATAL_ERROR
       "Truth quality preset check requires parameter source: ${required_parameter_file}")
@@ -92,6 +95,7 @@ require_truth_source_contains("${stage_parameter_source}"
   "Truth stage parameter defaults must match the Balanced preset")
 
 file(READ "${truth_effect_parameters}" effect_parameter_source)
+file(READ "${truth_environment_parameters}" environment_parameter_source)
 require_truth_source_contains("${effect_parameter_source}" [=[
 float TruthAutoExposureBlend
 <
@@ -110,7 +114,7 @@ bool TruthUseEnbLens
 > = false;
 ]=]
   "Truth effect parameter defaults must match the Balanced preset")
-require_truth_source_contains("${effect_parameter_source}" [=[
+require_truth_source_contains("${environment_parameter_source}" [=[
 float TruthSkyReplacementStrength
 <
     string UIName = "[Truth 10] Sky | Replacement Strength";
@@ -121,7 +125,7 @@ float TruthSkyReplacementStrength
 > = 0.62;
 ]=]
   "Truth effect parameter defaults must match the Balanced preset")
-require_truth_source_contains("${effect_parameter_source}" [=[
+require_truth_source_contains("${environment_parameter_source}" [=[
 float TruthWeatherDensity
 <
     string UIName = "[Truth 11] Weather | Density";
@@ -132,7 +136,7 @@ float TruthWeatherDensity
 > = 0.25;
 ]=]
   "Truth effect parameter defaults must match the Balanced preset")
-require_truth_source_contains("${effect_parameter_source}" [=[
+require_truth_source_contains("${environment_parameter_source}" [=[
 float TruthCloudCoverage
 <
     string UIName = "[Truth 12] Clouds | Coverage";
@@ -143,7 +147,7 @@ float TruthCloudCoverage
 > = 0.45;
 ]=]
   "Truth effect parameter defaults must match the Balanced preset")
-require_truth_source_contains("${effect_parameter_source}" [=[
+require_truth_source_contains("${environment_parameter_source}" [=[
 float TruthCloudDensity
 <
     string UIName = "[Truth 12] Clouds | Density";
@@ -154,7 +158,7 @@ float TruthCloudDensity
 > = 0.62;
 ]=]
   "Truth effect parameter defaults must match the Balanced preset")
-require_truth_source_contains("${effect_parameter_source}" [=[
+require_truth_source_contains("${environment_parameter_source}" [=[
 float TruthFogDensity
 <
     string UIName = "[Truth 13] Atmosphere | Fog Density";
@@ -165,7 +169,7 @@ float TruthFogDensity
 > = 0.12;
 ]=]
   "Truth effect parameter defaults must match the Balanced preset")
-require_truth_source_contains("${effect_parameter_source}" [=[
+require_truth_source_contains("${environment_parameter_source}" [=[
 float TruthAuroraActivity
 <
     string UIName = "[Truth 14] Aurora | Activity";
@@ -176,7 +180,7 @@ float TruthAuroraActivity
 > = 0.25;
 ]=]
   "Truth effect parameter defaults must match the Balanced preset")
-require_truth_source_contains("${effect_parameter_source}" [=[
+require_truth_source_contains("${environment_parameter_source}" [=[
 float TruthAuroraMask
 <
     string UIName = "[Truth 14] Aurora | Weather Mask";
@@ -449,7 +453,7 @@ endif()
 
 string(REGEX MATCHALL "string UIName = \"[^\"]+\""
   truth_source_ui_matches
-  "${stage_parameter_source}\n${effect_parameter_source}")
+  "${stage_parameter_source}\n${effect_parameter_source}\n${environment_parameter_source}")
 set(truth_source_ui_names)
 foreach(truth_source_ui_match IN LISTS truth_source_ui_matches)
   string(REGEX REPLACE "^string UIName = \"([^\"]+)\"$" "\\1"
@@ -496,7 +500,21 @@ function(require_truth_stage_ini_contract stage_file contents context)
     set(required_keys
       "[Truth 10] Prepass | Enabled="
       "[Truth 10] Prepass | Intensity="
-      "[Truth 10] Prepass | Depth Shape=")
+      "[Truth 10] Prepass | Depth Shape="
+      "[Truth 10] Sky | Procedural Replacement="
+      "[Truth 10] Sky | Replacement Strength="
+      "[Truth 10] Sky | Depth Threshold="
+      "[Truth 10] Sky | Depth Feather="
+      "[Truth 10] Sky | Radiance Scale="
+      "[Truth 11] Weather | Density="
+      "[Truth 12] Clouds | Coverage="
+      "[Truth 12] Clouds | Density="
+      "[Truth 13] Atmosphere | Fog Density="
+      "[Truth 14] Aurora | Activity="
+      "[Truth 14] Aurora | Weather Mask="
+      "[Truth 15] Motion | Wind X="
+      "[Truth 15] Motion | Wind Y="
+      "[Truth 16] World | Aurora Origin=")
   elseif(stage_file STREQUAL "enbdepthoffield.fx")
     set(required_keys
       "[Truth 20] Depth of Field | Enabled="
@@ -522,20 +540,6 @@ function(require_truth_stage_ini_contract stage_file contents context)
       "[Truth 00] Master | Enabled="
       "[Truth 02] Optical | ENB Bloom="
       "[Truth 02] Optical | ENB Lens="
-      "[Truth 10] Sky | Procedural Replacement="
-      "[Truth 10] Sky | Replacement Strength="
-      "[Truth 10] Sky | Depth Threshold="
-      "[Truth 10] Sky | Depth Feather="
-      "[Truth 10] Sky | Radiance Scale="
-      "[Truth 11] Weather | Density="
-      "[Truth 12] Clouds | Coverage="
-      "[Truth 12] Clouds | Density="
-      "[Truth 13] Atmosphere | Fog Density="
-      "[Truth 14] Aurora | Activity="
-      "[Truth 14] Aurora | Weather Mask="
-      "[Truth 15] Motion | Wind X="
-      "[Truth 15] Motion | Wind Y="
-      "[Truth 16] World | Aurora Origin="
       "[Truth 60] Main Effect | Manual EV="
       "[Truth 60] Main Effect | Auto Blend=")
   elseif(stage_file STREQUAL "enbeffectpostpass.fx")
@@ -560,10 +564,21 @@ function(require_truth_stage_ini_contract stage_file contents context)
   foreach(required_key IN LISTS required_keys)
     require_truth_ini_contains("${contents}" "${required_key}" "${context}")
   endforeach()
-  if(stage_file STREQUAL "enbeffect.fx")
+  if(stage_file STREQUAL "enbeffectprepass.fx")
     require_truth_ini_contains("${contents}"
       "[Truth 16] World | Aurora Origin=0,0,0\n"
       "${context}")
+  elseif(stage_file STREQUAL "enbeffect.fx")
+    foreach(environment_prefix IN ITEMS
+        "[Truth 10] Sky |"
+        "[Truth 11] Weather |"
+        "[Truth 12] Clouds |"
+        "[Truth 13] Atmosphere |"
+        "[Truth 14] Aurora |"
+        "[Truth 15] Motion |"
+        "[Truth 16] World |")
+      reject_truth_ini_contains("${contents}" "${environment_prefix}" "${context}")
+    endforeach()
   endif()
 endfunction()
 
@@ -625,6 +640,44 @@ foreach(host_name IN LISTS expected_hosts)
 
     set(tier_stage_root
       "${first_output}/${host_name}/${tier_name}/ROOT/enbseries")
+    file(READ "${tier_stage_root}/enbeffectprepass.fx.ini" tier_prepass)
+    file(READ "${tier_stage_root}/enblens.fx.ini" tier_lens)
+    file(READ "${tier_stage_root}/enbeffect.fx.ini" tier_main)
+    foreach(stable_environment_value IN ITEMS
+        "[Truth 10] Prepass | Intensity=0.52\n"
+        "[Truth 10] Prepass | Depth Shape=0.50\n"
+        "[Truth 10] Sky | Procedural Replacement=true\n"
+        "[Truth 10] Sky | Replacement Strength=0.62\n"
+        "[Truth 10] Sky | Depth Threshold=0.9998\n"
+        "[Truth 10] Sky | Depth Feather=0.0002\n"
+        "[Truth 10] Sky | Radiance Scale=1.0\n"
+        "[Truth 11] Weather | Density=0.25\n"
+        "[Truth 12] Clouds | Coverage=0.45\n"
+        "[Truth 12] Clouds | Density=0.62\n"
+        "[Truth 13] Atmosphere | Fog Density=0.12\n"
+        "[Truth 14] Aurora | Activity=0.25\n"
+        "[Truth 14] Aurora | Weather Mask=0.80\n"
+        "[Truth 15] Motion | Wind X=0.62\n"
+        "[Truth 15] Motion | Wind Y=-0.27\n"
+        "[Truth 16] World | Aurora Origin=0,0,0\n")
+      require_truth_ini_contains("${tier_prepass}" "${stable_environment_value}"
+        "Stable authored environment for host ${host_name} tier ${tier_name}")
+    endforeach()
+    require_truth_ini_contains("${tier_main}"
+      "[Truth 60] Main Effect | Auto Blend=0.25\n"
+      "Stable authored exposure for host ${host_name} tier ${tier_name}")
+    if(tier_name STREQUAL "performance" OR tier_name STREQUAL "balanced")
+      set(expected_lens_enabled false)
+    else()
+      set(expected_lens_enabled true)
+    endif()
+    require_truth_ini_contains("${tier_lens}"
+      "[Truth 50] Lens | Enabled=${expected_lens_enabled}\n"
+      "Lens producer for host ${host_name} tier ${tier_name}")
+    require_truth_ini_contains("${tier_main}"
+      "[Truth 02] Optical | ENB Lens=${expected_lens_enabled}\n"
+      "Lens consumer for host ${host_name} tier ${tier_name}")
+
     if(tier_name STREQUAL "performance")
       file(READ "${tier_stage_root}/enbdepthoffield.fx.ini" performance_dof)
       file(READ "${tier_stage_root}/enbbloom.fx.ini" performance_bloom)
@@ -644,12 +697,6 @@ foreach(host_name IN LISTS expected_hosts)
         "Performance main-effect preset")
       require_truth_ini_contains("${performance_main}"
         "[Truth 02] Optical | ENB Lens=false\n"
-        "Performance main-effect preset")
-      require_truth_ini_contains("${performance_main}"
-        "[Truth 10] Sky | Replacement Strength=0.50\n"
-        "Performance main-effect preset")
-      require_truth_ini_contains("${performance_main}"
-        "[Truth 14] Aurora | Activity=0.12\n"
         "Performance main-effect preset")
     elseif(tier_name STREQUAL "balanced")
       file(READ "${tier_stage_root}/enbeffectprepass.fx.ini" balanced_prepass)
@@ -691,12 +738,6 @@ foreach(host_name IN LISTS expected_hosts)
         "[Truth 02] Optical | ENB Lens=false\n"
         "Balanced main-effect preset")
       require_truth_ini_contains("${balanced_main}"
-        "[Truth 10] Sky | Replacement Strength=0.62\n"
-        "Balanced main-effect preset")
-      require_truth_ini_contains("${balanced_main}"
-        "[Truth 14] Aurora | Activity=0.25\n"
-        "Balanced main-effect preset")
-      require_truth_ini_contains("${balanced_main}"
         "[Truth 60] Main Effect | Auto Blend=0.25\n"
         "Balanced main-effect preset")
     elseif(tier_name STREQUAL "cinematic")
@@ -707,7 +748,7 @@ foreach(host_name IN LISTS expected_hosts)
       file(READ "${tier_stage_root}/enbunderwater.fx.ini" cinematic_underwater)
       file(READ "${tier_stage_root}/enbeffect.fx.ini" cinematic_main)
       require_truth_ini_contains("${cinematic_prepass}"
-        "[Truth 10] Prepass | Intensity=0.70\n"
+        "[Truth 10] Prepass | Intensity=0.52\n"
         "Cinematic prepass preset")
       require_truth_ini_contains("${cinematic_bloom}"
         "[Truth 30] Bloom | Intensity=0.36\n"
@@ -721,9 +762,6 @@ foreach(host_name IN LISTS expected_hosts)
       require_truth_ini_contains("${cinematic_underwater}"
         "[Truth 90] Underwater | Intensity=0.50\n"
         "Cinematic underwater preset")
-      require_truth_ini_contains("${cinematic_main}"
-        "[Truth 10] Sky | Replacement Strength=0.76\n"
-        "Cinematic main-effect preset")
       reject_truth_ini_contains("${cinematic_prepass}" "Intensity=1.0\n"
         "Cinematic preset boundedness")
       reject_truth_ini_contains("${cinematic_bloom}" "Intensity=1.0\n"

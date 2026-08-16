@@ -5,10 +5,11 @@
 ENBSeries is authored by Boris Vorontsov and is not distributed with Truth
 ENB. Users obtain ENB separately from its official distribution site.
 
-`Root/enbseries/enb/ENBSeries0504VanillaPostProcess.fxh` is the exact upstream
-fallback source required for ENB 0.504's reserved vanilla post-process
-technique. Truth keeps it isolated and hash-locked; Truth-owned rendering does
-not substitute code under the reserved technique name.
+Truth does not redistribute ENB binaries or upstream shader source. The
+`enb-upstream.lock` file is a source/version evidence ledger for manually
+checking silent upstream replacement. Truth's reserved
+`ORIGINALPOSTPROCESS` technique uses an independently authored scene-color
+identity fallback and is not described as the upstream vanilla post-process.
 
 ## enb-runtime-core
 

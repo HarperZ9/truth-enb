@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.30)
 
 cmake_policy(SET CMP0091 NEW)
-project(TruthENB VERSION 0.1.0 LANGUAGES CXX)
+project(TruthENB VERSION 1.0.0 LANGUAGES CXX)
 
 include(CTest)
 
@@ -158,6 +158,7 @@ if(WIN32 AND TRUTH_BUILD_RUNTIME)
     shaders/truth/TruthColorCore.fxh
     shaders/truth/TruthDepthOfField.fxh
     shaders/truth/TruthEffectParameters.fxh
+    shaders/truth/TruthEnvironmentParameters.fxh
     shaders/truth/TruthHostCapabilities.fxh
     shaders/truth/TruthInteriorLight.fxh
     shaders/truth/TruthLens.fxh
@@ -185,10 +186,6 @@ if(WIN32 AND TRUTH_BUILD_RUNTIME)
     shaders/enbsunsprite.fx
     shaders/enbunderwater.fx
   )
-  set(TRUTH_RELEASE_ENB_CONTRACT
-    shaders/enb/ENBSeries0504VanillaPostProcess.fxh
-  )
-
   install(
     FILES ${TRUTH_RELEASE_STAGES}
     DESTINATION "${TRUTH_RELEASE_SHADER_ROOT}"
@@ -197,11 +194,6 @@ if(WIN32 AND TRUTH_BUILD_RUNTIME)
   install(
     FILES ${TRUTH_RELEASE_SHADER_INCLUDES}
     DESTINATION "${TRUTH_RELEASE_SHADER_ROOT}/truth"
-    COMPONENT "${TRUTH_RELEASE_COMPONENT}"
-  )
-  install(
-    FILES ${TRUTH_RELEASE_ENB_CONTRACT}
-    DESTINATION "${TRUTH_RELEASE_SHADER_ROOT}/enb"
     COMPONENT "${TRUTH_RELEASE_COMPONENT}"
   )
   install(
@@ -556,7 +548,6 @@ if(BUILD_TESTING)
       "-DTRUTH_PREPASS=${CMAKE_CURRENT_SOURCE_DIR}/shaders/enbeffectprepass.fx"
       "-DTRUTH_ADAPTER=${CMAKE_CURRENT_SOURCE_DIR}/shaders/truth/TruthSkyViewAdapter.fxh"
       "-DTRUTH_RUNTIME=${CMAKE_CURRENT_SOURCE_DIR}/shaders/truth/TruthRuntimeParameters.fxh"
-      "-DTRUTH_ENB_VANILLA=${CMAKE_CURRENT_SOURCE_DIR}/shaders/enb/ENBSeries0504VanillaPostProcess.fxh"
       "-DTRUTH_COMPILE_SCRIPT=${CMAKE_CURRENT_SOURCE_DIR}/cmake/CompileTruthShader.cmake"
       -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/CheckTruthSkyViewAdapterContract.cmake"
   )
@@ -705,7 +696,7 @@ if(BUILD_TESTING)
       COMMAND "${CMAKE_CTEST_COMMAND}"
         --test-dir "${CMAKE_CURRENT_BINARY_DIR}"
         -C "$<CONFIG>"
-        -R "^(truth_quality_presets|truth_quality_preset_semantics|truth_sky_view_adapter_warp|truth_sky_view_adapter_shader_contract|truth_scene_contracts|truth_optical_contracts|truth_composition_contracts|truth_aurora_default_quality_contract|truth_stage_compile_matrix|truth_balanced_prepass_instruction_budget|truth_runtime_reproducible_release)$"
+        -R "^(truth_quality_presets|truth_quality_preset_semantics|truth_sky_view_adapter_warp|truth_sky_view_adapter_shader_contract|truth_scene_contracts|truth_optical_contracts|truth_composition_contracts|truth_aurora_default_quality_contract|truth_stage_compile_matrix|truth_balanced_prepass_instruction_budget|truth_runtime_reproducible_release|truth_public_release_package_manifest)$"
         --output-on-failure
         --no-tests=error
       DEPENDS truth_sky_view_adapter_warp_tests truth_enb_runtime_plugin
@@ -714,17 +705,7 @@ if(BUILD_TESTING)
     )
 
     add_custom_target(truth_public_release_package
-      COMMAND "${CMAKE_COMMAND}" -E make_directory
-        "${CMAKE_CURRENT_BINARY_DIR}/packages/$<CONFIG>"
-      COMMAND "${CMAKE_COMMAND}" -E env SOURCE_DATE_EPOCH=946684800
-        "${CMAKE_CPACK_COMMAND}"
-        --config "${CMAKE_CURRENT_BINARY_DIR}/CPackConfig.cmake"
-        -C "$<CONFIG>"
-        -G ZIP
-        -B "${CMAKE_CURRENT_BINARY_DIR}/packages/$<CONFIG>"
-      DEPENDS truth_enb_runtime_plugin truth_release_gate
-      COMMENT "Packaging the deterministic Truth ENB public release"
-      VERBATIM
+      DEPENDS truth_release_gate
     )
 
     add_test(
@@ -732,7 +713,9 @@ if(BUILD_TESTING)
       COMMAND "${CMAKE_COMMAND}"
         "-DTRUTH_BUILD_ROOT=${CMAKE_CURRENT_BINARY_DIR}"
         "-DTRUTH_CONFIGURATION=$<CONFIG>"
+        "-DTRUTH_ARCHITECTURE=${CMAKE_GENERATOR_PLATFORM}"
         "-DTRUTH_WORK_ROOT=${CMAKE_CURRENT_BINARY_DIR}/package-validation/$<CONFIG>"
+        "-DTRUTH_OUTPUT_ROOT=${CMAKE_CURRENT_BINARY_DIR}/packages/$<CONFIG>"
         "-DTRUTH_SOURCE_ROOT=${CMAKE_CURRENT_SOURCE_DIR}"
         "-DTRUTH_RUNTIME_PLUGIN=$<TARGET_FILE:truth_enb_runtime_plugin>"
         "-DTRUTH_PRESET_ROOT=${TRUTH_RELEASE_PRESET_ROOT}"

@@ -18,7 +18,7 @@
 
 #include "truth/TruthSkyViewAdapter.fxh"
 #include "truth/TruthRuntimeParameters.fxh"
-#include "truth/TruthEffectParameters.fxh"
+#include "truth/TruthEnvironmentParameters.fxh"
 #include "truth/TruthHostCapabilities.fxh"
 #include "truth/TruthPipelineCommon.fxh"
 #define TRUTH_STAGE_PARAMETER_SLOT 0

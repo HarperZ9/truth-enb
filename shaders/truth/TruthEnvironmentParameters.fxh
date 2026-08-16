@@ -1,0 +1,123 @@
+#ifndef TRUTH_ENVIRONMENT_PARAMETERS_FXH
+#define TRUTH_ENVIRONMENT_PARAMETERS_FXH
+
+bool TruthProceduralSkyEnabled
+<
+    string UIName = "[Truth 10] Sky | Procedural Replacement";
+> = true;
+
+float TruthSkyReplacementStrength
+<
+    string UIName = "[Truth 10] Sky | Replacement Strength";
+    string UIWidget = "Spinner";
+    float UIMin = 0.0;
+    float UIMax = 1.0;
+    float UIStep = 0.01;
+> = 0.62;
+
+float TruthSkyDepthThreshold
+<
+    string UIName = "[Truth 10] Sky | Depth Threshold";
+    string UIWidget = "Spinner";
+    float UIMin = 0.99;
+    float UIMax = 1.0;
+    float UIStep = 0.0001;
+> = 0.9998;
+
+float TruthSkyDepthFeather
+<
+    string UIName = "[Truth 10] Sky | Depth Feather";
+    string UIWidget = "Spinner";
+    float UIMin = 0.00001;
+    float UIMax = 0.005;
+    float UIStep = 0.00001;
+> = 0.0002;
+
+float TruthSkyRadianceScale
+<
+    string UIName = "[Truth 10] Sky | Radiance Scale";
+    string UIWidget = "Spinner";
+    float UIMin = 0.1;
+    float UIMax = 8.0;
+    float UIStep = 0.05;
+> = 1.0;
+
+float TruthWeatherDensity
+<
+    string UIName = "[Truth 11] Weather | Density";
+    string UIWidget = "Spinner";
+    float UIMin = 0.0;
+    float UIMax = 1.0;
+    float UIStep = 0.01;
+> = 0.25;
+
+float TruthCloudCoverage
+<
+    string UIName = "[Truth 12] Clouds | Coverage";
+    string UIWidget = "Spinner";
+    float UIMin = 0.0;
+    float UIMax = 1.0;
+    float UIStep = 0.01;
+> = 0.45;
+
+float TruthCloudDensity
+<
+    string UIName = "[Truth 12] Clouds | Density";
+    string UIWidget = "Spinner";
+    float UIMin = 0.0;
+    float UIMax = 1.0;
+    float UIStep = 0.01;
+> = 0.62;
+
+float TruthFogDensity
+<
+    string UIName = "[Truth 13] Atmosphere | Fog Density";
+    string UIWidget = "Spinner";
+    float UIMin = 0.0;
+    float UIMax = 1.0;
+    float UIStep = 0.01;
+> = 0.12;
+
+float TruthAuroraActivity
+<
+    string UIName = "[Truth 14] Aurora | Activity";
+    string UIWidget = "Spinner";
+    float UIMin = 0.0;
+    float UIMax = 1.0;
+    float UIStep = 0.01;
+> = 0.25;
+
+float TruthAuroraMask
+<
+    string UIName = "[Truth 14] Aurora | Weather Mask";
+    string UIWidget = "Spinner";
+    float UIMin = 0.0;
+    float UIMax = 1.0;
+    float UIStep = 0.01;
+> = 0.80;
+
+float TruthSkyWindX
+<
+    string UIName = "[Truth 15] Motion | Wind X";
+    string UIWidget = "Spinner";
+    float UIMin = -1.0;
+    float UIMax = 1.0;
+    float UIStep = 0.01;
+> = 0.62;
+
+float TruthSkyWindY
+<
+    string UIName = "[Truth 15] Motion | Wind Y";
+    string UIWidget = "Spinner";
+    float UIMin = -1.0;
+    float UIMax = 1.0;
+    float UIStep = 0.01;
+> = -0.27;
+
+float3 TruthAuroraWorldOrigin
+<
+    string UIName = "[Truth 16] World | Aurora Origin";
+    string UIWidget = "Vector";
+> = {0.0, 0.0, 0.0};
+
+#endif

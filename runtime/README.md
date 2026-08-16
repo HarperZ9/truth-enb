@@ -30,24 +30,27 @@ The plugin:
   the published rows are the exact row-major matrix consumed by Truth's
   `mul(inverse_view_projection, clip_column)` shader contract.
 
-The ENB SDK category is `ENBEFFECT.FX`. Every value is SDK `COLOR4`, addressed
-by UI name rather than by its HLSL identifier:
+The ENB SDK category is `ENBEFFECT.FX`. The protocol has seven SDK `COLOR4` values,
+each addressed by UI name rather than by its HLSL identifier:
 
 1. `Truth Runtime | Inverse VP Row 0`
 2. `Truth Runtime | Inverse VP Row 1`
 3. `Truth Runtime | Inverse VP Row 2`
 4. `Truth Runtime | Inverse VP Row 3`
 5. `Truth Runtime | Camera World`
-6. `Truth Runtime | Status`
+6. `Truth Runtime | Celestial`
+7. `Truth Runtime | Status`
 
-Status is `(protocol, valid, folded_generation, world_scale)`. Protocol is
-`1.0`; valid is exactly `0.0` or `1.0`; generation is folded modulo `2^24` so
-it remains an exact IEEE-754 integer; and the default scale is `4096.0` engine
-units per aurora unit.
+Status is `(protocol, valid, folded_generation, world_scale)`. Protocol `1.1`
+reserves the celestial slot; `Celestial.w` gates whether that vector is ready.
+Version `1.0` camera payloads remain readable and leave only the celestial path
+disabled. Valid is exactly `0.0` or `1.0`; generation is folded modulo `2^24`
+so it remains an exact IEEE-754 integer; and the default scale is `4096.0`
+engine units per aurora unit.
 
 All `ENBGetParameter` and `ENBSetParameter` calls are mechanically gated to an
-ENB callback scope. Every publication writes invalid Status first, the five
-camera payload values next, and the target Status last, so partial camera data
+ENB callback scope. Every publication writes invalid Status first, the six
+camera/celestial payload values next, and the target Status last, so partial data
 can never remain marked valid. `PostLoad` captures the current effect's shader
 defaults; repeated `PostLoad` callbacks recapture and rebind a recreated effect
 without restoring defaults from the previous effect. `PreSave`, `PreReset`, and
@@ -99,7 +102,7 @@ ENB 0.504:
    camera capability reports ready.
 3. Rotate, pitch, translate, change FOV, enter interiors, open menus, and load a
    save while checking that world-space sky motion remains stable.
-4. Use Save Configuration, reload the effect, and verify the six authored
+4. Use Save Configuration, reload the effect, and verify the seven authored
    defaults were not replaced by a runtime matrix.
 5. Trigger display reset/fullscreen changes and verify `PreReset`/`PostReset`
    recovery.
@@ -107,7 +110,7 @@ ENB 0.504:
    show `valid=0` or retain authored defaults without partial live data.
 
 The official SDK v1002 header says hidden shader variables may be rejected by
-`ENBGetParameter` and `ENBSetParameter`. Therefore `UIHidden=1` on these six
+`ENBGetParameter` and `ENBSetParameter`. Therefore `UIHidden=1` on these seven
 variables is an explicit in-game compatibility gate for ENB 0.504. If 0.504
 follows that documented behavior, keep the parameters SDK-addressable and hide
 them through an editor presentation mechanism that does not mark the variables

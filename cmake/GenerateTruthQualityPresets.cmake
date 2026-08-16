@@ -204,25 +204,25 @@ function(set_truth_preset_values tier)
   if(tier EQUAL 0)
     set(preset_master_enabled true)
     set(preset_manual_exposure_ev 0.0)
-    set(preset_auto_exposure_blend 0.15)
+    set(preset_auto_exposure_blend 0.25)
     set(preset_use_enb_bloom false)
     set(preset_use_enb_lens false)
     set(preset_procedural_sky_enabled true)
-    set(preset_sky_replacement_strength 0.50)
+    set(preset_sky_replacement_strength 0.62)
     set(preset_sky_depth_threshold 0.9998)
     set(preset_sky_depth_feather 0.0002)
-    set(preset_sky_radiance_scale 0.85)
-    set(preset_weather_density 0.18)
-    set(preset_cloud_coverage 0.30)
-    set(preset_cloud_density 0.38)
-    set(preset_fog_density 0.08)
-    set(preset_aurora_activity 0.12)
-    set(preset_aurora_mask 0.70)
+    set(preset_sky_radiance_scale 1.0)
+    set(preset_weather_density 0.25)
+    set(preset_cloud_coverage 0.45)
+    set(preset_cloud_density 0.62)
+    set(preset_fog_density 0.12)
+    set(preset_aurora_activity 0.25)
+    set(preset_aurora_mask 0.80)
     set(preset_sky_wind_x 0.62)
     set(preset_sky_wind_y -0.27)
     set(preset_prepass_enabled true)
-    set(preset_prepass_intensity 0.40)
-    set(preset_prepass_depth_shape 0.30)
+    set(preset_prepass_intensity 0.52)
+    set(preset_prepass_depth_shape 0.50)
     set(preset_dof_enabled false)
     set(preset_dof_intensity 0.0)
     set(preset_dof_focus_shape 0.45)
@@ -290,23 +290,23 @@ function(set_truth_preset_values tier)
     set(preset_manual_exposure_ev 0.0)
     set(preset_auto_exposure_blend 0.25)
     set(preset_use_enb_bloom true)
-    set(preset_use_enb_lens false)
+    set(preset_use_enb_lens true)
     set(preset_procedural_sky_enabled true)
-    set(preset_sky_replacement_strength 0.66)
+    set(preset_sky_replacement_strength 0.62)
     set(preset_sky_depth_threshold 0.9998)
     set(preset_sky_depth_feather 0.0002)
-    set(preset_sky_radiance_scale 1.02)
-    set(preset_weather_density 0.27)
-    set(preset_cloud_coverage 0.48)
-    set(preset_cloud_density 0.64)
-    set(preset_fog_density 0.13)
-    set(preset_aurora_activity 0.32)
-    set(preset_aurora_mask 0.90)
+    set(preset_sky_radiance_scale 1.0)
+    set(preset_weather_density 0.25)
+    set(preset_cloud_coverage 0.45)
+    set(preset_cloud_density 0.62)
+    set(preset_fog_density 0.12)
+    set(preset_aurora_activity 0.25)
+    set(preset_aurora_mask 0.80)
     set(preset_sky_wind_x 0.62)
     set(preset_sky_wind_y -0.27)
     set(preset_prepass_enabled true)
-    set(preset_prepass_intensity 0.58)
-    set(preset_prepass_depth_shape 0.52)
+    set(preset_prepass_intensity 0.52)
+    set(preset_prepass_depth_shape 0.50)
     set(preset_dof_enabled true)
     set(preset_dof_intensity 0.18)
     set(preset_dof_focus_shape 0.52)
@@ -332,23 +332,23 @@ function(set_truth_preset_values tier)
     set(preset_manual_exposure_ev 0.0)
     set(preset_auto_exposure_blend 0.25)
     set(preset_use_enb_bloom true)
-    set(preset_use_enb_lens false)
+    set(preset_use_enb_lens true)
     set(preset_procedural_sky_enabled true)
-    set(preset_sky_replacement_strength 0.70)
+    set(preset_sky_replacement_strength 0.62)
     set(preset_sky_depth_threshold 0.9998)
     set(preset_sky_depth_feather 0.0002)
-    set(preset_sky_radiance_scale 1.05)
-    set(preset_weather_density 0.30)
-    set(preset_cloud_coverage 0.50)
-    set(preset_cloud_density 0.66)
-    set(preset_fog_density 0.14)
-    set(preset_aurora_activity 0.40)
-    set(preset_aurora_mask 0.92)
+    set(preset_sky_radiance_scale 1.0)
+    set(preset_weather_density 0.25)
+    set(preset_cloud_coverage 0.45)
+    set(preset_cloud_density 0.62)
+    set(preset_fog_density 0.12)
+    set(preset_aurora_activity 0.25)
+    set(preset_aurora_mask 0.80)
     set(preset_sky_wind_x 0.62)
     set(preset_sky_wind_y -0.27)
     set(preset_prepass_enabled true)
-    set(preset_prepass_intensity 0.64)
-    set(preset_prepass_depth_shape 0.55)
+    set(preset_prepass_intensity 0.52)
+    set(preset_prepass_depth_shape 0.50)
     set(preset_dof_enabled true)
     set(preset_dof_intensity 0.25)
     set(preset_dof_focus_shape 0.55)
@@ -376,21 +376,21 @@ function(set_truth_preset_values tier)
     set(preset_use_enb_bloom true)
     set(preset_use_enb_lens true)
     set(preset_procedural_sky_enabled true)
-    set(preset_sky_replacement_strength 0.76)
+    set(preset_sky_replacement_strength 0.62)
     set(preset_sky_depth_threshold 0.9998)
     set(preset_sky_depth_feather 0.0002)
-    set(preset_sky_radiance_scale 1.08)
-    set(preset_weather_density 0.32)
-    set(preset_cloud_coverage 0.52)
-    set(preset_cloud_density 0.68)
-    set(preset_fog_density 0.16)
-    set(preset_aurora_activity 0.48)
-    set(preset_aurora_mask 0.95)
+    set(preset_sky_radiance_scale 1.0)
+    set(preset_weather_density 0.25)
+    set(preset_cloud_coverage 0.45)
+    set(preset_cloud_density 0.62)
+    set(preset_fog_density 0.12)
+    set(preset_aurora_activity 0.25)
+    set(preset_aurora_mask 0.80)
     set(preset_sky_wind_x 0.62)
     set(preset_sky_wind_y -0.27)
     set(preset_prepass_enabled true)
-    set(preset_prepass_intensity 0.70)
-    set(preset_prepass_depth_shape 0.58)
+    set(preset_prepass_intensity 0.52)
+    set(preset_prepass_depth_shape 0.50)
     set(preset_dof_enabled true)
     set(preset_dof_intensity 0.34)
     set(preset_dof_focus_shape 0.58)
@@ -471,7 +471,21 @@ function(write_truth_stage_ini output_dir stage_file host_vignette_strength host
     string(APPEND stage_contents
       "[Truth 10] Prepass | Enabled=${preset_prepass_enabled}\n"
       "[Truth 10] Prepass | Intensity=${preset_prepass_intensity}\n"
-      "[Truth 10] Prepass | Depth Shape=${preset_prepass_depth_shape}\n")
+      "[Truth 10] Prepass | Depth Shape=${preset_prepass_depth_shape}\n"
+      "[Truth 10] Sky | Procedural Replacement=${preset_procedural_sky_enabled}\n"
+      "[Truth 10] Sky | Replacement Strength=${preset_sky_replacement_strength}\n"
+      "[Truth 10] Sky | Depth Threshold=${preset_sky_depth_threshold}\n"
+      "[Truth 10] Sky | Depth Feather=${preset_sky_depth_feather}\n"
+      "[Truth 10] Sky | Radiance Scale=${preset_sky_radiance_scale}\n"
+      "[Truth 11] Weather | Density=${preset_weather_density}\n"
+      "[Truth 12] Clouds | Coverage=${preset_cloud_coverage}\n"
+      "[Truth 12] Clouds | Density=${preset_cloud_density}\n"
+      "[Truth 13] Atmosphere | Fog Density=${preset_fog_density}\n"
+      "[Truth 14] Aurora | Activity=${preset_aurora_activity}\n"
+      "[Truth 14] Aurora | Weather Mask=${preset_aurora_mask}\n"
+      "[Truth 15] Motion | Wind X=${preset_sky_wind_x}\n"
+      "[Truth 15] Motion | Wind Y=${preset_sky_wind_y}\n"
+      "[Truth 16] World | Aurora Origin=0,0,0\n")
   elseif(stage_file STREQUAL "enbdepthoffield.fx")
     string(APPEND stage_contents
       "[Truth 20] Depth of Field | Enabled=${preset_dof_enabled}\n"
@@ -497,20 +511,6 @@ function(write_truth_stage_ini output_dir stage_file host_vignette_strength host
       "[Truth 00] Master | Enabled=${preset_master_enabled}\n"
       "[Truth 02] Optical | ENB Bloom=${preset_use_enb_bloom}\n"
       "[Truth 02] Optical | ENB Lens=${preset_use_enb_lens}\n"
-      "[Truth 10] Sky | Procedural Replacement=${preset_procedural_sky_enabled}\n"
-      "[Truth 10] Sky | Replacement Strength=${preset_sky_replacement_strength}\n"
-      "[Truth 10] Sky | Depth Threshold=${preset_sky_depth_threshold}\n"
-      "[Truth 10] Sky | Depth Feather=${preset_sky_depth_feather}\n"
-      "[Truth 10] Sky | Radiance Scale=${preset_sky_radiance_scale}\n"
-      "[Truth 11] Weather | Density=${preset_weather_density}\n"
-      "[Truth 12] Clouds | Coverage=${preset_cloud_coverage}\n"
-      "[Truth 12] Clouds | Density=${preset_cloud_density}\n"
-      "[Truth 13] Atmosphere | Fog Density=${preset_fog_density}\n"
-      "[Truth 14] Aurora | Activity=${preset_aurora_activity}\n"
-      "[Truth 14] Aurora | Weather Mask=${preset_aurora_mask}\n"
-      "[Truth 15] Motion | Wind X=${preset_sky_wind_x}\n"
-      "[Truth 15] Motion | Wind Y=${preset_sky_wind_y}\n"
-      "[Truth 16] World | Aurora Origin=0,0,0\n"
       "[Truth 60] Main Effect | Manual EV=${preset_manual_exposure_ev}\n"
       "[Truth 60] Main Effect | Auto Blend=${preset_auto_exposure_blend}\n")
   elseif(stage_file STREQUAL "enbeffectpostpass.fx")

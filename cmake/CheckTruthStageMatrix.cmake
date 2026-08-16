@@ -23,13 +23,16 @@ set(truth_common "${truth_source_dir}/shaders/truth/TruthPipelineCommon.fxh")
 set(truth_capabilities "${truth_source_dir}/shaders/truth/TruthHostCapabilities.fxh")
 set(truth_parameters "${truth_source_dir}/shaders/truth/TruthStageParameters.fxh")
 set(truth_effect_parameters "${truth_source_dir}/shaders/truth/TruthEffectParameters.fxh")
+set(truth_environment_parameters
+  "${truth_source_dir}/shaders/truth/TruthEnvironmentParameters.fxh")
 
 foreach(required_file IN ITEMS
     "${truth_compile_script}"
     "${truth_common}"
     "${truth_capabilities}"
     "${truth_parameters}"
-    "${truth_effect_parameters}")
+    "${truth_effect_parameters}"
+    "${truth_environment_parameters}")
   if(NOT EXISTS "${required_file}")
     message(FATAL_ERROR "Truth stage matrix requires source: ${required_file}")
   endif()
@@ -70,6 +73,11 @@ require_truth_source_order("${truth_main_effect}"
   "#include \"truth/TruthRuntimeParameters.fxh\""
   "#include \"truth/TruthEffectParameters.fxh\""
   "Main effect runtime ABI")
+
+set(truth_prepass_effect "${truth_source_dir}/shaders/enbeffectprepass.fx")
+require_truth_contract_tokens("${truth_prepass_effect}"
+  "HDR prepass environment ownership"
+  "#include \"truth/TruthEnvironmentParameters.fxh\"")
 require_truth_source_order("${truth_main_effect}"
   "#include \"truth/TruthEffectParameters.fxh\""
   "#include \"truth/TruthPipelineCommon.fxh\""

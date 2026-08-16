@@ -49,10 +49,25 @@ SamplerState Sampler1
     AddressV = Clamp;
 };
 
-#pragma warning(push)
-#pragma warning(disable: 3206)
-#include "enb/ENBSeries0504VanillaPostProcess.fxh"
-#pragma warning(pop)
+struct TruthEnbVertexInput
+{
+    float3 position : POSITION;
+    float2 texcoord : TEXCOORD0;
+};
+
+struct TruthEnbVertexOutput
+{
+    float4 position : SV_POSITION;
+    float2 txcoord0 : TEXCOORD0;
+};
+
+TruthEnbVertexOutput TruthEnbVertex(TruthEnbVertexInput input)
+{
+    TruthEnbVertexOutput output;
+    output.position = float4(input.position, 1.0);
+    output.txcoord0 = input.texcoord;
+    return output;
+}
 
 float TruthResolveMainAdaptationLuminance(float raw_luminance)
 {
@@ -101,7 +116,7 @@ float3 TruthCompressDisplayGamut(float3 color)
     return peak > 1.0 ? color / peak : max(color, 0.0);
 }
 
-float4 TruthEnbPixelMain(VS_OUTPUT_POST input) : SV_Target
+float4 TruthEnbPixelMain(TruthEnbVertexOutput input) : SV_Target
 {
     float3 linear_color = TruthResolveMainCapability(
         TruthResolveEnbOpticalInput(input.txcoord0));
@@ -128,36 +143,36 @@ float4 TruthEnbPixelMain(VS_OUTPUT_POST input) : SV_Target
     return float4(saturate(TruthCompressDisplayGamut(display_color)), 1.0);
 }
 
-float4 TruthEnbFallbackPixel(VS_OUTPUT_POST input) : SV_Target
+float4 TruthEnbFallbackPixel(TruthEnbVertexOutput input) : SV_Target
 {
-    return float4(saturate(TextureColor.Sample(Sampler0, input.txcoord0).rgb), 1.0);
+    return TextureColor.Sample(Sampler0, input.txcoord0);
 }
 
 technique11 Draw <string UIName = "Truth ENB";>
 {
     pass p0
     {
-        SetVertexShader(CompileShader(vs_5_0, VS_Draw()));
+        SetVertexShader(CompileShader(vs_5_0, TruthEnbVertex()));
         SetPixelShader(CompileShader(ps_5_0, TruthEnbPixelMain()));
     }
 }
 
-// This is intentionally Truth-named. ORIGINALPOSTPROCESS is an ENB-reserved
-// vanilla implementation and must not be redefined by a custom shortcut.
 technique11 TRUTHPASSTHROUGH <string UIName = "Truth: Safe passthrough";>
 {
     pass p0
     {
-        SetVertexShader(CompileShader(vs_5_0, VS_Draw()));
+        SetVertexShader(CompileShader(vs_5_0, TruthEnbVertex()));
         SetPixelShader(CompileShader(ps_5_0, TruthEnbFallbackPixel()));
     }
 }
 
-technique11 ORIGINALPOSTPROCESS <string UIName="Vanilla";> //do not modify this technique
+// ENB reserves this technique name. The implementation is an independently
+// authored scene-color identity fallback, not redistributed ENB/Bethesda code.
+technique11 ORIGINALPOSTPROCESS <string UIName="Truth: Safe fallback";>
 {
     pass p0
     {
-        SetVertexShader(CompileShader(vs_5_0, VS_Draw()));
-        SetPixelShader(CompileShader(ps_5_0, PS_DrawOriginal()));
+        SetVertexShader(CompileShader(vs_5_0, TruthEnbVertex()));
+        SetPixelShader(CompileShader(ps_5_0, TruthEnbFallbackPixel()));
     }
 }

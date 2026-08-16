@@ -63,7 +63,7 @@ TruthSunSpriteCelestial TruthSunSpriteResolveNativeCelestial()
     return TruthSunSpriteMakeCelestial(
         TruthRuntimeCelestial.xyz,
         TruthRuntimeCelestial.w,
-        TruthRuntimeCelestialReady() ? 1.0 : 0.0);
+        TruthRuntimeReady() && TruthRuntimeCelestialReady() ? 1.0 : 0.0);
 }
 
 TruthSunSpriteCelestial TruthSunSpriteResolveBridgeCelestial()

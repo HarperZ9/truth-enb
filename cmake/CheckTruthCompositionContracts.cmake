@@ -82,6 +82,7 @@ foreach(required_sun_token IN ITEMS
     "TruthEvaluateSunSprite("
     "TruthRuntimeCelestial"
     "TruthRuntimeCelestialReady()"
+    "TruthRuntimeReady() && TruthRuntimeCelestialReady()"
     "SB_Sun_Direction"
     "SB_Render_Frame"
     "TruthSunSpriteResolveCelestial("

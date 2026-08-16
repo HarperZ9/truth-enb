@@ -362,7 +362,7 @@ This task establishes what Elder actually does before changing anything.
 - Consumes: nothing.
 - Produces: a written finding that decides whether Elder needs a host axis at all.
 
-- [ ] **Step 1: Establish whether the theme fields are live**
+- [x] **Step 1: Establish whether the theme fields are live**
 
 ```bash
 cd /c/dev/elder-enb && grep -rn "sharpenStr\|grainIntensity\|vignetteEnable\|vignetteStr" presets/eote --include=*.fx --include=*.fxh
@@ -370,7 +370,7 @@ cd /c/dev/elder-enb && grep -rn "sharpenStr\|grainIntensity\|vignetteEnable\|vig
 
 Expected: hits only inside `Helper/EotE_ThemeSystem.fxh`. If that holds, the fields are declared and unread, and Elder has no theme-driven conflict.
 
-- [ ] **Step 2: Establish whether the unsharp mask is live**
+- [x] **Step 2: Establish whether the unsharp mask is live**
 
 ```bash
 cd /c/dev/elder-enb && grep -rn "Effect_ColorGrading" presets/eote --include=*.fx --include=*.fxh
@@ -378,15 +378,17 @@ cd /c/dev/elder-enb && grep -rn "Effect_ColorGrading" presets/eote --include=*.f
 
 Read each include site and record whether the `detail = color - blur` path at `Effect_ColorGrading.fxh:392` reaches the output, and what gates it.
 
-- [ ] **Step 3: Write the finding**
+- [x] **Step 3: Write the finding**
 
 Create `elder-enb/docs/EFFECTS11-CONFLICT-AUDIT.md` recording, for each of the four candidate stages, whether it is live, what gates it, and whether Effects 11 duplicates it. State honest nulls where a stage turns out to be inert.
 
-- [ ] **Step 4: Decide and record the consequence**
+- [x] **Step 4: Decide and record the consequence**
 
-If no live stage conflicts, write that Elder needs no host axis and why. If the unsharp mask is live, add a follow-on task mirroring Task 1: give it a strength uniform defaulting to its current constant, then add the host axis.
+Outcome: **Elder needs no host axis.** All four theme fields are read by nothing. The one live sharpener is `CG_Clarity` at `Effect_ColorGrading.fxh:374`, reached from `enbeffect.fx:1244` and gated on `ui_ClarityEnable`, which defaults to `false`. A default install runs no sharpening, no grain, and no vignette, so the two generated variants would be byte-identical.
 
-- [ ] **Step 5: Commit**
+No follow-on uniform task is needed. `GRADE | Clarity Enable` goes into the Task 5 upstream contribution instead, which protects the user who enables clarity without adding a variant nobody needs.
+
+- [x] **Step 5: Commit**
 
 ```bash
 cd /c/dev/elder-enb
@@ -408,23 +410,26 @@ Effects 11 force-disables competing post effects through `SettingsPatches.json`,
 - Consumes: the uniform name from Task 1.
 - Produces: nothing this repository consumes.
 
-- [ ] **Step 1: Fork and branch**
+- [x] **Step 1: Fork and branch**
 
 ```bash
 gh repo fork community-shaders/skyrim-community-shaders --clone --remote
 cd skyrim-community-shaders && git checkout -b feat/truth-enb-settings-patches dev
 ```
 
-- [ ] **Step 2: Add the entries**
+- [x] **Step 2: Add the entries**
 
 In the `enbeffectpostpass.fx` object of `features/Effects11/Shaders/Effects11/SettingsPatches.json`, add to the `patches` array:
 
 ```json
 { "variable": "[Truth 70] Postpass | Vignette Strength", "value": "0.0" },
-{ "variable": "[Truth 70] Postpass | Grain Shape", "value": "0.0" }
+{ "variable": "[Truth 70] Postpass | Grain Shape", "value": "0.0" },
+{ "variable": "GRADE | Clarity Enable", "value": "false" }
 ```
 
-- [ ] **Step 3: Verify the file still parses**
+Placement is per shader file and it matters. The two Truth names are declared in the postpass parameter slot, so they belong under the `enbeffectpostpass.fx` object. Elder's clarity reaches the output through `enbeffect.fx`, so it belongs under that one. Assert placement programmatically after editing rather than reading the diff, because the objects look alike.
+
+- [x] **Step 3: Verify the file still parses**
 
 ```bash
 python -c "import json,sys; json.load(open('features/Effects11/Shaders/Effects11/SettingsPatches.json')); print('ok')"
@@ -432,7 +437,7 @@ python -c "import json,sys; json.load(open('features/Effects11/Shaders/Effects11
 
 Expected: `ok`. A trailing comma is the common failure here.
 
-- [ ] **Step 4: Commit and raise the PR**
+- [x] **Step 4: Commit and raise the PR**
 
 `CONTRIBUTING.md` requires conventional commit titles, atomic commits, and no work-in-progress code. This change is data only.
 
@@ -445,7 +450,7 @@ gh pr create --repo community-shaders/skyrim-community-shaders --base dev \
 
 The PR body states which preset the names come from, that the stages duplicate Community Shaders upscaling and TAA, and links the preset's Nexus page. Their `CONTRIBUTING.md` directs contributors to Discord for discussion, so raise it there in parallel rather than waiting on the PR queue.
 
-- [ ] **Step 5: Record the outcome**
+- [x] **Step 5: Record the outcome**
 
 Whatever they decide, append the result to `truth-enb/docs/DECISION-hardening-branch.md`'s sibling: create `truth-enb/docs/DECISION-effects11-upstream.md` recording the PR URL, the response, and what it implies for the W3 sky feature. An accepted data PR is evidence the sky PRs are worth writing. A rejected one is worth knowing before spending the effort.
 
@@ -462,7 +467,7 @@ Whatever they decide, append the result to `truth-enb/docs/DECISION-hardening-br
 - Consumes: nothing.
 - Produces: nothing.
 
-- [ ] **Step 1: Add the statement**
+- [x] **Step 1: Add the statement**
 
 Add a section immediately after the opening paragraph of `enb-runtime-core/README.md`:
 
@@ -476,7 +481,7 @@ entry points and publish no ENB API, so this library is inert there by design
 rather than by defect.
 ```
 
-- [ ] **Step 2: Verify the claim still holds**
+- [x] **Step 2: Verify the claim still holds**
 
 ```bash
 curl -sSL https://raw.githubusercontent.com/community-shaders/skyrim-community-shaders/dev/src/XSEPlugin.cpp | grep -c 'extern "C" DLLEXPORT'
@@ -484,7 +489,7 @@ curl -sSL https://raw.githubusercontent.com/community-shaders/skyrim-community-s
 
 Expected: `3`, matching `SKSEPlugin_Load`, `SKSEPlugin_Version`, and `SKSEPlugin_Query`. If this returns a larger number, Community Shaders has added exports and the claim needs rechecking before it ships.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 cd /c/dev/enb-runtime-core

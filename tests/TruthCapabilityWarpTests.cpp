@@ -1,12 +1,17 @@
 #include <array>
 #include <cmath>
 #include <cstdint>
+#include <cwchar>
 #include <cstring>
 #include <cstdlib>
 #include <filesystem>
+#include <fstream>
 #include <iostream>
+#include <limits>
+#include <new>
 #include <string>
 #include <string_view>
+#include <vector>
 
 #include <d3d11.h>
 #include <d3dcompiler.h>
@@ -80,6 +85,116 @@ void check_hr(const HRESULT hr, const std::string_view operation)
     return std::string(data, data + blob->GetBufferSize());
 }
 
+[[nodiscard]] bool equal_path_part(const std::filesystem::path& left,
+                                   const std::filesystem::path& right)
+{
+    return _wcsicmp(left.c_str(), right.c_str()) == 0;
+}
+
+[[nodiscard]] bool is_within(const std::filesystem::path& root,
+                             const std::filesystem::path& candidate)
+{
+    auto root_part = root.begin();
+    auto candidate_part = candidate.begin();
+    for (; root_part != root.end(); ++root_part, ++candidate_part) {
+        if (candidate_part == candidate.end()
+            || !equal_path_part(*root_part, *candidate_part)) {
+            return false;
+        }
+    }
+    return true;
+}
+
+[[nodiscard]] std::filesystem::path shader_root_for(
+    const std::filesystem::path& shader_path)
+{
+    auto directory = std::filesystem::weakly_canonical(shader_path.parent_path());
+    if (equal_path_part(directory.filename(), "truth")) {
+        directory = directory.parent_path();
+    }
+    return directory;
+}
+
+class ShaderRootIncludeResolver final : public ID3DInclude {
+public:
+    explicit ShaderRootIncludeResolver(std::filesystem::path shader_root)
+        : shader_root_(std::filesystem::weakly_canonical(std::move(shader_root)))
+    {
+        if (!std::filesystem::is_directory(shader_root_)) {
+            fail("shader include root does not exist");
+        }
+    }
+
+    HRESULT __stdcall Open(D3D_INCLUDE_TYPE,
+                           LPCSTR file_name,
+                           LPCVOID,
+                           LPCVOID* data,
+                           UINT* byte_count) override
+    {
+        if (file_name == nullptr || data == nullptr || byte_count == nullptr) {
+            return E_INVALIDARG;
+        }
+        try {
+            const std::filesystem::path requested{file_name};
+            if (requested.empty() || requested.is_absolute()
+                || requested.has_root_name() || requested.has_root_directory()) {
+                return E_ACCESSDENIED;
+            }
+            for (const auto& part : requested) {
+                if (part == "..") {
+                    return E_ACCESSDENIED;
+                }
+            }
+
+            for (const auto& base : {shader_root_, shader_root_ / "truth"}) {
+                const auto candidate = std::filesystem::weakly_canonical(
+                    base / requested);
+                if (!is_within(shader_root_, candidate)
+                    || !std::filesystem::is_regular_file(candidate)) {
+                    continue;
+                }
+
+                std::ifstream stream(candidate, std::ios::binary | std::ios::ate);
+                if (!stream) {
+                    return E_FAIL;
+                }
+                const auto length = stream.tellg();
+                if (length < 0
+                    || static_cast<std::uint64_t>(length)
+                        > (std::numeric_limits<UINT>::max)()) {
+                    return E_FAIL;
+                }
+                stream.seekg(0, std::ios::beg);
+                const auto size = static_cast<std::size_t>(length);
+                auto* bytes = new (std::nothrow) char[size == 0U ? 1U : size];
+                if (bytes == nullptr) {
+                    return E_OUTOFMEMORY;
+                }
+                if (size != 0U
+                    && !stream.read(bytes, static_cast<std::streamsize>(size))) {
+                    delete[] bytes;
+                    return E_FAIL;
+                }
+                *data = bytes;
+                *byte_count = static_cast<UINT>(size);
+                return S_OK;
+            }
+            return E_ACCESSDENIED;
+        } catch (...) {
+            return E_FAIL;
+        }
+    }
+
+    HRESULT __stdcall Close(LPCVOID data) override
+    {
+        delete[] static_cast<const char*>(data);
+        return S_OK;
+    }
+
+private:
+    std::filesystem::path shader_root_;
+};
+
 [[nodiscard]] ComPtr<ID3DBlob> compile_probe(
     const std::filesystem::path& probe_path,
     const bool declared_native_available)
@@ -95,8 +210,9 @@ void check_hr(const HRESULT hr, const std::string_view operation)
         | D3DCOMPILE_WARNINGS_ARE_ERRORS
         | D3DCOMPILE_IEEE_STRICTNESS
         | D3DCOMPILE_OPTIMIZATION_LEVEL3;
+    ShaderRootIncludeResolver includes{shader_root_for(probe_path)};
     const HRESULT hr = D3DCompileFromFile(
-        probe_path.c_str(), macros, D3D_COMPILE_STANDARD_FILE_INCLUDE,
+        probe_path.c_str(), macros, &includes,
         "TruthCapabilityWarpProbeMain", "cs_5_0", flags, 0U,
         &bytecode, &diagnostics);
     if (FAILED(hr)) {

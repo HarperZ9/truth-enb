@@ -12,12 +12,14 @@
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
+#include <cwchar>
 #include <cstring>
 #include <exception>
 #include <fstream>
 #include <iomanip>
 #include <limits>
 #include <mutex>
+#include <new>
 #include <sstream>
 #include <string>
 #include <system_error>
@@ -86,6 +88,109 @@ static_assert(sizeof(SceneParameters) == 64U);
   return stream.str();
 }
 
+[[nodiscard]] bool EqualPathPart(const std::filesystem::path& left,
+                                 const std::filesystem::path& right) {
+  return _wcsicmp(left.c_str(), right.c_str()) == 0;
+}
+
+[[nodiscard]] bool IsWithin(const std::filesystem::path& root,
+                            const std::filesystem::path& candidate) {
+  auto root_part = root.begin();
+  auto candidate_part = candidate.begin();
+  for (; root_part != root.end(); ++root_part, ++candidate_part) {
+    if (candidate_part == candidate.end()
+        || !EqualPathPart(*root_part, *candidate_part)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+[[nodiscard]] std::filesystem::path ShaderRootFor(
+    const std::filesystem::path& shader_path) {
+  auto directory = std::filesystem::weakly_canonical(shader_path.parent_path());
+  if (EqualPathPart(directory.filename(), "truth")) {
+    directory = directory.parent_path();
+  }
+  return directory;
+}
+
+class ShaderRootIncludeResolver final : public ID3DInclude {
+ public:
+  explicit ShaderRootIncludeResolver(std::filesystem::path shader_root)
+      : shader_root_(std::filesystem::weakly_canonical(std::move(shader_root))) {}
+
+  HRESULT __stdcall Open(D3D_INCLUDE_TYPE,
+                         LPCSTR file_name,
+                         LPCVOID,
+                         LPCVOID* data,
+                         UINT* byte_count) override {
+    if (file_name == nullptr || data == nullptr || byte_count == nullptr) {
+      return E_INVALIDARG;
+    }
+    try {
+      if (!std::filesystem::is_directory(shader_root_)) {
+        return E_ACCESSDENIED;
+      }
+      const std::filesystem::path requested{file_name};
+      if (requested.empty() || requested.is_absolute()
+          || requested.has_root_name() || requested.has_root_directory()) {
+        return E_ACCESSDENIED;
+      }
+      for (const auto& part : requested) {
+        if (part == "..") {
+          return E_ACCESSDENIED;
+        }
+      }
+
+      for (const auto& base : {shader_root_, shader_root_ / "truth"}) {
+        const auto candidate = std::filesystem::weakly_canonical(
+            base / requested);
+        if (!IsWithin(shader_root_, candidate)
+            || !std::filesystem::is_regular_file(candidate)) {
+          continue;
+        }
+
+        std::ifstream stream(candidate, std::ios::binary | std::ios::ate);
+        if (!stream) {
+          return E_FAIL;
+        }
+        const auto length = stream.tellg();
+        if (length < 0
+            || static_cast<std::uint64_t>(length)
+                > (std::numeric_limits<UINT>::max)()) {
+          return E_FAIL;
+        }
+        stream.seekg(0, std::ios::beg);
+        const auto size = static_cast<std::size_t>(length);
+        auto* bytes = new (std::nothrow) char[size == 0U ? 1U : size];
+        if (bytes == nullptr) {
+          return E_OUTOFMEMORY;
+        }
+        if (size != 0U
+            && !stream.read(bytes, static_cast<std::streamsize>(size))) {
+          delete[] bytes;
+          return E_FAIL;
+        }
+        *data = bytes;
+        *byte_count = static_cast<UINT>(size);
+        return S_OK;
+      }
+      return E_ACCESSDENIED;
+    } catch (...) {
+      return E_FAIL;
+    }
+  }
+
+  HRESULT __stdcall Close(LPCVOID data) override {
+    delete[] static_cast<const char*>(data);
+    return S_OK;
+  }
+
+ private:
+  std::filesystem::path shader_root_;
+};
+
 [[nodiscard]] bool CompileShader(
     const std::filesystem::path& shader_path,
     const char* entry_point,
@@ -132,10 +237,11 @@ static_assert(sizeof(SceneParameters) == 64U);
       | D3DCOMPILE_WARNINGS_ARE_ERRORS
       | D3DCOMPILE_IEEE_STRICTNESS
       | D3DCOMPILE_OPTIMIZATION_LEVEL1;
+  ShaderRootIncludeResolver includes{ShaderRootFor(normalized_path)};
   const HRESULT result = D3DCompileFromFile(
       normalized_path.c_str(),
       macro_pointer,
-      D3D_COMPILE_STANDARD_FILE_INCLUDE,
+      &includes,
       entry_point,
       target,
       flags,

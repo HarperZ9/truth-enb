@@ -1,6 +1,8 @@
 #ifndef TRUTH_QUALITY_FXH
 #define TRUTH_QUALITY_FXH
 
+#include "truth/TruthQualityPresetOverride.fxh"
+
 #ifndef TRUTH_QUALITY_TIER
 #define TRUTH_QUALITY_TIER 1
 #endif

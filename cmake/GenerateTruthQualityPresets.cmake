@@ -141,6 +141,51 @@ foreach(expected_tier RANGE 0 4)
   endif()
 endforeach()
 
+# Host manifest. Effects 11 injects no preprocessor defines into preset shaders
+# (both D3DCompile sites pass nullptr for pDefines), so a preset cannot detect
+# its host at compile time. Host selection travels through the generated INIs,
+# which is why this is a second generator axis rather than a shader fork.
+if(NOT DEFINED TRUTH_HOSTS_CSV OR "${TRUTH_HOSTS_CSV}" STREQUAL "")
+  set(TRUTH_HOSTS_CSV "${truth_source_dir}/config/hosts.csv")
+endif()
+if(NOT EXISTS "${TRUTH_HOSTS_CSV}")
+  message(FATAL_ERROR "Truth host manifest is absent: ${TRUTH_HOSTS_CSV}")
+endif()
+file(REAL_PATH "${TRUTH_HOSTS_CSV}" truth_hosts_csv)
+
+file(STRINGS "${truth_hosts_csv}" host_lines ENCODING UTF-8)
+list(LENGTH host_lines host_line_count)
+if(NOT host_line_count EQUAL 3)
+  message(FATAL_ERROR
+    "Truth host manifest must contain one header and exactly two hosts; found ${host_line_count} lines")
+endif()
+
+list(GET host_lines 0 host_header)
+set(expected_host_header
+  "host,id,label,postpass_intensity,postpass_vignette_strength,postpass_grain_shape")
+if(NOT host_header STREQUAL expected_host_header)
+  message(FATAL_ERROR "Truth host manifest header does not match the canonical contract")
+endif()
+
+set(expected_host_rows
+  "0,enbseries,ENBSeries,1.0,0.18,0.0"
+  "1,effects11,Effects 11,1.0,0.0,0.0")
+foreach(host_index RANGE 0 1)
+  math(EXPR host_line_index "${host_index} + 1")
+  list(GET host_lines ${host_line_index} host_line)
+  list(GET expected_host_rows ${host_index} expected_host_row)
+  if(NOT host_line STREQUAL expected_host_row)
+    message(FATAL_ERROR
+      "Truth host manifest row ${host_line_index} does not match the canonical contract")
+  endif()
+  string(REPLACE "," ";" host_fields "${host_line}")
+  list(LENGTH host_fields host_field_count)
+  if(NOT host_field_count EQUAL 6)
+    message(FATAL_ERROR "Truth host manifest row ${host_line_index} must contain 6 fields")
+  endif()
+  set("truth_host_row_${host_index}" "${host_fields}")
+endforeach()
+
 file(REMOVE_RECURSE "${truth_output_dir}")
 file(MAKE_DIRECTORY "${truth_output_dir}")
 
@@ -154,6 +199,22 @@ set(truth_stage_files
   enbeffectpostpass.fx
   enbsunsprite.fx
   enbunderwater.fx)
+
+foreach(host_index RANGE 0 1)
+  set(host_fields "${truth_host_row_${host_index}}")
+  list(GET host_fields 1 host_id)
+  list(GET host_fields 2 host_label)
+  list(GET host_fields 3 host_postpass_intensity)
+  list(GET host_fields 4 host_vignette_strength)
+  list(GET host_fields 5 host_grain_shape)
+
+  string(CONCAT host_values
+    "[TRUTH HOST]\n"
+    "Host=${host_id}\n"
+    "HostLabel=${host_label}\n"
+    "TruthPostpassIntensity=${host_postpass_intensity}\n"
+    "TruthPostpassVignetteStrength=${host_vignette_strength}\n"
+    "TruthPostpassGrainShape=${host_grain_shape}\n")
 
 foreach(tier RANGE 0 4)
   set(quality_fields "${truth_quality_row_${tier}}")
@@ -169,10 +230,10 @@ foreach(tier RANGE 0 4)
   list(GET quality_fields 10 bloom_radius)
   list(GET quality_fields 11 ssr_steps)
 
-  set(tier_enbseries_dir "${truth_output_dir}/${tier_id}/ROOT/enbseries")
+  set(tier_enbseries_dir "${truth_output_dir}/${host_id}/${tier_id}/ROOT/enbseries")
   file(MAKE_DIRECTORY "${tier_enbseries_dir}")
   set(tier_header
-    "; Generated from config/quality-tiers.csv\n; Product=Truth ENB\n; Tier=${tier_id}\n")
+    "; Generated from config/quality-tiers.csv and config/hosts.csv\n; Product=Truth ENB\n; Host=${host_id}\n; Tier=${tier_id}\n")
   string(CONCAT tier_quality_values
     "[TRUTH QUALITY]\n"
     "TRUTH_QUALITY_TIER=${tier}\n"
@@ -188,9 +249,10 @@ foreach(tier RANGE 0 4)
     "SSRSteps=${ssr_steps}\n")
 
   file(WRITE "${tier_enbseries_dir}/truth-quality.ini"
-    "${tier_header}\n${tier_quality_values}")
+    "${tier_header}\n${tier_quality_values}\n${host_values}")
   foreach(stage_file IN LISTS truth_stage_files)
     file(WRITE "${tier_enbseries_dir}/${stage_file}.ini"
-      "${tier_header}\n${tier_quality_values}\n[TRUTH STAGE]\nName=${stage_file}\n")
+      "${tier_header}\n${tier_quality_values}\n${host_values}\n[TRUTH STAGE]\nName=${stage_file}\n")
   endforeach()
+endforeach()
 endforeach()

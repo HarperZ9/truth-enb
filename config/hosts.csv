@@ -1,0 +1,3 @@
+host,id,label,postpass_intensity,postpass_vignette_strength,postpass_grain_shape
+0,enbseries,ENBSeries,1.0,0.18,0.0
+1,effects11,Effects 11,1.0,0.0,0.0

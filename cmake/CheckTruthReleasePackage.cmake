@@ -48,6 +48,10 @@ set(truth_include_names
   TruthSunSprite.fxh
   TruthUnderwater.fxh)
 set(truth_tier_ids performance balanced quality ultra cinematic)
+# Presets ship per host as well as per tier. Effects 11 injects no defines into
+# preset shaders, so the host is carried by the generated INI rather than by a
+# compile-time branch.
+set(truth_host_ids enbseries effects11)
 set(truth_preset_names
   enbadaptation.fx.ini
   enbbloom.fx.ini
@@ -78,10 +82,12 @@ endforeach()
 foreach(include IN LISTS truth_include_names)
   list(APPEND expected_files "Root/enbseries/truth/${include}")
 endforeach()
-foreach(tier IN LISTS truth_tier_ids)
-  foreach(preset IN LISTS truth_preset_names)
-    list(APPEND expected_files
-      "Presets/${tier}/ROOT/enbseries/${preset}")
+foreach(host IN LISTS truth_host_ids)
+  foreach(tier IN LISTS truth_tier_ids)
+    foreach(preset IN LISTS truth_preset_names)
+      list(APPEND expected_files
+        "Presets/${host}/${tier}/ROOT/enbseries/${preset}")
+    endforeach()
   endforeach()
 endforeach()
 list(SORT expected_files)
@@ -116,9 +122,9 @@ function(truth_expected_source relative output)
   elseif(relative MATCHES "^Root/enbseries/(.+\\.fx)$")
     set(source "${TRUTH_SOURCE_ROOT}/shaders/${CMAKE_MATCH_1}")
   elseif(relative MATCHES
-      "^Presets/([^/]+)/ROOT/enbseries/(.+\\.ini)$")
+      "^Presets/([^/]+)/([^/]+)/ROOT/enbseries/(.+\\.ini)$")
     set(source
-      "${TRUTH_PRESET_ROOT}/${CMAKE_MATCH_1}/ROOT/enbseries/${CMAKE_MATCH_2}")
+      "${TRUTH_PRESET_ROOT}/${CMAKE_MATCH_1}/${CMAKE_MATCH_2}/ROOT/enbseries/${CMAKE_MATCH_3}")
   else()
     message(FATAL_ERROR "No source mapping for package file: ${relative}")
   endif()

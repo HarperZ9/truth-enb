@@ -133,7 +133,7 @@ git commit -m "feat: give postpass vignette its own strength uniform"
 - Consumes: `TruthPostpassVignetteStrength` from Task 1.
 - Produces: preset output at `Presets/<host_id>/<tier_id>/ROOT/enbseries/truth-quality.ini` for host ids `enbseries` and `effects11`. Task 3 asserts this layout.
 
-- [ ] **Step 1: Write the failing gate assertion**
+- [x] **Step 1: Write the failing gate assertion**
 
 In `cmake/CheckTruthQualityPresets.cmake`, replace the single-axis glob at line 196 with a host-aware one:
 
@@ -151,7 +151,7 @@ foreach(host_name IN LISTS expected_hosts)
 endforeach()
 ```
 
-- [ ] **Step 2: Run the gate to verify it fails**
+- [x] **Step 2: Run the gate to verify it fails**
 
 ```bash
 cmake --preset vs2026-x64
@@ -159,7 +159,7 @@ cmake --preset vs2026-x64
 
 Expected: FATAL_ERROR naming `.../enbseries/performance/ROOT/enbseries/truth-quality.ini` as absent, because the generator still writes the single-axis layout.
 
-- [ ] **Step 3: Create the host manifest**
+- [x] **Step 3: Create the host manifest**
 
 Create `config/hosts.csv`. Only the keys that differ per host appear here. `postpass_vignette_strength` and `postpass_grain_shape` go to zero under Effects 11 because Community Shaders owns those stages; `postpass_intensity` stays at 1.0 so dithering survives.
 
@@ -169,7 +169,7 @@ host,id,label,postpass_intensity,postpass_vignette_strength,postpass_grain_shape
 1,effects11,Effects 11,1.0,0.0,0.0
 ```
 
-- [ ] **Step 4: Extend the generator**
+- [x] **Step 4: Extend the generator**
 
 In `cmake/GenerateTruthQualityPresets.cmake`, after the existing quality-manifest validation block, add host-manifest validation using the same shape:
 
@@ -240,15 +240,20 @@ Update the generated header comment in `cmake/CheckTruthQualityPresets.cmake:205
 "; Generated from config/quality-tiers.csv and config/hosts.csv\n; Product=Truth ENB\n; Host=${host_label}\n; Tier=${tier_name}\n"
 ```
 
-- [ ] **Step 5: Run the gate to verify it passes**
+- [x] **Step 5: Run the gate to verify it passes**
 
 ```bash
 cmake --preset vs2026-x64
+ctest --preset vs2026-x64-debug -R truth_quality_presets --output-on-failure
 ```
 
-Expected: configure succeeds. Ten preset directories exist, two hosts by five tiers.
+The gate needed one change this task did not anticipate. `CheckTruthQualityPresets.cmake` also validated the shape of the output root, asserting it held exactly the five canonical tiers. With the host axis the root holds hosts, and each host holds the tiers, so that check became a nested pair. Without it the gate failed with "Truth quality preset root must contain exactly five canonical tiers" even though generation was correct.
 
-- [ ] **Step 6: Verify the ENBSeries variant did not move**
+Two assertions were added beyond the plan, because a host axis that generates two identical trees would otherwise pass every existing check. For each tier, the ENBSeries variant must contain `TruthPostpassVignetteStrength=0.18` and the Effects 11 variant must contain `TruthPostpassVignetteStrength=0.0`. A generator that silently wrote the same file twice now fails here rather than shipping a variant that double-processes.
+
+Observed: ten preset directories, two hosts by five tiers, 100 INI files.
+
+- [x] **Step 6: Verify the ENBSeries variant did not move**
 
 ```bash
 ctest --preset vs2026-x64-debug -R truth_post_finish_warp --output-on-failure
@@ -256,7 +261,7 @@ ctest --preset vs2026-x64-debug -R truth_post_finish_warp --output-on-failure
 
 Expected: PASS at the Task 1 baseline hash. The ENBSeries host row carries `0.18`, so its render is unchanged.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add config/hosts.csv cmake/GenerateTruthQualityPresets.cmake cmake/CheckTruthQualityPresets.cmake
@@ -274,7 +279,7 @@ git commit -m "feat: generate presets across a host axis"
 - Consumes: the `Presets/<host>/<tier>/ROOT/enbseries/*.ini` layout from Task 2.
 - Produces: nothing later tasks consume.
 
-- [ ] **Step 1: Write the failing assertion**
+- [x] **Step 1: Write the failing assertion**
 
 At `cmake/CheckTruthReleasePackage.cmake:84`, replace the single-axis expected-file construction:
 
@@ -297,7 +302,7 @@ elseif(relative MATCHES "^Presets/([^/]+)/([^/]+)/ROOT/enbseries/(.+\\.ini)$")
     "${TRUTH_PRESET_ROOT}/${CMAKE_MATCH_1}/${CMAKE_MATCH_2}/ROOT/enbseries/${CMAKE_MATCH_3}")
 ```
 
-- [ ] **Step 2: Run the package gate to verify it fails**
+- [x] **Step 2: Run the package gate to verify it fails**
 
 ```bash
 cmake --build --preset vs2026-x64-debug --target package
@@ -305,24 +310,23 @@ cmake --build --preset vs2026-x64-debug --target package
 
 Expected: FATAL_ERROR listing the ten expected `Presets/<host>/<tier>/...` paths as absent from the archive, because the install rules still stage the single-axis tree.
 
-- [ ] **Step 3: Update the install rules**
+- [x] **Step 3: The install rules need no change**
 
-In `CMakeLists.txt`, replace the single-axis preset install block near line 229 with a host-aware pair of loops:
+This step was wrong. `CMakeLists.txt:253` already installs the whole preset tree recursively:
 
 ```cmake
-  foreach(preset_host IN ITEMS enbseries effects11)
-    foreach(preset_tier IN ITEMS performance balanced quality ultra cinematic)
-      install(
-        DIRECTORY "${TRUTH_PRESET_ROOT}/${preset_host}/${preset_tier}/"
-        DESTINATION "Presets/${preset_host}/${preset_tier}"
-        FILES_MATCHING PATTERN "*.ini")
-    endforeach()
-  endforeach()
+  install(
+    DIRECTORY "${TRUTH_RELEASE_PRESET_ROOT}/"
+    DESTINATION "Presets"
+    COMPONENT "${TRUTH_RELEASE_COMPONENT}"
+  )
 ```
 
-The host and tier lists are duplicated here rather than read from the CSVs because `install()` runs at configure time against values the generator has already validated. If the manifests change, both gates in Task 2 and Task 3 fail loudly rather than silently packaging a stale set.
+A recursive directory install picks up the new host level with no edit. Adding the explicit per-host, per-tier loops the plan proposed would have duplicated the manifest lists into a third place for no benefit. The only changes Task 3 needs are the two in Step 1.
 
-- [ ] **Step 4: Run the package gate to verify it passes**
+**Stale evidence, worth knowing.** Preset generation runs at *configure* time through `execute_process` at `CMakeLists.txt:238`, not at build time. After Task 2 the full suite reported 33 of 33 passing including this package gate, which was impossible, because `build/release-presets` still held the pre-Task-2 single-axis tree. Reconfiguring regenerated it and the gate then failed correctly. Any evidence about packaging gathered without a reconfigure after touching the generator or either manifest is worthless.
+
+- [x] **Step 4: Run the package gate to verify it passes**
 
 ```bash
 cmake --build --preset vs2026-x64-debug --target package
@@ -330,11 +334,11 @@ cmake --build --preset vs2026-x64-debug --target package
 
 Expected: the archive builds and the gate reports no unexpected and no missing files.
 
-- [ ] **Step 5: Verify determinism**
+- [x] **Step 5: Verify determinism**
 
 Build the package twice and compare archive hashes. Expected: identical. The existing package-validation harness already renders `archive-first` and `archive-second` for this purpose.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add cmake/CheckTruthReleasePackage.cmake CMakeLists.txt

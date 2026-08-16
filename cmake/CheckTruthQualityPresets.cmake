@@ -166,58 +166,110 @@ endif()
 set(expected_tiers performance balanced quality ultra cinematic)
 set(canonical_tiers ${expected_tiers})
 list(SORT expected_tiers)
-file(GLOB first_entries LIST_DIRECTORIES true "${first_output}/*")
-set(actual_tiers)
-foreach(entry IN LISTS first_entries)
+
+# The root now holds hosts, and each host holds the five tiers.
+set(canonical_hosts enbseries effects11)
+set(sorted_hosts ${canonical_hosts})
+list(SORT sorted_hosts)
+file(GLOB first_host_entries LIST_DIRECTORIES true "${first_output}/*")
+set(actual_hosts)
+foreach(entry IN LISTS first_host_entries)
   if(NOT IS_DIRECTORY "${entry}")
-    message(FATAL_ERROR "Truth quality preset root contains a non-tier artifact: ${entry}")
+    message(FATAL_ERROR "Truth quality preset root contains a non-host artifact: ${entry}")
   endif()
-  get_filename_component(tier_name "${entry}" NAME)
-  list(APPEND actual_tiers "${tier_name}")
+  get_filename_component(host_name "${entry}" NAME)
+  list(APPEND actual_hosts "${host_name}")
 endforeach()
-list(SORT actual_tiers)
-if(NOT "${actual_tiers}" STREQUAL "${expected_tiers}")
-  message(FATAL_ERROR "Truth quality preset root must contain exactly five canonical tiers")
+list(SORT actual_hosts)
+if(NOT "${actual_hosts}" STREQUAL "${sorted_hosts}")
+  message(FATAL_ERROR "Truth quality preset root must contain exactly the two canonical hosts")
 endif()
+
+foreach(host_name IN LISTS canonical_hosts)
+  file(GLOB first_entries LIST_DIRECTORIES true "${first_output}/${host_name}/*")
+  set(actual_tiers)
+  foreach(entry IN LISTS first_entries)
+    if(NOT IS_DIRECTORY "${entry}")
+      message(FATAL_ERROR "Truth quality preset host contains a non-tier artifact: ${entry}")
+    endif()
+    get_filename_component(tier_name "${entry}" NAME)
+    list(APPEND actual_tiers "${tier_name}")
+  endforeach()
+  list(SORT actual_tiers)
+  if(NOT "${actual_tiers}" STREQUAL "${expected_tiers}")
+    message(FATAL_ERROR
+      "Truth quality host ${host_name} must contain exactly five canonical tiers")
+  endif()
+endforeach()
 
 file(GLOB_RECURSE first_ini_files
   LIST_DIRECTORIES false
   RELATIVE "${first_output}"
   "${first_output}/*.ini")
 list(LENGTH first_ini_files first_ini_count)
-if(NOT first_ini_count EQUAL 50)
-  message(FATAL_ERROR "Truth quality presets must contain exactly 50 INI files; found ${first_ini_count}")
+if(NOT first_ini_count EQUAL 100)
+  message(FATAL_ERROR "Truth quality presets must contain exactly 100 INI files; found ${first_ini_count}")
 endif()
 
-foreach(tier_name IN LISTS expected_tiers)
-  list(FIND canonical_tiers "${tier_name}" tier_index)
-  file(GLOB tier_ini_files
-    LIST_DIRECTORIES false
-    "${first_output}/${tier_name}/ROOT/enbseries/*.ini")
-  list(LENGTH tier_ini_files tier_ini_count)
-  if(NOT tier_ini_count EQUAL 10)
-    message(FATAL_ERROR
-      "Truth quality tier ${tier_name} must contain nine stage INIs and truth-quality.ini")
-  endif()
-  foreach(tier_ini_file IN LISTS tier_ini_files)
-    file(READ "${tier_ini_file}" tier_ini_contents)
-    set(expected_header
-      "; Generated from config/quality-tiers.csv\n; Product=Truth ENB\n; Tier=${tier_name}\n")
-    string(LENGTH "${expected_header}" expected_header_length)
-    string(SUBSTRING "${tier_ini_contents}" 0 ${expected_header_length} actual_header)
-    if(NOT actual_header STREQUAL expected_header)
-      message(FATAL_ERROR "Truth quality preset has an invalid header: ${tier_ini_file}")
+# Effects 11 injects no preprocessor defines into preset shaders, so a preset
+# cannot detect its host at compile time. Host selection travels through these
+# generated INIs instead, which is why the tier axis gained a host axis rather
+# than the shader tree gaining a fork.
+set(expected_hosts enbseries effects11)
+
+foreach(host_name IN LISTS expected_hosts)
+  foreach(tier_name IN LISTS expected_tiers)
+    list(FIND canonical_tiers "${tier_name}" tier_index)
+    file(GLOB tier_ini_files
+      LIST_DIRECTORIES false
+      "${first_output}/${host_name}/${tier_name}/ROOT/enbseries/*.ini")
+    list(LENGTH tier_ini_files tier_ini_count)
+    if(NOT tier_ini_count EQUAL 10)
+      message(FATAL_ERROR
+        "Truth quality host ${host_name} tier ${tier_name} must contain nine stage INIs and truth-quality.ini")
+    endif()
+    foreach(tier_ini_file IN LISTS tier_ini_files)
+      file(READ "${tier_ini_file}" tier_ini_contents)
+      set(expected_header
+        "; Generated from config/quality-tiers.csv and config/hosts.csv\n; Product=Truth ENB\n; Host=${host_name}\n; Tier=${tier_name}\n")
+      string(LENGTH "${expected_header}" expected_header_length)
+      string(SUBSTRING "${tier_ini_contents}" 0 ${expected_header_length} actual_header)
+      if(NOT actual_header STREQUAL expected_header)
+        message(FATAL_ERROR "Truth quality preset has an invalid header: ${tier_ini_file}")
+      endif()
+    endforeach()
+    file(READ "${first_output}/${host_name}/${tier_name}/ROOT/enbseries/truth-quality.ini"
+      truth_quality_contents)
+    set(expected_quality_values
+      "[TRUTH QUALITY]\nTRUTH_QUALITY_TIER=${tier_index}\n")
+    string(FIND "${truth_quality_contents}" "${expected_quality_values}"
+      quality_values_position)
+    if(quality_values_position EQUAL -1)
+      message(FATAL_ERROR
+        "Truth quality metadata is not written as active INI values for host ${host_name} tier ${tier_name}")
     endif()
   endforeach()
-  file(READ "${first_output}/${tier_name}/ROOT/enbseries/truth-quality.ini"
-    truth_quality_contents)
-  set(expected_quality_values
-    "[TRUTH QUALITY]\nTRUTH_QUALITY_TIER=${tier_index}\n")
-  string(FIND "${truth_quality_contents}" "${expected_quality_values}"
-    quality_values_position)
-  if(quality_values_position EQUAL -1)
+endforeach()
+
+# The host axis is only real if the two hosts disagree. Assert the postpass keys
+# differ, so a generator that silently wrote the same file twice fails here
+# rather than shipping a variant that double-processes under Effects 11.
+foreach(tier_name IN LISTS expected_tiers)
+  file(READ "${first_output}/enbseries/${tier_name}/ROOT/enbseries/enbeffectpostpass.fx.ini"
+    enbseries_postpass_contents)
+  file(READ "${first_output}/effects11/${tier_name}/ROOT/enbseries/enbeffectpostpass.fx.ini"
+    effects11_postpass_contents)
+  string(FIND "${enbseries_postpass_contents}" "TruthPostpassVignetteStrength=0.18"
+    enbseries_vignette_position)
+  if(enbseries_vignette_position EQUAL -1)
     message(FATAL_ERROR
-      "Truth quality metadata is not written as active INI values for tier ${tier_name}")
+      "The ENBSeries variant must keep its vignette at 0.18 for tier ${tier_name}")
+  endif()
+  string(FIND "${effects11_postpass_contents}" "TruthPostpassVignetteStrength=0.0"
+    effects11_vignette_position)
+  if(effects11_vignette_position EQUAL -1)
+    message(FATAL_ERROR
+      "The Effects 11 variant must zero its vignette for tier ${tier_name}")
   endif()
 endforeach()
 

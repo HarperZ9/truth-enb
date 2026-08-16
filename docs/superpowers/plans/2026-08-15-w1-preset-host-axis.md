@@ -498,6 +498,19 @@ git add README.md
 git commit -m "docs: state the ENBSeries host requirement plainly"
 ```
 
+- [x] **Step 4: Return the checkout to main, or Truth stops building**
+
+Truth pins `enb-runtime-core` by exact revision and verifies it at configure time. `CMakeLists.txt:78` in the runtime subproject fails with `enb-runtime-core revision mismatch` when the local checkout's HEAD is not the pinned commit. Committing on a branch there moves HEAD, so a documentation-only commit in a sibling repository breaks Truth's `truth_runtime_reproducible_release` gate.
+
+```bash
+git -C /c/dev/enb-runtime-core checkout main
+cd /c/dev/truth-enb && ctest --preset vs2026-x64-debug
+```
+
+Expected: 33 of 33. The branch keeps the work; the pin keeps pointing at main until that branch merges, at which point Truth's pin is updated deliberately as its own change.
+
+This is the same failure class as a history rewrite invalidating a pin, reached a different way. The tell is identical: the dependency looks fine on its own and the dependent will not configure.
+
 ---
 
 ### Task 7: In-game verification under both hosts

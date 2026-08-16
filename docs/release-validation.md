@@ -28,7 +28,10 @@ Authoritative upstream pages:
 
 - `https://enbdev.com/download_mod_tesskyrimse.html`
 - `https://www.enbdev.com/news.html`
-- `https://www.nexusmods.com/skyrimspecialedition/mods/184607`
+
+Truth ENB public page:
+
+- Nexus Mods: TBD until a Truth ENB page is assigned
 
 ## Automated gates
 
@@ -38,11 +41,20 @@ budget, runtime plugin binary/ABI tests, and deterministic install/ZIP manifest.
 The public package target runs the complete production shader suite plus two clean,
 independent static-runtime Release builds before archiving; their plugin bytes
 must match each other and the plugin entering the archive exactly.
+These are release-artifact requirements, not a standalone public acceptance
+claim. Mark them passed only when the final ZIP path, checksum, and package
+manifest are recorded for that specific release artifact.
 
 ## Live gates before public upload
 
 Run these checks on both Skyrim SE 1.5.97 and the supported AE build using the
 locked ENB archive:
+
+The final integrated live matrix is not recorded here yet. Public upload remains
+blocked until Performance, Balanced, and Cinematic are run and recorded, along
+with the no-runtime/fail-closed path. An isolated main-menu shader compile smoke
+is compile-smoke evidence only; without a recorded row and artifact, it is not
+visual, gameplay, tier-integration, or upload-acceptance evidence.
 
 1. Confirm the native plugin resolves the host and exact Address Library file.
 2. Confirm all seven hidden runtime values can be read and written only inside

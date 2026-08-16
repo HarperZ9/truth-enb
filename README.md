@@ -120,7 +120,8 @@ installs and two byte-identical archives, then rejects any file outside the
 exact nine-stage shader suite, five presets, ENB 0.504 vanilla fallback,
 native plugin, dependency locks, and documentation manifest. The repository is
 MIT licensed. Public upload remains blocked until the live SE/AE + ENB 0.504
-acceptance rows in `docs/release-validation.md` are actually executed.
+Performance, Balanced, Cinematic, and no-runtime/fail-closed acceptance rows in
+`docs/release-validation.md` are actually executed and recorded.
 
 `runtime/enb-upstream.lock` records the exact current official ENB 0.504
 archive, wrapper, compiler, shader, SDK archive, and SDK-header hashes used by

@@ -15,7 +15,7 @@ to paste into the mod-page description field.
 ## Requirements (add these on the mod page)
 
 - Skyrim Special Edition or Anniversary Edition
-- ENBSeries (built and validated against 0.504)
+- ENBSeries 0.504
 - Optional: SkyrimBridge, if you want live engine state driving the shaders
 
 ## Description (BBCode)
@@ -69,26 +69,32 @@ hash, so a tier that is declared but produces an identical image fails the build
 
 [size=4]What is verified, and how[/size]
 
-The release gate is ten tests, all passing: quality presets, the sky-view adapter
-and its shader contract, scene contracts, optical and composition contracts, the
-aurora default-quality contract, the stage compile matrix, the balanced prepass
-instruction budget, and runtime reproducibility. The wider suite is 32 tests.
+The automated release gate covers quality presets, the sky-view adapter and its
+shader contract, scene contracts, optical and composition contracts, the aurora
+default-quality contract, the stage compile matrix, the balanced prepass
+instruction budget, and runtime reproducibility. Treat those as passed only when
+they are recorded against the final posted archive and its SHA-256 sidecar.
 
-The safety contracts run the real shader code rather than reading it. Unoccluded
-ambient occlusion returns the scene unchanged, samples taken across a depth
-discontinuity are rejected instead of counted as occlusion, a reflection ray that
-misses returns the scene, and a zero skin mask returns the scene bit for bit.
-Each of those is asserted against rendered output on a software device.
+When the automated gate is run, the safety contracts exercise the real shader
+code rather than only reading it. Unoccluded ambient occlusion must return the
+scene unchanged, samples taken across a depth discontinuity must be rejected
+instead of counted as occlusion, a reflection ray that misses must return the
+scene, and a zero skin mask must return the scene bit for bit. Each of those
+must be asserted against rendered output on a software device before the gate is
+marked passed.
 
-The package is deterministic and ships a SHA-256 sidecar.
+The package gate requires deterministic output and a SHA-256 sidecar for the
+final archive.
 
 [size=4]Scope, stated plainly[/size]
 
-In-game visual validation across SE, AE, and ENB 0.504 is ahead of this release.
-The gates prove the shaders compile within budget, that the tiers differ, that
-the identity contracts hold, and that the package is reproducible. They do not
-prove it looks good on your monitor in your load order. That judgment is yours,
-and feedback with screenshots is the most useful thing you can send.
+Final in-game visual and gameplay acceptance across SE, AE, and ENB 0.504 is not
+recorded yet. Public upload remains blocked until the integrated Performance,
+Balanced, Cinematic, and no-runtime/fail-closed matrix is run and recorded. The
+automated gates, when recorded for the final artifact, cover shader compilation
+budget, tier distinctness, identity contracts, and package reproducibility. They
+do not prove it looks good on your monitor in your load order. That judgment is
+yours, and feedback with screenshots is the most useful thing you can send.
 
 [size=4]Pairs with SkyrimBridge[/size]
 

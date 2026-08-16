@@ -12,6 +12,22 @@ to paste into the mod-page description field.
 - **Category**: Visuals and Graphics
 - **Version**: 1.0.0
 
+## Promotional media policy (required)
+
+The images under `media/nexus` are generated promotional brand art, not
+gameplay screenshots or evidence of in-game visual quality.
+
+- Use this exact caption on every generated promotional image:
+  **Generated promotional brand art — not an in-game screenshot.**
+- Apply the Nexus Mods **AI Media** tag whenever any generated promotional
+  image is used on the page.
+- Do not submit or use these images in the current Nexus Mods
+  **25th Anniversary Mod Drive**.
+- Support every visual claim—including shader-quality claims, before/after
+  comparisons, quality-tier comparisons, and runtime feature
+  demonstrations—with clearly labeled, real in-game screenshots or captures.
+  Generated promotional art must never be presented as that evidence.
+
 ## Requirements (add these on the mod page)
 
 - Skyrim Special Edition or Anniversary Edition

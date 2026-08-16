@@ -538,35 +538,54 @@ void CpuAndHlslSkyFieldsRemainAligned(
 void CpuAndHlslAuroraQualityTiersRemainAligned(
     TestContext& context,
     const std::filesystem::path& shader_path) {
+  using truth::render::AuroraQuality;
+  using truth::render::QualityTier;
+
   constexpr std::uint32_t width = 16U;
   constexpr std::uint32_t height = 16U;
   constexpr float pi = 3.14159265358979323846F;
   constexpr float tolerance = 2.1F / 255.0F;
-  constexpr std::array qualities{
-      truth::render::AuroraQuality::fallback,
-      truth::render::AuroraQuality::low,
-      truth::render::AuroraQuality::balanced,
-      truth::render::AuroraQuality::high,
+  struct TierCase {
+    QualityTier tier;
+    AuroraQuality cpu_quality;
+    std::uint32_t expected_samples;
+    std::string_view name;
   };
-  for (const auto quality : qualities) {
+
+  constexpr std::array tier_cases{
+      TierCase{QualityTier::performance, AuroraQuality::performance, 1U, "performance"},
+      TierCase{QualityTier::balanced, AuroraQuality::balanced, 2U, "balanced"},
+      TierCase{QualityTier::quality, AuroraQuality::quality, 4U, "quality"},
+      TierCase{QualityTier::ultra, AuroraQuality::ultra, 7U, "ultra"},
+      TierCase{QualityTier::cinematic, AuroraQuality::cinematic, 10U, "cinematic"},
+  };
+  for (const auto tier_case : tier_cases) {
+    bool observed_integrated_cpu_sample{};
+    context.expect(
+        truth::render::AuroraSampleCount(tier_case.cpu_quality)
+            == tier_case.expected_samples,
+        std::string{tier_case.name}
+            + ": CPU aurora sample budget no longer mirrors TruthQuality");
     const auto scalars = truth::render::RenderWarpSkyFieldScalars(
         ReferenceScene::active_clear_night,
         shader_path,
         width,
         height,
-        quality);
+        tier_case.tier);
     context.expect(scalars.status == ReferenceRenderStatus::rendered,
-                   scalars.diagnostic.empty() ? "quality scalar probe failed"
-                                              : scalars.diagnostic);
+                   scalars.diagnostic.empty()
+                       ? std::string{tier_case.name} + ": tier scalar probe failed"
+                       : scalars.diagnostic);
     const auto radiance = truth::render::RenderWarpSkyFieldRadiance(
         ReferenceScene::active_clear_night,
         shader_path,
         width,
         height,
-        quality);
+        tier_case.tier);
     context.expect(radiance.status == ReferenceRenderStatus::rendered,
-                   radiance.diagnostic.empty() ? "quality radiance probe failed"
-                                               : radiance.diagnostic);
+                   radiance.diagnostic.empty()
+                       ? std::string{tier_case.name} + ": tier radiance probe failed"
+                       : radiance.diagnostic);
     for (std::uint32_t y = 0; y < height; ++y) {
       const float vertical = 1.0F
           - ((static_cast<float>(y) + 0.5F) / static_cast<float>(height));
@@ -586,13 +605,18 @@ void CpuAndHlslAuroraQualityTiersRemainAligned(
             0.62F, -0.27F,
             0.82F,
             1.0F,
-            quality,
+            tier_case.cpu_quality,
         };
         truth::render::AuroraCurtainOutput cpu{};
         context.expect(
             truth::render::EvaluateAuroraCurtain(input, cpu).status
                 == truth::render::AuroraCurtainStatus::evaluated,
             "CPU quality-tier parity sample was rejected");
+        context.expect(cpu.samples == 0U || cpu.samples == tier_case.expected_samples,
+                       std::string{tier_case.name}
+                           + ": CPU aurora evaluation used the wrong sample count");
+        observed_integrated_cpu_sample = observed_integrated_cpu_sample
+            || cpu.samples == tier_case.expected_samples;
         const auto offset = (static_cast<std::size_t>(y) * width + x) * 4U;
         const auto close = [&](const std::uint8_t gpu, const float expected) {
           return std::fabs((static_cast<float>(gpu) / 255.0F) - expected)
@@ -608,6 +632,9 @@ void CpuAndHlslAuroraQualityTiersRemainAligned(
                        "CPU/HLSL quality-tier aurora radiance drifted");
       }
     }
+    context.expect(observed_integrated_cpu_sample,
+                   std::string{tier_case.name}
+                       + ": CPU aurora parity grid never exercised the tier budget");
   }
 }
 

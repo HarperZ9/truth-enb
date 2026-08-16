@@ -64,7 +64,7 @@ struct TestContext {
       0.62F, -0.27F,
       0.82F,
       1.0F,
-      AuroraQuality::balanced,
+      AuroraQuality::ultra,
   };
 }
 
@@ -111,14 +111,16 @@ void StableCodesAndBudgetsAreExplicit(TestContext& context) {
   context.expect(static_cast<std::uint32_t>(AuroraCurtainDiagnostic::quality_invalid)
                      == 250U,
                  "aurora quality diagnostic changed");
-  context.expect(truth::render::AuroraSampleCount(AuroraQuality::fallback) == 1U,
-                 "aurora fallback budget changed");
-  context.expect(truth::render::AuroraSampleCount(AuroraQuality::low) == 4U,
-                 "aurora low budget changed");
-  context.expect(truth::render::AuroraSampleCount(AuroraQuality::balanced) == 7U,
+  context.expect(truth::render::AuroraSampleCount(AuroraQuality::performance) == 1U,
+                 "aurora performance budget changed");
+  context.expect(truth::render::AuroraSampleCount(AuroraQuality::balanced) == 2U,
                  "aurora balanced budget changed");
-  context.expect(truth::render::AuroraSampleCount(AuroraQuality::high) == 10U,
-                 "aurora high budget changed");
+  context.expect(truth::render::AuroraSampleCount(AuroraQuality::quality) == 4U,
+                 "aurora quality budget changed");
+  context.expect(truth::render::AuroraSampleCount(AuroraQuality::ultra) == 7U,
+                 "aurora ultra budget changed");
+  context.expect(truth::render::AuroraSampleCount(AuroraQuality::cinematic) == 10U,
+                 "aurora cinematic budget changed");
 }
 
 void InvalidInputsPreserveOutput(TestContext& context) {
@@ -243,10 +245,11 @@ void DayAndInactiveAuroraAreExactZero(TestContext& context) {
                  "day aurora consumed integration samples");
 
   constexpr std::array qualities{
-      AuroraQuality::fallback,
-      AuroraQuality::low,
+      AuroraQuality::performance,
       AuroraQuality::balanced,
-      AuroraQuality::high,
+      AuroraQuality::quality,
+      AuroraQuality::ultra,
+      AuroraQuality::cinematic,
   };
   for (const auto quality : qualities) {
     input = ReferenceInput();
@@ -268,10 +271,11 @@ void DayAndInactiveAuroraAreExactZero(TestContext& context) {
 void DenseGridIsDeterministicFiniteAndBounded(TestContext& context) {
   constexpr float pi = 3.14159265358979323846F;
   constexpr std::array qualities{
-      AuroraQuality::fallback,
-      AuroraQuality::low,
+      AuroraQuality::performance,
       AuroraQuality::balanced,
-      AuroraQuality::high,
+      AuroraQuality::quality,
+      AuroraQuality::ultra,
+      AuroraQuality::cinematic,
   };
   for (const auto quality : qualities) {
     for (std::uint32_t azimuth_index = 0; azimuth_index < 17U; ++azimuth_index) {
@@ -376,38 +380,44 @@ void CameraTranslationProducesParallax(TestContext& context) {
 
 void QualityTiersAreBoundedAndDistinct(TestContext& context) {
   AuroraCurtainInput input = ReferenceInput();
-  input.quality = AuroraQuality::fallback;
-  AuroraCurtainOutput fallback{};
-  ExpectSucceeded(context, EvaluateAuroraCurtain(input, fallback));
-  input.quality = AuroraQuality::low;
-  AuroraCurtainOutput low{};
-  ExpectSucceeded(context, EvaluateAuroraCurtain(input, low));
+  input.quality = AuroraQuality::performance;
+  AuroraCurtainOutput performance{};
+  ExpectSucceeded(context, EvaluateAuroraCurtain(input, performance));
   input.quality = AuroraQuality::balanced;
   AuroraCurtainOutput balanced{};
   ExpectSucceeded(context, EvaluateAuroraCurtain(input, balanced));
-  input.quality = AuroraQuality::high;
-  AuroraCurtainOutput high{};
-  ExpectSucceeded(context, EvaluateAuroraCurtain(input, high));
+  input.quality = AuroraQuality::quality;
+  AuroraCurtainOutput quality{};
+  ExpectSucceeded(context, EvaluateAuroraCurtain(input, quality));
+  input.quality = AuroraQuality::ultra;
+  AuroraCurtainOutput ultra{};
+  ExpectSucceeded(context, EvaluateAuroraCurtain(input, ultra));
+  input.quality = AuroraQuality::cinematic;
+  AuroraCurtainOutput cinematic{};
+  ExpectSucceeded(context, EvaluateAuroraCurtain(input, cinematic));
 
-  context.expect(fallback.samples == 1U && low.samples == 4U
-                     && balanced.samples == 7U && high.samples == 10U,
+  context.expect(performance.samples == 1U && balanced.samples == 2U
+                     && quality.samples == 4U && ultra.samples == 7U
+                     && cinematic.samples == 10U,
                  "aurora quality tier sample counts were wrong");
-  context.expect(!SameOutput(fallback, balanced),
-                 "aurora fallback was indistinguishable from balanced");
-  context.expect(!SameOutput(low, high),
-                 "aurora low and high tiers were indistinguishable");
-  ExpectBounded(context, fallback);
-  ExpectBounded(context, low);
+  context.expect(!SameOutput(performance, ultra),
+                 "aurora performance was indistinguishable from ultra");
+  context.expect(!SameOutput(quality, cinematic),
+                 "aurora quality and cinematic tiers were indistinguishable");
+  ExpectBounded(context, performance);
   ExpectBounded(context, balanced);
-  ExpectBounded(context, high);
+  ExpectBounded(context, quality);
+  ExpectBounded(context, ultra);
+  ExpectBounded(context, cinematic);
 }
 
 void EmptyWorldSpaceRaysAreRejectedBeforeIntegration(TestContext& context) {
   constexpr std::array qualities{
-      AuroraQuality::fallback,
-      AuroraQuality::low,
+      AuroraQuality::performance,
       AuroraQuality::balanced,
-      AuroraQuality::high,
+      AuroraQuality::quality,
+      AuroraQuality::ultra,
+      AuroraQuality::cinematic,
   };
   for (const auto quality : qualities) {
     AuroraCurtainInput input = ReferenceInput();
@@ -432,9 +442,10 @@ void EmptyWorldSpaceRaysAreRejectedBeforeIntegration(TestContext& context) {
 
 void QualityTiersConvergeTowardHigh(TestContext& context) {
   constexpr float pi = 3.14159265358979323846F;
-  double fallback_error{};
-  double low_error{};
   double balanced_error{};
+  double performance_error{};
+  double quality_error{};
+  double ultra_error{};
   const auto accumulate_error = [](const AuroraCurtainOutput& value,
                                    const AuroraCurtainOutput& reference) {
     return static_cast<double>(std::fabs(value.mask - reference.mask)
@@ -450,27 +461,33 @@ void QualityTiersConvergeTowardHigh(TestContext& context) {
           input,
           azimuth,
           0.06F + (0.88F * static_cast<float>(y) / 19.0F));
-      input.quality = AuroraQuality::high;
-      AuroraCurtainOutput high{};
-      ExpectSucceeded(context, EvaluateAuroraCurtain(input, high));
-      input.quality = AuroraQuality::fallback;
-      AuroraCurtainOutput fallback{};
-      ExpectSucceeded(context, EvaluateAuroraCurtain(input, fallback));
-      input.quality = AuroraQuality::low;
-      AuroraCurtainOutput low{};
-      ExpectSucceeded(context, EvaluateAuroraCurtain(input, low));
+      input.quality = AuroraQuality::cinematic;
+      AuroraCurtainOutput cinematic{};
+      ExpectSucceeded(context, EvaluateAuroraCurtain(input, cinematic));
+      input.quality = AuroraQuality::performance;
+      AuroraCurtainOutput performance{};
+      ExpectSucceeded(context, EvaluateAuroraCurtain(input, performance));
       input.quality = AuroraQuality::balanced;
       AuroraCurtainOutput balanced{};
       ExpectSucceeded(context, EvaluateAuroraCurtain(input, balanced));
-      fallback_error += accumulate_error(fallback, high);
-      low_error += accumulate_error(low, high);
-      balanced_error += accumulate_error(balanced, high);
+      input.quality = AuroraQuality::quality;
+      AuroraCurtainOutput quality{};
+      ExpectSucceeded(context, EvaluateAuroraCurtain(input, quality));
+      input.quality = AuroraQuality::ultra;
+      AuroraCurtainOutput ultra{};
+      ExpectSucceeded(context, EvaluateAuroraCurtain(input, ultra));
+      performance_error += accumulate_error(performance, cinematic);
+      balanced_error += accumulate_error(balanced, cinematic);
+      quality_error += accumulate_error(quality, cinematic);
+      ultra_error += accumulate_error(ultra, cinematic);
     }
   }
-  context.expect(balanced_error < low_error,
-                 "balanced aurora did not converge beyond low quality");
-  context.expect(low_error < fallback_error,
-                 "low aurora did not converge beyond fallback quality");
+  context.expect(ultra_error < quality_error,
+                 "ultra aurora did not converge beyond quality");
+  context.expect(quality_error < balanced_error,
+                 "quality aurora did not converge beyond balanced");
+  context.expect(balanced_error < performance_error,
+                 "balanced aurora did not converge beyond performance");
 }
 
 void CurtainFormsBroadArcsWithoutPillars(TestContext& context) {

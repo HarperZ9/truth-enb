@@ -912,7 +912,7 @@ void TierAndIdentityReferences(
   const std::string quality = ReadTextFile(shader_directory / "TruthQuality.fxh");
   const std::string screen_space = ReadTextFile(shader_directory / "TruthScreenSpace.fxh");
 
-  context.expect(cloud.find("#include \"TruthQuality.fxh\"") != std::string::npos,
+  context.expect(cloud.find("#include \"truth/TruthQuality.fxh\"") != std::string::npos,
                  "performance-analytic-day: cloud volume does not consume TruthQuality");
   context.expect(cloud.find("#if TRUTH_QUALITY_TIER < 2") != std::string::npos
                      && cloud.find("#define TRUTH_ENABLE_CLOUD_VOLUME 0") != std::string::npos
@@ -951,7 +951,7 @@ void TierAndIdentityReferences(
                      && cloud.find("TruthCloudVolumeInterleavedJitter") != std::string::npos,
                  "cinematic-volume-cloud: tier 4 budget or stable sampling changed");
 
-  context.expect(aurora.find("#include \"TruthQuality.fxh\"") != std::string::npos
+  context.expect(aurora.find("#include \"truth/TruthQuality.fxh\"") != std::string::npos
                      && aurora.find("static const uint TruthAuroraCurtainSamples = TruthQualityAuroraSamples;")
                             != std::string::npos,
                  "aurora quality tiers do not consume TruthQuality");

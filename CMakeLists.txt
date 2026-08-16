@@ -588,6 +588,16 @@ if(BUILD_TESTING)
     LABELS "shader;aurora;contract;performance"
   )
 
+  add_test(
+    NAME truth_host_include_layout_contract
+    COMMAND "${CMAKE_COMMAND}"
+      "-DTRUTH_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}"
+      -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/CheckTruthHostIncludeLayout.cmake"
+  )
+  set_tests_properties(truth_host_include_layout_contract PROPERTIES
+    LABELS "shader;include;contract;package;host"
+  )
+
   if(WIN32)
     add_executable(truth_reference_renderer_tests
       tests/ReferenceRendererTests.cpp

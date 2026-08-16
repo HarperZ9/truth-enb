@@ -1,7 +1,7 @@
 #ifndef TRUTH_AURORA_CURTAIN_FXH
 #define TRUTH_AURORA_CURTAIN_FXH
 
-#include "TruthQuality.fxh"
+#include "truth/TruthQuality.fxh"
 
 static const uint TruthAuroraCurtainSamples = TruthQualityAuroraSamples;
 

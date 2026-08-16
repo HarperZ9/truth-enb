@@ -1,7 +1,7 @@
 #ifndef TRUTH_DEPTH_OF_FIELD_FXH
 #define TRUTH_DEPTH_OF_FIELD_FXH
 
-#include "TruthQuality.fxh"
+#include "truth/TruthQuality.fxh"
 
 float3 TruthApplyDepthOfField(float2 uv, float3 scene, float linear_depth)
 {

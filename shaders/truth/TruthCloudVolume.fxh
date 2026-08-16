@@ -1,7 +1,7 @@
 #ifndef TRUTH_CLOUD_VOLUME_FXH
 #define TRUTH_CLOUD_VOLUME_FXH
 
-#include "TruthQuality.fxh"
+#include "truth/TruthQuality.fxh"
 
 #ifdef TRUTH_ENABLE_CLOUD_VOLUME
 #undef TRUTH_ENABLE_CLOUD_VOLUME

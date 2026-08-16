@@ -64,7 +64,7 @@ function(validate_truth_screen_contract candidate_source is_valid rejection_reas
 
   foreach(required_token IN ITEMS
       "#ifndef TRUTH_PIPELINE_COMMON_FXH"
-      "#include \"TruthQuality.fxh\""
+      "#include \"truth/TruthQuality.fxh\""
       "struct TruthScreenSpaceInput"
       "Texture2D scene_texture"
       "Texture2D depth_texture"

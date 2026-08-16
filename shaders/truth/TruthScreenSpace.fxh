@@ -5,7 +5,7 @@
 #error Include TruthHostCapabilities.fxh and TruthPipelineCommon.fxh before TruthScreenSpace.fxh
 #endif
 
-#include "TruthQuality.fxh"
+#include "truth/TruthQuality.fxh"
 
 static const float TruthScreenSpaceTwoPi = 6.28318530717958647692;
 static const float TruthScreenSpaceMinimumDepth = 0.000001;

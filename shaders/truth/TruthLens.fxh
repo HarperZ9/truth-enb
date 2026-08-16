@@ -1,7 +1,7 @@
 #ifndef TRUTH_LENS_FXH
 #define TRUTH_LENS_FXH
 
-#include "TruthQuality.fxh"
+#include "truth/TruthQuality.fxh"
 
 float3 TruthApplyLens(float2 uv, float3 bloom, float3 scene)
 {

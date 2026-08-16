@@ -5,7 +5,7 @@
 #error Include TruthHostCapabilities.fxh after stage declarations and before TruthPipelineCommon.fxh
 #endif
 
-#include "TruthQuality.fxh"
+#include "truth/TruthQuality.fxh"
 
 // Truth uses device depth where sky is near one. All stage depth tests use this
 // helper instead of duplicating a local threshold or feather.

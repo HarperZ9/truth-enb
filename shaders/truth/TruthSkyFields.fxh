@@ -1,7 +1,7 @@
 #ifndef TRUTH_SKY_FIELDS_FXH
 #define TRUTH_SKY_FIELDS_FXH
 
-#include "TruthAuroraCurtain.fxh"
+#include "truth/TruthAuroraCurtain.fxh"
 
 static const float TruthSkyPi = 3.14159265358979323846;
 static const float TruthSkyTwoPi = 2.0 * TruthSkyPi;

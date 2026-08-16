@@ -6,17 +6,17 @@
 // interior response, then current-frame screen-space work.  The main effect
 // consumes the resulting TextureColor and never rebuilds this environment.
 
-#include "TruthColorCore.fxh"
-#include "TruthAtmosphereCore.fxh"
-#include "TruthSkyViewAdapter.fxh"
-#include "TruthRuntimeParameters.fxh"
-#include "TruthEffectParameters.fxh"
-#include "TruthPipelineCommon.fxh"
-#include "TruthSkyFields.fxh"
-#include "TruthCloudLighting.fxh"
-#include "TruthCloudVolume.fxh"
-#include "TruthInteriorLight.fxh"
-#include "TruthScreenSpace.fxh"
+#include "truth/TruthColorCore.fxh"
+#include "truth/TruthAtmosphereCore.fxh"
+#include "truth/TruthSkyViewAdapter.fxh"
+#include "truth/TruthRuntimeParameters.fxh"
+#include "truth/TruthEffectParameters.fxh"
+#include "truth/TruthPipelineCommon.fxh"
+#include "truth/TruthSkyFields.fxh"
+#include "truth/TruthCloudLighting.fxh"
+#include "truth/TruthCloudVolume.fxh"
+#include "truth/TruthInteriorLight.fxh"
+#include "truth/TruthScreenSpace.fxh"
 
 // Versioned SkyrimBridge v3 interoperability surface.  These are independent
 // ENB UI-name bindings rather than an include dependency, so Truth can run

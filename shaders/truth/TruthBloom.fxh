@@ -1,7 +1,7 @@
 #ifndef TRUTH_BLOOM_FXH
 #define TRUTH_BLOOM_FXH
 
-#include "TruthQuality.fxh"
+#include "truth/TruthQuality.fxh"
 
 float3 TruthBloomSoftKnee(float3 color, float threshold)
 {

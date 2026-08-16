@@ -24,6 +24,7 @@ foreach(required_main_token IN ITEMS
     "TruthApplyExposure("
     "TruthFilmicToneCurve3("
     "TruthCompressDisplayGamut("
+    "TruthResolveMainAdaptationLuminance("
     "TextureBloom.Sample"
     "TextureLens.Sample")
   string(FIND "${truth_main_source}" "${required_main_token}" token_position)
@@ -42,6 +43,8 @@ foreach(forbidden_duplicate IN ITEMS
 endforeach()
 
 file(READ "${truth_post}" truth_post_source)
+file(READ "${truth_source_dir}/shaders/truth/TruthSunSprite.fxh"
+  truth_sun_sprite_source)
 foreach(required_post_token IN ITEMS
     "#include \"truth/TruthPostFinish.fxh\""
     "TruthFinishLdr("
@@ -73,13 +76,33 @@ foreach(forbidden_post_token IN ITEMS
 endforeach()
 
 file(READ "${truth_sun}" truth_sun_source)
+set(truth_sun_contract_source "${truth_sun_source}\n${truth_sun_sprite_source}")
 foreach(required_sun_token IN ITEMS
     "#include \"truth/TruthSunSprite.fxh\""
     "TruthEvaluateSunSprite("
-    "TruthRuntimeCelestial")
-  string(FIND "${truth_sun_source}" "${required_sun_token}" token_position)
+    "TruthRuntimeCelestial"
+    "TruthRuntimeCelestialReady()"
+    "SB_Sun_Direction"
+    "SB_Render_Frame"
+    "TruthSunSpriteResolveCelestial("
+    "TruthSunSpriteBridgeActive()"
+    "TruthRetainSkyrimBridgeSunBindings("
+    "return TruthStageIdentity(source, false, 0.0)"
+    "saturate(TruthFiniteOrBlack(source.rgb + sprite + bridge_keepalive))")
+  string(FIND "${truth_sun_contract_source}" "${required_sun_token}" token_position)
   if(token_position EQUAL -1)
     message(FATAL_ERROR "Sun sprite is missing celestial contract token: ${required_sun_token}")
+  endif()
+endforeach()
+foreach(forbidden_sun_token IN ITEMS
+    "TruthTriangularDither"
+    "TruthFinishLdr("
+    "TruthFilmicToneCurve"
+    "TruthApplyExposure(")
+  string(FIND "${truth_sun_contract_source}" "${forbidden_sun_token}" token_position)
+  if(NOT token_position EQUAL -1)
+    message(FATAL_ERROR
+      "Sun sprite stage contains forbidden terminal/display operation: ${forbidden_sun_token}")
   endif()
 endforeach()
 
@@ -87,7 +110,8 @@ file(READ "${truth_underwater}" truth_underwater_source)
 foreach(required_underwater_token IN ITEMS
     "#include \"truth/TruthUnderwater.fxh\""
     "TruthEvaluateUnderwater("
-    "TextureDepth")
+    "TextureDepth"
+    "saturate(TruthFiniteOrBlack(TruthEvaluateUnderwater(")
   string(FIND "${truth_underwater_source}" "${required_underwater_token}" token_position)
   if(token_position EQUAL -1)
     message(FATAL_ERROR "Underwater stage is missing medium token: ${required_underwater_token}")
@@ -98,6 +122,10 @@ foreach(forbidden_underwater_token IN ITEMS
     "TruthEvaluateFog"
     "TruthApplyLens"
     "TruthLensDirt"
+    "TruthTriangularDither"
+    "TruthFinishLdr("
+    "TruthFilmicToneCurve"
+    "TruthApplyExposure("
     "GodRay")
   string(FIND "${truth_underwater_source}" "${forbidden_underwater_token}" token_position)
   if(NOT token_position EQUAL -1)
@@ -106,4 +134,4 @@ foreach(forbidden_underwater_token IN ITEMS
   endif()
 endforeach()
 
-message(STATUS "Truth composition contracts enforce one HDR-to-display owner and dither-last LDR finish")
+message(STATUS "Truth composition contracts enforce one HDR-to-display owner, dither-last postpass, and bounded later terminal stages")

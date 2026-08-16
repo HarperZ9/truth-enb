@@ -3,6 +3,11 @@
 
 #include "truth/TruthQuality.fxh"
 
+float4 TruthBloomAdditiveNeutral(float alpha)
+{
+    return float4(0.0.xxx, alpha);
+}
+
 float3 TruthBloomSoftKnee(float3 color, float threshold)
 {
     float luminance = dot(max(color, 0.0), float3(0.2126, 0.7152, 0.0722));
@@ -16,7 +21,7 @@ float3 TruthApplyBloom(float2 uv, float3 hdr_source)
 {
     if (TruthBloomIntensity <= 0.0)
     {
-        return hdr_source;
+        return 0.0.xxx;
     }
 
     float2 pixel_size = max(ScreenSize.zw, 0.000001.xx);
@@ -31,16 +36,17 @@ float3 TruthApplyBloom(float2 uv, float3 hdr_source)
                 float(offset_index) / max(float(TruthQualityBloomRadius), 1.0);
             float weight = 1.0 - (0.75 * abs(normalized_offset));
             float2 offset = pixel_size * float2(float(offset_index), normalized_offset);
-            float3 sample_color = max(
-                TextureColor.SampleLevel(Sampler0, uv + offset, 0.0).rgb,
-                0.0);
+            float3 sample_color = offset_index == 0
+                ? TruthFiniteOrBlack(hdr_source)
+                : TruthFiniteOrBlack(
+                      TextureColor.SampleLevel(Sampler0, uv + offset, 0.0).rgb);
             accumulated += TruthBloomSoftKnee(
                 sample_color, max(TruthBloomThresholdShape, 0.0001)) * weight;
             total_weight += weight;
         }
     }
     float3 bloom = accumulated / max(total_weight, 0.0001);
-    return TruthFiniteOrBlack(lerp(hdr_source, bloom, saturate(TruthBloomIntensity)));
+    return TruthFiniteOrBlack(bloom * saturate(TruthBloomIntensity));
 }
 
 #endif

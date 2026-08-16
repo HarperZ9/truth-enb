@@ -3,6 +3,11 @@
 
 #include "truth/TruthQuality.fxh"
 
+float4 TruthLensAdditiveNeutral(float alpha)
+{
+    return float4(0.0.xxx, alpha);
+}
+
 float3 TruthApplyLens(float2 uv, float3 bloom, float3 scene)
 {
     if (TruthLensIntensity <= 0.0 || TruthQualityLensGhosts == 0u)

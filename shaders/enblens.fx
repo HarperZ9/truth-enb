@@ -36,7 +36,7 @@ float4 TruthLensMain(TruthStageVSOutput input) : SV_Target
     float4 bloom = TextureColor.Sample(Sampler0, input.texcoord);
     if (!TruthStageIsActive() || TRUTH_STAGE_INTENSITY <= 0.0)
     {
-        return TruthStageIdentity(bloom, false, 0.0);
+        return TruthLensAdditiveNeutral(bloom.a);
     }
     return float4(
         TruthApplyLens(input.texcoord, max(bloom.rgb, 0.0), 0.0),

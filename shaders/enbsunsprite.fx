@@ -5,9 +5,9 @@
 #define TRUTH_STAGE_OWNS_MASK 0
 #define TRUTH_STAGE_OWNS_NATIVE_CELESTIAL_VIEW 1
 #define TRUTH_STAGE_OWNS_PREVIOUS_SCALAR_ADAPTATION 0
-#define TRUTH_STAGE_OWNS_BRIDGE_VALUE 0
+#define TRUTH_STAGE_OWNS_BRIDGE_VALUE 1
 #define TRUTH_STAGE_NATIVE_CAPABILITY_AVAILABLE 1
-#define TRUTH_STAGE_BRIDGE_CAPABILITY_AVAILABLE 0
+#define TRUTH_STAGE_BRIDGE_CAPABILITY_AVAILABLE 1
 #define TRUTH_STAGE_SPATIAL_CAPABILITY_AVAILABLE 0
 #define TRUTH_STAGE_SCRATCH_OWNER TRUTH_SCRATCH_SUNSPRITE
 #define TRUTH_STAGE_SCRATCH_READ TRUTH_SCRATCH_NONE
@@ -22,7 +22,23 @@
 #include "truth/TruthSkyViewAdapter.fxh"
 #include "truth/TruthRuntimeParameters.fxh"
 
+float4 Timer;
+
 Texture2D TextureColor;
+
+float4 SB_Sun_Direction
+<
+    string UIName = "SB_Sun_Direction";
+    string UIWidget = "Color";
+    int UIHidden = 1;
+> = {0.0, 0.0, 0.0, 0.0};
+
+float4 SB_Render_Frame
+<
+    string UIName = "SB_Render_Frame";
+    string UIWidget = "Color";
+    int UIHidden = 1;
+> = {0.0, 0.0, 0.0, 0.0};
 
 SamplerState Sampler0
 {
@@ -40,11 +56,20 @@ float4 TruthSunSpriteMain(TruthStageVSOutput input) : SV_Target
     {
         return TruthStageIdentity(source, false, 0.0);
     }
+    TruthSunSpriteCelestial celestial = TruthSunSpriteResolveCelestial();
+    if (celestial.availability <= 0.5)
+    {
+        return TruthStageIdentity(source, false, 0.0);
+    }
+    float3 bridge_keepalive = TruthRetainSkyrimBridgeSunBindings(
+        input.texcoord);
     float3 sprite = TruthEvaluateSunSprite(
         input.texcoord,
-        TruthRuntimeCelestial.xyz,
-        TruthRuntimeCelestial.w);
-    return float4(TruthFiniteOrBlack(source.rgb + sprite), source.a);
+        celestial.direction,
+        celestial.visibility);
+    return float4(
+        saturate(TruthFiniteOrBlack(source.rgb + sprite + bridge_keepalive)),
+        source.a);
 }
 
 technique11 Draw <string UIName = "Truth [80] Sun Sprite";>

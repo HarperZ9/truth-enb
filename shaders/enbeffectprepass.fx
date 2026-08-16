@@ -50,7 +50,9 @@ SamplerState Sampler0
 float4 TruthPrepassMain(TruthStageVSOutput input) : SV_Target
 {
     float4 source = TextureColor.Sample(Sampler0, input.texcoord);
-    if (!TruthStageIsActive() || !TruthRuntimeReady())
+    if (!TruthStageIsActive()
+        || !TruthRuntimeReady()
+        || !TruthPrepassControlsReady(EInteriorFactor))
     {
         return TruthStageIdentity(source, false, 0.0);
     }
@@ -58,7 +60,10 @@ float4 TruthPrepassMain(TruthStageVSOutput input) : SV_Target
     float raw_depth = TextureDepth.SampleLevel(Sampler0, input.texcoord, 0.0).x;
     TruthPrepassResult composed = TruthComposePrepass(
         source.rgb, raw_depth, input.texcoord, EInteriorFactor);
-    float3 color = lerp(source.rgb, composed.color, saturate(TruthPrepassIntensity));
+    float3 color = lerp(
+        source.rgb,
+        composed.color,
+        TruthPrepassSaturateControl(TruthPrepassIntensity, 0.0));
     return float4(TruthFiniteOrBlack(color), source.a);
 }
 

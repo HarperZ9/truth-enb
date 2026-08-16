@@ -40,6 +40,7 @@ set(truth_include_names
   TruthPostFinish.fxh
   TruthPrepassCore.fxh
   TruthQuality.fxh
+  TruthQualityPresetOverride.fxh
   TruthRuntimeParameters.fxh
   TruthScreenSpace.fxh
   TruthSkyFields.fxh
@@ -88,6 +89,8 @@ foreach(host IN LISTS truth_host_ids)
       list(APPEND expected_files
         "Presets/${host}/${tier}/ROOT/enbseries/${preset}")
     endforeach()
+    list(APPEND expected_files
+      "Presets/${host}/${tier}/ROOT/enbseries/truth/TruthQualityPresetOverride.fxh")
   endforeach()
 endforeach()
 list(SORT expected_files)
@@ -125,6 +128,10 @@ function(truth_expected_source relative output)
       "^Presets/([^/]+)/([^/]+)/ROOT/enbseries/(.+\\.ini)$")
     set(source
       "${TRUTH_PRESET_ROOT}/${CMAKE_MATCH_1}/${CMAKE_MATCH_2}/ROOT/enbseries/${CMAKE_MATCH_3}")
+  elseif(relative MATCHES
+      "^Presets/([^/]+)/([^/]+)/ROOT/enbseries/truth/(TruthQualityPresetOverride\\.fxh)$")
+    set(source
+      "${TRUTH_PRESET_ROOT}/${CMAKE_MATCH_1}/${CMAKE_MATCH_2}/ROOT/enbseries/truth/${CMAKE_MATCH_3}")
   else()
     message(FATAL_ERROR "No source mapping for package file: ${relative}")
   endif()

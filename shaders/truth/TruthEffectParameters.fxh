@@ -22,7 +22,7 @@ float TruthAutoExposureBlend
     float UIMin = 0.0;
     float UIMax = 1.0;
     float UIStep = 0.01;
-> = 0.0;
+> = 0.25;
 
 bool TruthUseEnbBloom
 <
@@ -32,7 +32,7 @@ bool TruthUseEnbBloom
 bool TruthUseEnbLens
 <
     string UIName = "[Truth 02] Optical | ENB Lens";
-> = true;
+> = false;
 
 bool TruthProceduralSkyEnabled
 <
@@ -46,7 +46,7 @@ float TruthSkyReplacementStrength
     float UIMin = 0.0;
     float UIMax = 1.0;
     float UIStep = 0.01;
-> = 1.0;
+> = 0.62;
 
 float TruthSkyDepthThreshold
 <
@@ -118,7 +118,7 @@ float TruthAuroraActivity
     float UIMin = 0.0;
     float UIMax = 1.0;
     float UIStep = 0.01;
-> = 0.55;
+> = 0.25;
 
 float TruthAuroraMask
 <
@@ -127,7 +127,7 @@ float TruthAuroraMask
     float UIMin = 0.0;
     float UIMax = 1.0;
     float UIStep = 0.01;
-> = 1.0;
+> = 0.80;
 
 float TruthSkyWindX
 <

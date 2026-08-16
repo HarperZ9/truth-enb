@@ -37,7 +37,7 @@ float4 TruthBloomMain(TruthStageVSOutput input) : SV_Target
     float4 source = TextureColor.Sample(Sampler0, input.texcoord);
     if (!TruthStageIsActive() || TRUTH_STAGE_INTENSITY <= 0.0)
     {
-        return TruthStageIdentity(source, false, 0.0);
+        return TruthBloomAdditiveNeutral(source.a);
     }
     return float4(TruthApplyBloom(input.texcoord, source.rgb), source.a);
 }

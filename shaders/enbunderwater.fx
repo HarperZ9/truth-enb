@@ -42,7 +42,8 @@ float4 TruthUnderwaterMain(TruthStageVSOutput input) : SV_Target
     float linear_depth =
         TextureDepth.SampleLevel(Sampler0, input.texcoord, 0.0).x;
     return float4(
-        TruthEvaluateUnderwater(input.texcoord, source.rgb, linear_depth),
+        saturate(TruthFiniteOrBlack(TruthEvaluateUnderwater(
+            input.texcoord, source.rgb, linear_depth))),
         source.a);
 }
 

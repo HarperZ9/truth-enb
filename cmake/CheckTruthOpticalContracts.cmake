@@ -43,9 +43,9 @@ endforeach()
 
 set(required_module_tokens
   "TruthDepthOfField.fxh|TruthApplyDepthOfField|TruthQualityDOFRings|return scene"
-  "TruthBloom.fxh|TruthApplyBloom|TruthQualityBloomRadius|TruthBloomSoftKnee|return hdr_source"
-  "TruthAdaptation.fxh|TruthUpdateAdaptedLuminance|3.0|1.5|return measured"
-  "TruthLens.fxh|TruthApplyLens|TruthQualityLensGhosts|return scene")
+  "TruthBloom.fxh|TruthApplyBloom|TruthQualityBloomRadius|TruthBloomAdditiveNeutral"
+  "TruthAdaptation.fxh|TruthUpdateAdaptedLuminance|TruthAdaptationSafeLuminance|TruthAdaptationDeltaSeconds"
+  "TruthLens.fxh|TruthApplyLens|TruthQualityLensGhosts|TruthLensAdditiveNeutral")
 foreach(module_contract IN LISTS required_module_tokens)
   string(REPLACE "|" ";" module_fields "${module_contract}")
   list(GET module_fields 0 module_name)
@@ -89,4 +89,84 @@ foreach(stage_contract IN LISTS stage_contracts)
   endforeach()
 endforeach()
 
-message(STATUS "Truth optical contracts enforce bounded five-tier modules and exact identities")
+file(READ "${truth_source_dir}/shaders/enbbloom.fx" truth_bloom_stage_source)
+foreach(required_bloom_stage_token IN ITEMS
+    "TruthBloomAdditiveNeutral(source.a)"
+    "TruthApplyBloom(input.texcoord, source.rgb)")
+  string(FIND "${truth_bloom_stage_source}" "${required_bloom_stage_token}" token_position)
+  if(token_position EQUAL -1)
+    message(FATAL_ERROR
+      "Bloom scratch stage is missing additive-neutral contract token: ${required_bloom_stage_token}")
+  endif()
+endforeach()
+string(FIND "${truth_bloom_stage_source}"
+  "return TruthStageIdentity(source, false, 0.0)"
+  bloom_wrong_identity_position)
+if(NOT bloom_wrong_identity_position EQUAL -1)
+  message(FATAL_ERROR
+    "Bloom scratch stage may not return the scene as a disabled/zero-intensity identity; TextureBloom is additive in enbeffect.fx")
+endif()
+
+file(READ "${truth_source_dir}/shaders/enblens.fx" truth_lens_stage_source)
+foreach(required_lens_stage_token IN ITEMS
+    "TruthLensAdditiveNeutral(bloom.a)"
+    "TruthApplyLens(input.texcoord, max(bloom.rgb, 0.0), 0.0)")
+  string(FIND "${truth_lens_stage_source}" "${required_lens_stage_token}" token_position)
+  if(token_position EQUAL -1)
+    message(FATAL_ERROR
+      "Lens scratch stage is missing additive-neutral contract token: ${required_lens_stage_token}")
+  endif()
+endforeach()
+string(FIND "${truth_lens_stage_source}"
+  "return TruthStageIdentity(bloom, false, 0.0)"
+  lens_wrong_identity_position)
+if(NOT lens_wrong_identity_position EQUAL -1)
+  message(FATAL_ERROR
+    "Lens scratch stage may not return bloom as a disabled/zero-intensity identity; TextureLens is additive in enbeffect.fx")
+endif()
+
+file(READ "${truth_source_dir}/shaders/enbadaptation.fx" truth_adaptation_stage_source)
+foreach(required_adaptation_stage_token IN ITEMS
+    "float4 Timer;"
+    "TruthAdaptationSafeMeasuredColor("
+    "previous_scalar"
+    "TruthAdaptationDeltaSeconds(Timer.w)")
+  string(FIND "${truth_adaptation_stage_source}" "${required_adaptation_stage_token}" token_position)
+  if(token_position EQUAL -1)
+    message(FATAL_ERROR
+      "Adaptation stage is missing finite sample/delta contract token: ${required_adaptation_stage_token}")
+  endif()
+endforeach()
+string(FIND "${truth_adaptation_stage_source}" "1.0 / 60.0)" fixed_delta_position)
+if(NOT fixed_delta_position EQUAL -1)
+  message(FATAL_ERROR
+    "Adaptation stage may not use a hard-coded fixed delta when Timer.w is available")
+endif()
+
+file(READ "${truth_source_dir}/shaders/enbeffect.fx" truth_main_source)
+foreach(required_main_adaptation_token IN ITEMS
+    "TruthResolveMainAdaptationLuminance("
+    "TextureAdaptation.SampleLevel(Sampler0, input.txcoord0, 0.0).x")
+  string(FIND "${truth_main_source}" "${required_main_adaptation_token}" token_position)
+  if(token_position EQUAL -1)
+    message(FATAL_ERROR
+      "Main effect is missing robust adaptation sample contract token: ${required_main_adaptation_token}")
+  endif()
+endforeach()
+foreach(required_main_optical_token IN ITEMS
+    "float3 bloom_payload"
+    "float3 lens_payload"
+    "return scene + bloom_payload + lens_payload;")
+  string(FIND "${truth_main_source}" "${required_main_optical_token}" token_position)
+  if(token_position EQUAL -1)
+    message(FATAL_ERROR
+      "Main effect is missing exact additive optical composition token: ${required_main_optical_token}")
+  endif()
+endforeach()
+string(FIND "${truth_main_source}" "bloom - color" bloom_subtract_position)
+if(NOT bloom_subtract_position EQUAL -1)
+  message(FATAL_ERROR
+    "Main effect may not subtract the scene from TextureBloom; bloom is an additive payload")
+endif()
+
+message(STATUS "Truth optical contracts enforce bounded modules, additive-neutral bloom/lens scratch, and finite adaptation sampling")

@@ -63,6 +63,73 @@ struct TruthPrepassCelestial
     float availability;
 };
 
+bool TruthPrepassFinite3(float3 value)
+{
+    return all((asuint(value) & 0x7fffffffu) < 0x7f800000u.xxx);
+}
+
+float TruthPrepassFiniteControl(float value, float fallback)
+{
+    return TruthFinite1(value) ? value : fallback;
+}
+
+float2 TruthPrepassFinite2Control(float2 value, float2 fallback)
+{
+    return TruthFinite1(value.x) && TruthFinite1(value.y)
+        ? value
+        : fallback;
+}
+
+float3 TruthPrepassFinite3Control(float3 value, float3 fallback)
+{
+    return TruthPrepassFinite3(value) ? value : fallback;
+}
+
+float TruthPrepassSaturateControl(float value, float fallback)
+{
+    return saturate(TruthPrepassFiniteControl(value, fallback));
+}
+
+float TruthPrepassClampControl(float value, float fallback, float minimum_value, float maximum_value)
+{
+    return clamp(TruthPrepassFiniteControl(value, fallback),
+                 minimum_value,
+                 maximum_value);
+}
+
+float2 TruthPrepassScreenSize()
+{
+    return max(
+        TruthPrepassFinite2Control(ScreenSize.xy, float2(1.0, 1.0)),
+        float2(1.0, 1.0));
+}
+
+bool TruthPrepassControlsReady(float interior_factor)
+{
+    return TruthFinite1(Timer.x)
+        && TruthFinite1(ScreenSize.x)
+        && TruthFinite1(ScreenSize.y)
+        && ScreenSize.x >= 1.0
+        && ScreenSize.y >= 1.0
+        && TruthFinite1(ENightDayFactor)
+        && TruthFinite1(interior_factor)
+        && TruthFinite1(TruthPrepassIntensity)
+        && TruthFinite1(TruthPrepassDepthShape)
+        && TruthFinite1(TruthSkyReplacementStrength)
+        && TruthFinite1(TruthSkyDepthThreshold)
+        && TruthFinite1(TruthSkyDepthFeather)
+        && TruthFinite1(TruthSkyRadianceScale)
+        && TruthFinite1(TruthWeatherDensity)
+        && TruthFinite1(TruthCloudCoverage)
+        && TruthFinite1(TruthCloudDensity)
+        && TruthFinite1(TruthFogDensity)
+        && TruthFinite1(TruthAuroraActivity)
+        && TruthFinite1(TruthAuroraMask)
+        && TruthFinite1(TruthSkyWindX)
+        && TruthFinite1(TruthSkyWindY)
+        && TruthPrepassFinite3(TruthAuroraWorldOrigin);
+}
+
 float TruthPrepassLuminance(float3 value)
 {
     return dot(max(value, 0.0.xxx), float3(0.2126, 0.7152, 0.0722));
@@ -145,7 +212,8 @@ TruthSkyViewAdapterOutput TruthPrepassResolveSkyView(float2 texcoord)
     input.texcoord = texcoord;
     input.inverse_view_projection = TruthRuntimeBuildInverseViewProjection();
     input.camera_world_position = TruthRuntimeCameraWorld.xyz;
-    input.aurora_world_origin = TruthAuroraWorldOrigin;
+    input.aurora_world_origin = TruthPrepassFinite3Control(
+        TruthAuroraWorldOrigin, 0.0.xxx);
     input.engine_world_units_per_aurora_unit = TruthRuntimeStatus.w;
     return TruthEvaluateSkyViewAdapter(input);
 }
@@ -162,17 +230,27 @@ float3 TruthPrepassResolveSkyRadiance(
         return float3(0.0, 0.0, 0.0);
     }
 
-    float phase = TruthFinite1(Timer.x) ? frac(max(Timer.x, 0.0)) : 0.0;
-    float night_factor = saturate(1.0 - ENightDayFactor);
+    float phase = frac(max(TruthPrepassFiniteControl(Timer.x, 0.0), 0.0));
+    float night_factor = saturate(
+        1.0 - TruthPrepassSaturateControl(ENightDayFactor, 0.5));
     TruthSkyFieldInput sky_field_input;
     sky_field_input.view_direction = sky_view.view_world_direction;
     sky_field_input.phase = phase;
-    sky_field_input.wind = clamp(float2(TruthSkyWindX, TruthSkyWindY), -1.0, 1.0);
-    sky_field_input.cloud_coverage = saturate(TruthCloudCoverage);
-    sky_field_input.cloud_density = saturate(TruthCloudDensity);
-    sky_field_input.weather_density = saturate(TruthWeatherDensity);
-    sky_field_input.aurora_activity = saturate(TruthAuroraActivity)
-        * saturate(TruthAuroraMask);
+    sky_field_input.wind = clamp(
+        float2(
+            TruthPrepassFiniteControl(TruthSkyWindX, 0.0),
+            TruthPrepassFiniteControl(TruthSkyWindY, 0.0)),
+        -1.0,
+        1.0);
+    sky_field_input.cloud_coverage = TruthPrepassSaturateControl(
+        TruthCloudCoverage, 0.0);
+    sky_field_input.cloud_density = TruthPrepassSaturateControl(
+        TruthCloudDensity, 0.0);
+    sky_field_input.weather_density = TruthPrepassSaturateControl(
+        TruthWeatherDensity, 0.0);
+    sky_field_input.aurora_activity = TruthPrepassSaturateControl(
+            TruthAuroraActivity, 0.0)
+        * TruthPrepassSaturateControl(TruthAuroraMask, 0.0);
     sky_field_input.night_factor = night_factor;
     sky_field_input.camera_position = sky_view.camera_aurora_position;
     TruthSkyFieldOutput sky_field = TruthEvaluateSkyFields(sky_field_input);
@@ -182,10 +260,12 @@ float3 TruthPrepassResolveSkyRadiance(
     atmosphere_input.view_sun_cosine = clamp(
         dot(sky_view.view_world_direction, celestial.direction), -1.0, 1.0);
     atmosphere_input.sun_elevation = celestial.elevation;
-    atmosphere_input.weather_density = saturate(TruthWeatherDensity);
+    atmosphere_input.weather_density = TruthPrepassSaturateControl(
+        TruthWeatherDensity, 0.0);
     atmosphere_input.cloud_coverage = 0.0;
     atmosphere_input.cloud_density = 0.0;
-    atmosphere_input.fog_density = saturate(TruthFogDensity);
+    atmosphere_input.fog_density = TruthPrepassSaturateControl(
+        TruthFogDensity, 0.0);
     atmosphere_input.aurora_activity = 0.0;
     atmosphere_input.aurora_mask = 0.0;
     atmosphere_input.night_factor = night_factor;
@@ -208,7 +288,7 @@ float3 TruthPrepassResolveSkyRadiance(
     volume_input.cloud_type = 0.0;
     volume_input.night_factor = night_factor;
     volume_input.pixel_coordinate = uint2(
-        saturate(texcoord) * max(ScreenSize.xy, float2(1.0, 1.0)));
+        saturate(texcoord) * TruthPrepassScreenSize());
     // No frame-random jitter is permitted without a temporal resolver.
     volume_input.jitter_frame = 0u;
     TruthCloudVolumeOutput volume = TruthEvaluateCloudVolume(volume_input);
@@ -234,7 +314,7 @@ float3 TruthPrepassResolveSkyRadiance(
 
     valid = 1.0;
     return TruthFiniteOrBlack(composite_radiance)
-        * max(TruthSkyRadianceScale, 0.0);
+        * max(TruthPrepassFiniteControl(TruthSkyRadianceScale, 1.0), 0.0);
 }
 
 float3 TruthPrepassApplyInterior(float3 scene)
@@ -244,10 +324,14 @@ float3 TruthPrepassApplyInterior(float3 scene)
         return scene;
     }
 
+    float ambient_weight = TruthPrepassSaturateControl(
+        TruthBridgeInteriorAmbient.w, 0.0);
+    float directional_weight = TruthPrepassSaturateControl(
+        TruthBridgeInteriorDirectional.w, 0.0);
     float3 ambient_color = TruthFiniteOrBlack(TruthBridgeInteriorAmbient.rgb)
-        * saturate(TruthBridgeInteriorAmbient.w);
+        * ambient_weight;
     float3 directional_color = TruthFiniteOrBlack(TruthBridgeInteriorDirectional.rgb)
-        * saturate(TruthBridgeInteriorDirectional.w);
+        * directional_weight;
     TruthInteriorLightInput input;
     input.exterior_sky_luminance = 0.0;
     input.ambient_floor = clamp(
@@ -277,19 +361,24 @@ float3 TruthPrepassApplyScreenSpace(
     float3 view_direction)
 {
     TruthScreenSpaceInput input;
-    input.texel_size = 1.0 / max(ScreenSize.xy, float2(1.0, 1.0));
+    input.texel_size = 1.0 / TruthPrepassScreenSize();
     input.view_direction = view_direction;
     input.raw_depth = raw_depth;
     input.native_normal_valid = 1.0;
     input.skin_mask_valid = 1.0;
-    input.sky_depth_threshold = TruthSkyDepthThreshold;
-    input.ao_intensity = 0.16 * saturate(TruthPrepassIntensity);
+    input.sky_depth_threshold = TruthPrepassClampControl(
+        TruthSkyDepthThreshold, 0.9998, 0.99, 1.0);
+    input.ao_intensity = 0.16 * TruthPrepassSaturateControl(
+        TruthPrepassIntensity, 0.0);
     input.contact_intensity = 0.25;
-    input.ao_radius_pixels = 6.0 + (18.0 * saturate(TruthPrepassDepthShape));
-    input.ssr_intensity = 0.08 * saturate(TruthPrepassIntensity);
+    input.ao_radius_pixels = 6.0 + (18.0 * TruthPrepassSaturateControl(
+        TruthPrepassDepthShape, 0.5));
+    input.ssr_intensity = 0.08 * TruthPrepassSaturateControl(
+        TruthPrepassIntensity, 0.0);
     input.ssr_max_distance = 20.0;
     input.ssr_thickness = 0.12;
-    input.diffusion_intensity = 0.10 * saturate(TruthPrepassIntensity);
+    input.diffusion_intensity = 0.10 * TruthPrepassSaturateControl(
+        TruthPrepassIntensity, 0.0);
     input.diffusion_radius_pixels = 1.5;
     return TruthApplyScreenSpaceEffects(
         scene, TextureColor, TextureDepth, TextureNormal, TextureMask,
@@ -305,7 +394,7 @@ TruthPrepassResult TruthComposePrepass(
     TruthPrepassResult output;
     output.color = scene;
     output.environment_applied = 0.0;
-    if (!TruthRuntimeReady())
+    if (!TruthRuntimeReady() || !TruthPrepassControlsReady(interior_factor))
     {
         return output;
     }
@@ -316,7 +405,7 @@ TruthPrepassResult TruthComposePrepass(
         return output;
     }
 
-    if (saturate(interior_factor) >= 0.5)
+    if (TruthPrepassSaturateControl(interior_factor, 0.0) >= 0.5)
     {
         float3 interior_color = TruthPrepassApplyInterior(output.color);
         output.environment_applied = any(interior_color != output.color) ? 1.0 : 0.0;
@@ -333,7 +422,7 @@ TruthPrepassResult TruthComposePrepass(
             float3 sky_radiance = TruthPrepassResolveSkyRadiance(
                 sky_view, texcoord, sky_valid);
             float environment_weight = sky_mask * sky_valid
-                * saturate(TruthSkyReplacementStrength);
+                * TruthPrepassSaturateControl(TruthSkyReplacementStrength, 0.0);
             if (environment_weight > 0.0)
             {
                 output.color = lerp(output.color, sky_radiance, environment_weight);

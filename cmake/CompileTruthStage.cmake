@@ -118,11 +118,31 @@ else()
 endif()
 
 if(NOT truth_stage_name STREQUAL "enbeffect.fx"
-    AND NOT truth_stage_name STREQUAL "enbeffectprepass.fx")
+    AND NOT truth_stage_name STREQUAL "enbeffectprepass.fx"
+    AND NOT truth_stage_name STREQUAL "enbbloom.fx"
+    AND NOT truth_stage_name STREQUAL "enblens.fx")
   string(FIND "${truth_stage_contents}" "TruthStageIdentity" identity_position)
   if(identity_position EQUAL -1)
     message(FATAL_ERROR
       "Identity stage ${truth_stage_name} must use the exact TruthStageIdentity output")
+  endif()
+endif()
+if(truth_stage_name STREQUAL "enbbloom.fx")
+  string(FIND "${truth_stage_contents}"
+    "TruthBloomAdditiveNeutral(source.a)"
+    bloom_additive_neutral_position)
+  if(bloom_additive_neutral_position EQUAL -1)
+    message(FATAL_ERROR
+      "Bloom scratch stage must return additive-neutral TextureBloom output when disabled")
+  endif()
+endif()
+if(truth_stage_name STREQUAL "enblens.fx")
+  string(FIND "${truth_stage_contents}"
+    "TruthLensAdditiveNeutral(bloom.a)"
+    lens_additive_neutral_position)
+  if(lens_additive_neutral_position EQUAL -1)
+    message(FATAL_ERROR
+      "Lens scratch stage must return additive-neutral TextureLens output when disabled")
   endif()
 endif()
 string(FIND "${truth_stage_contents}" "ORIGINALPOSTPROCESS" original_postprocess_position)

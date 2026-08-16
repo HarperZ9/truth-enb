@@ -54,20 +54,37 @@ SamplerState Sampler1
 #include "enb/ENBSeries0504VanillaPostProcess.fxh"
 #pragma warning(pop)
 
+float TruthResolveMainAdaptationLuminance(float raw_luminance)
+{
+    return TruthFinite1(raw_luminance)
+        ? clamp(raw_luminance, TruthLuminanceFloor, 65504.0)
+        : TruthMiddleGray;
+}
+
+float TruthResolveMainNonNegativeControl(float value)
+{
+    return TruthFinite1(value) ? max(value, 0.0) : 0.0;
+}
+
 float3 TruthResolveEnbOpticalInput(float2 texcoord)
 {
-    float3 color = max(TextureColor.Sample(Sampler0, texcoord).rgb, 0.0);
+    float3 scene = TruthFiniteOrBlack(
+        TextureColor.Sample(Sampler0, texcoord).rgb);
+    float3 lens_payload = 0.0.xxx;
     if (TruthUseEnbLens)
     {
-        color += max(TextureLens.Sample(Sampler1, texcoord).rgb, 0.0)
-            * max(ENBParams01.y, 0.0);
+        lens_payload = TruthFiniteOrBlack(
+            TextureLens.Sample(Sampler1, texcoord).rgb)
+            * TruthResolveMainNonNegativeControl(ENBParams01.y);
     }
+    float3 bloom_payload = 0.0.xxx;
     if (TruthUseEnbBloom)
     {
-        float3 bloom = max(TextureBloom.Sample(Sampler1, texcoord).rgb, 0.0);
-        color += max(bloom - color, 0.0) * max(ENBParams01.x, 0.0);
+        bloom_payload = TruthFiniteOrBlack(
+            TextureBloom.Sample(Sampler1, texcoord).rgb)
+            * TruthResolveMainNonNegativeControl(ENBParams01.x);
     }
-    return color;
+    return scene + bloom_payload + lens_payload;
 }
 
 float3 TruthResolveMainCapability(float3 color)
@@ -93,9 +110,8 @@ float4 TruthEnbPixelMain(VS_OUTPUT_POST input) : SV_Target
         return float4(saturate(linear_color), 1.0);
     }
 
-    float measured_luminance = max(
-        TextureAdaptation.SampleLevel(Sampler0, input.txcoord0, 0.0).x,
-        TruthLuminanceFloor);
+    float measured_luminance = TruthResolveMainAdaptationLuminance(
+        TextureAdaptation.SampleLevel(Sampler0, input.txcoord0, 0.0).x);
     TruthAtmosphereSample metering;
     metering.scene_luminance = measured_luminance;
     metering.sky_luminance = measured_luminance;

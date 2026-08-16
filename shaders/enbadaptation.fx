@@ -20,6 +20,8 @@
 #include "truth/TruthPipelineCommon.fxh"
 #include "truth/TruthStageParameters.fxh"
 
+float4 Timer;
+
 Texture2D TextureCurrent;
 Texture2D TexturePrevious;
 
@@ -42,10 +44,12 @@ float4 TruthAdaptationMain(TruthStageVSOutput input) : SV_Target
     {
         return TruthStageIdentity(selected, false, 0.0);
     }
+    float3 measured_color = TruthAdaptationSafeMeasuredColor(
+        source.rgb, previous_scalar);
     float measured = dot(
-        max(source.rgb, 0.0), float3(0.2126, 0.7152, 0.0722));
+        measured_color, float3(0.2126, 0.7152, 0.0722));
     float adapted = TruthUpdateAdaptedLuminance(
-        measured, previous_scalar, 1.0 / 60.0);
+        measured, previous_scalar, TruthAdaptationDeltaSeconds(Timer.w));
     return float4(adapted, adapted, adapted, 1.0);
 }
 

@@ -157,6 +157,10 @@ file(READ "${truth_main_effect}" truth_main_effect_source)
 
 foreach(required_prepass_core_token IN ITEMS
     "struct TruthPrepassResult"
+    "TruthPrepassControlsReady("
+    "TruthPrepassFiniteControl("
+    "TruthPrepassFinite3Control("
+    "TruthPrepassSaturateControl("
     "TruthComposePrepass("
     "TruthRuntimeReady()"
     "TruthEvaluateSkyViewAdapter"
@@ -186,6 +190,8 @@ foreach(required_prepass_stage_token IN ITEMS
     "Texture2D TextureNormal;"
     "Texture2D TextureMask;"
     "TruthComposePrepass("
+    "TruthPrepassControlsReady(EInteriorFactor)"
+    "TruthPrepassSaturateControl(TruthPrepassIntensity"
     "TruthStageIdentity")
   string(FIND "${truth_prepass_stage_source}" "${required_prepass_stage_token}" token_position)
   if(token_position EQUAL -1)

@@ -64,20 +64,33 @@ Effects 11 there is no such host.
 ## W1: dual-target the presets
 
 Truth and Elder shaders compile unmodified under Effects 11. The defect is
-silent double-processing: their post chains stay enabled because the Effects 11
-blocklist does not know the variable names `sharpenStr`, `vignetteEnable`,
-`TruthPostpassGrainShape`, or `[Truth 70] Postpass | Grain Shape`. Under
-Effects 11 those stack on Community Shaders upscaling and TAA.
+silent double-processing, and it applies to Truth only.
+
+**Corrected 2026-08-15, after the audit in `elder-enb/docs/EFFECTS11-CONFLICT-AUDIT.md`.**
+This section originally named `sharpenStr`, `vignetteEnable`, and
+`grainIntensity` as Elder's conflicting stages. All four of those `ThemeParams`
+fields are declared at `EotE_ThemeSystem.fxh:73-76` and read by nothing. Elder's
+only live sharpener is `CG_Clarity`, a nine-tap unsharp mask at
+`Effect_ColorGrading.fxh:374` reached through `enbeffect.fx:1244`, and it is
+gated on `ui_ClarityEnable`, which defaults to `false`. A default Elder install
+runs no sharpening, no grain, and no vignette.
+
+So the live defect is Truth's alone. `TruthPostpassGrainShape` and the vignette
+term run by default, the blocklist knows neither name, and under Effects 11 they
+stack on Community Shaders upscaling and TAA.
 
 Host selection extends the existing five-tier generator with a host axis rather
 than duplicating the shader tree. One source tree continues to produce the
 ENBSeries presets and additionally produces Effects 11 variants whose ini
-disables the stages Community Shaders already owns: sharpening, film grain,
-vignette, anti-aliasing, and letterboxing. The shader sources do not fork.
+disables the stages Community Shaders already owns. The shader sources do not
+fork. **Truth gets the host axis. Elder does not**, because its two variants
+would be byte-identical and generating them would be ceremony.
 
-The upstream half is a data-file contribution adding Truth and Elder variable
-names to `SettingsPatches.json`, so a user installing either preset under
-Effects 11 gets correct behaviour without the variant. This is small, obviously
+The upstream half is a data-file contribution to `SettingsPatches.json`, so a
+user installing either preset under Effects 11 gets correct behaviour without
+the variant. Truth contributes two postpass names. Elder contributes
+`GRADE | Clarity Enable`, which protects the user who turns clarity on without
+knowing what else is running, even though it ships off. This is small, obviously
 useful, and carries no architectural risk. It is the first contact with the
 project and it precedes the sky PRs.
 

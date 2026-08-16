@@ -16,7 +16,14 @@ to paste into the mod-page description field.
 
 - Skyrim Special Edition or Anniversary Edition
 - ENBSeries 0.504
-- Optional: SkyrimBridge, if you want live engine state driving the shaders
+- Bundled `TruthENBRuntime.dllplugin`, installed under `enbseries`, for native
+  camera/world-state publishing
+- The matching Address Library database for your runtime under
+  `Data/SKSE/Plugins` (`version-1-5-97-0.bin` on SE 1.5.97, or the matching
+  `versionlib-<major>-<minor>-<patch>-<build>.bin` on AE 1.6.x)
+- Optional: SkyrimBridge-compatible external state for setups that publish the
+  same shader parameter names. It is not required for Truth's native
+  camera/world-state path.
 
 ## Description (BBCode)
 
@@ -75,13 +82,12 @@ default-quality contract, the stage compile matrix, the balanced prepass
 instruction budget, and runtime reproducibility. Treat those as passed only when
 they are recorded against the final posted archive and its SHA-256 sidecar.
 
-When the automated gate is run, the safety contracts exercise the real shader
-code rather than only reading it. Unoccluded ambient occlusion must return the
-scene unchanged, samples taken across a depth discontinuity must be rejected
+The narrower `truth_release_gate` does not include the full rendered-output
+screen-space WARP artifact. That evidence comes from `truth_screen_space_warp`
+when the final artifact suite is run: unoccluded ambient occlusion must return
+the scene unchanged, samples taken across a depth discontinuity must be rejected
 instead of counted as occlusion, a reflection ray that misses must return the
-scene, and a zero skin mask must return the scene bit for bit. Each of those
-must be asserted against rendered output on a software device before the gate is
-marked passed.
+scene, and a zero skin mask must return the scene bit for bit.
 
 The package gate requires deterministic output and a SHA-256 sidecar for the
 final archive.
@@ -96,12 +102,17 @@ budget, tier distinctness, identity contracts, and package reproducibility. They
 do not prove it looks good on your monitor in your load order. That judgment is
 yours, and feedback with screenshots is the most useful thing you can send.
 
-[size=4]Pairs with SkyrimBridge[/size]
+[size=4]Native runtime and SkyrimBridge compatibility[/size]
 
-Truth is standalone and needs nothing else. If you also run SkyrimBridge, live
-engine state becomes available to the shaders through it: weather, camera,
-celestial position, and interior state, published as shader parameters each
-frame.
+Truth's native live-state path is its bundled ENB external plugin,
+`TruthENBRuntime.dllplugin`. It reads the matching Address Library database from
+`Data/SKSE/Plugins` and publishes camera/world-state shader parameters without
+requiring SKSE, CommonLib, or SkyrimBridge.
+
+SkyrimBridge remains an optional compatibility surface. If your setup publishes
+compatible weather, celestial, camera, or interior shader parameters, Truth can
+consume them, but SkyrimBridge is not required for the native camera/world-state
+path above.
 
 [size=4]Credits[/size]
 

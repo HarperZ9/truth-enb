@@ -314,7 +314,7 @@ SkyFieldEvaluation EvaluateSkyFields(
       input.wind_y,
       input.aurora_activity,
       input.night_factor,
-      AuroraQuality::low,
+      AuroraQuality::quality,
   };
   const AuroraCurtainEvaluation aurora_evaluation =
       EvaluateAuroraCurtain(aurora_input, aurora);

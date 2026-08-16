@@ -483,21 +483,6 @@ std::string_view ReferenceSceneName(const ReferenceScene scene) noexcept {
   }
 }
 
-[[nodiscard]] const char* AuroraQualityDefine(
-    const AuroraQuality quality) noexcept {
-  switch (quality) {
-    case AuroraQuality::fallback:
-      return "0";
-    case AuroraQuality::low:
-      return "2";
-    case AuroraQuality::balanced:
-      return "3";
-    case AuroraQuality::high:
-      return "4";
-  }
-  return nullptr;
-}
-
 [[nodiscard]] const char* QualityTierDefine(const QualityTier tier) noexcept {
   switch (tier) {
     case QualityTier::performance:
@@ -570,7 +555,7 @@ ReferenceRenderResult RenderWarpSkyFieldScalars(
       width,
       height,
       "TruthSkyFieldScalarProbePixelMain",
-      AuroraQualityDefine(AuroraQuality::low));
+      QualityTierDefine(QualityTier::quality));
 }
 
 ReferenceRenderResult RenderWarpSkyFieldScalars(
@@ -578,11 +563,11 @@ ReferenceRenderResult RenderWarpSkyFieldScalars(
     const std::filesystem::path& shader_path,
     const std::uint32_t width,
     const std::uint32_t height,
-    const AuroraQuality quality) noexcept {
-  const char* const define = AuroraQualityDefine(quality);
+    const QualityTier tier) noexcept {
+  const char* const define = QualityTierDefine(tier);
   if (define == nullptr) {
     return Fail(ReferenceRenderStatus::invalid_request,
-                "unknown aurora quality tier");
+                "unknown Truth quality tier");
   }
   return RenderWarpPass(scene,
                         shader_path,
@@ -603,7 +588,7 @@ ReferenceRenderResult RenderWarpSkyFieldRadiance(
       width,
       height,
       "TruthSkyFieldRadianceProbePixelMain",
-      AuroraQualityDefine(AuroraQuality::low));
+      QualityTierDefine(QualityTier::quality));
 }
 
 ReferenceRenderResult RenderWarpSkyFieldRadiance(
@@ -611,11 +596,11 @@ ReferenceRenderResult RenderWarpSkyFieldRadiance(
     const std::filesystem::path& shader_path,
     const std::uint32_t width,
     const std::uint32_t height,
-    const AuroraQuality quality) noexcept {
-  const char* const define = AuroraQualityDefine(quality);
+    const QualityTier tier) noexcept {
+  const char* const define = QualityTierDefine(tier);
   if (define == nullptr) {
     return Fail(ReferenceRenderStatus::invalid_request,
-                "unknown aurora quality tier");
+                "unknown Truth quality tier");
   }
   return RenderWarpPass(scene,
                         shader_path,

@@ -20,22 +20,31 @@ inline constexpr float kAuroraTopHeight = 16.0F;
 inline constexpr float kAuroraMaximumRayDistance = 180.0F;
 
 enum class AuroraQuality : std::uint32_t {
-  fallback = 0U,
-  low = 1U,
-  balanced = 2U,
-  high = 3U,
+  performance = 0U,
+  balanced = 1U,
+  quality = 2U,
+  ultra = 3U,
+  cinematic = 4U,
+
+  // Compatibility aliases for older CPU callers. The canonical five-tier
+  // contract above mirrors TRUTH_QUALITY_TIER and TruthQuality.fxh.
+  fallback = performance,
+  low = quality,
+  high = cinematic,
 };
 
 [[nodiscard]] constexpr std::uint32_t AuroraSampleCount(
     const AuroraQuality quality) noexcept {
   switch (quality) {
-    case AuroraQuality::fallback:
+    case AuroraQuality::performance:
       return 1U;
-    case AuroraQuality::low:
-      return 4U;
     case AuroraQuality::balanced:
+      return 2U;
+    case AuroraQuality::quality:
+      return 4U;
+    case AuroraQuality::ultra:
       return 7U;
-    case AuroraQuality::high:
+    case AuroraQuality::cinematic:
       return 10U;
   }
   return 0U;

@@ -87,7 +87,7 @@ enum class QualityTier : std::uint8_t {
     const std::filesystem::path& shader_path,
     std::uint32_t width,
     std::uint32_t height,
-    AuroraQuality quality) noexcept;
+    QualityTier tier) noexcept;
 
 [[nodiscard]] ReferenceRenderResult RenderWarpSkyFieldRadiance(
     ReferenceScene scene,
@@ -100,7 +100,7 @@ enum class QualityTier : std::uint8_t {
     const std::filesystem::path& shader_path,
     std::uint32_t width,
     std::uint32_t height,
-    AuroraQuality quality) noexcept;
+    QualityTier tier) noexcept;
 
 [[nodiscard]] ReferenceRenderResult RenderWarpCloudVolumeScalars(
     ReferenceScene scene,

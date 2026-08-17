@@ -50,13 +50,26 @@ endforeach()
 foreach(pipeline_token IN ITEMS
     "TruthFinite1"
     "TruthSkyMask"
-    "TRUTH_DEPTH_CONVENTION_DEVICE_Z_SKY_AT_ONE")
+    "TRUTH_DEPTH_CONVENTION_DEVICE_Z_SKY_AT_ONE"
+    "struct TruthStageVSInput"
+    "float3 position : POSITION;"
+    "float2 texcoord : TEXCOORD0;"
+    "TruthFullscreenVertex(TruthStageVSInput input)"
+    "output.position = float4(input.position, 1.0);"
+    "output.texcoord = input.texcoord;")
   string(FIND "${truth_pipeline_source}" "${pipeline_token}" pipeline_position)
   if(pipeline_position EQUAL -1)
     message(FATAL_ERROR
       "Truth pipeline contract is missing token: ${pipeline_token}")
   endif()
 endforeach()
+string(FIND "${truth_pipeline_source}" "SV_VertexID"
+  synthetic_vertex_id_position)
+if(NOT synthetic_vertex_id_position EQUAL -1)
+  message(FATAL_ERROR
+    "Truth ordered stages synthesize a fullscreen triangle instead of "
+    "consuming ENB's POSITION/TEXCOORD host quad")
+endif()
 
 function(validate_truth_screen_contract candidate_source is_valid rejection_reason)
   set(valid TRUE)

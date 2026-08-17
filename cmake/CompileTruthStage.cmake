@@ -291,5 +291,23 @@ foreach(output_file IN ITEMS "${TRUTH_OUTPUT}" "${TRUTH_LISTING}")
   endif()
 endforeach()
 
+# ENB supplies an indexed fullscreen quad through POSITION/TEXCOORD. A shader
+# that synthesizes geometry from SV_VertexID can compile cleanly yet collapse
+# when ENB's vertex indices/base vertex are not the assumed 0/1/2 sequence.
+file(READ "${TRUTH_LISTING}" truth_stage_listing)
+string(REGEX MATCH "// POSITION[ \t]+0[ \t]+xyz"
+  truth_host_position_signature "${truth_stage_listing}")
+string(REGEX MATCH "// TEXCOORD[ \t]+0[ \t]+xy"
+  truth_host_texcoord_signature "${truth_stage_listing}")
+string(FIND "${truth_stage_listing}" "// SV_VertexID"
+  truth_synthetic_vertex_signature_position)
+if(truth_host_position_signature STREQUAL ""
+    OR truth_host_texcoord_signature STREQUAL ""
+    OR NOT truth_synthetic_vertex_signature_position EQUAL -1)
+  message(FATAL_ERROR
+    "FXC vertex signature for ${truth_stage_name} does not consume ENB's "
+    "POSITION(float3)/TEXCOORD0(float2) host quad")
+endif()
+
 message(STATUS
   "FXC stage: ${truth_stage_name}; tier: ${TRUTH_QUALITY_TIER}; technique: ${TRUTH_STAGE_TECHNIQUE}")

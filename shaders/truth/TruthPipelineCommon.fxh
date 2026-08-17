@@ -41,20 +41,23 @@ float TruthIdentityScalar(float value)
     return value;
 }
 
+struct TruthStageVSInput
+{
+    float3 position : POSITION;
+    float2 texcoord : TEXCOORD0;
+};
+
 struct TruthStageVSOutput
 {
     float4 position : SV_POSITION;
     float2 texcoord : TEXCOORD0;
 };
 
-TruthStageVSOutput TruthFullscreenVertex(uint vertex_id : SV_VertexID)
+TruthStageVSOutput TruthFullscreenVertex(TruthStageVSInput input)
 {
     TruthStageVSOutput output;
-    float2 triangle_position = vertex_id == 0u
-        ? float2(-1.0, -1.0)
-        : (vertex_id == 1u ? float2(-1.0, 3.0) : float2(3.0, -1.0));
-    output.position = float4(triangle_position, 0.0, 1.0);
-    output.texcoord = triangle_position * float2(0.5, -0.5) + 0.5;
+    output.position = float4(input.position, 1.0);
+    output.texcoord = input.texcoord;
     return output;
 }
 

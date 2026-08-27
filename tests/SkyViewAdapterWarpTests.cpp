@@ -795,7 +795,7 @@ class ProductionIncludeResolver final : public ID3DInclude {
   if (buffer == nullptr) Fail("production $Globals is absent");
   D3D11_SHADER_BUFFER_DESC description{};
   CheckHr(buffer->GetDesc(&description), "production $Globals reflection");
-  if (description.Size != 368U) {
+  if (description.Size != 304U) {
     std::string layout = "production $Globals reflected "
         + std::to_string(description.Size) + " bytes:";
     for (UINT index = 0U; index < description.Variables; ++index) {
@@ -830,10 +830,14 @@ class ProductionIncludeResolver final : public ID3DInclude {
   ValidateVariable(*buffer, "TruthRuntimeCelestial", 80U, 16U);
   ValidateVariable(*buffer, "TruthRuntimeStatus", 96U, 16U);
   ValidateVariable(*buffer, "TruthMasterEnabled", 112U, 4U);
-  ValidateVariable(*buffer, "TruthAuroraWorldOrigin", 192U, 12U);
-  ValidateVariable(*buffer, "Timer", 208U, 16U);
-  ValidateVariable(*buffer, "EInteriorFactor", 224U, 4U);
-  ValidateVariable(*buffer, "ENBParams01", 352U, 16U);
+  ValidateVariable(*buffer, "TruthManualExposureEv", 116U, 4U);
+  ValidateVariable(*buffer, "TruthAutoExposureBlend", 120U, 4U);
+  ValidateVariable(*buffer, "TruthUseEnbBloom", 124U, 4U);
+  ValidateVariable(*buffer, "TruthUseEnbLens", 128U, 4U);
+  ValidateVariable(*buffer, "Timer", 144U, 16U);
+  ValidateVariable(*buffer, "EInteriorFactor", 160U, 4U);
+  ValidateVariable(*buffer, "Params01", 176U, 112U);
+  ValidateVariable(*buffer, "ENBParams01", 288U, 16U);
   return result;
 }
 
@@ -1046,6 +1050,9 @@ void ConfigureProductionFrame(ReflectedBuffer& globals) {
   SetVariable(globals, "ENBParams01", Float4{});
   SetBool(globals, "TruthUseEnbBloom", false);
   SetBool(globals, "TruthUseEnbLens", false);
+  // The shipped UI default blends 25% auto exposure; the parity cases need
+  // the pure manual-EV path, so pin the blend instead of trusting defaults.
+  SetVariable(globals, "TruthAutoExposureBlend", 0.0F);
 }
 
 [[nodiscard]] Float4 ExpectedTone(const Float4 scene, const float ev) {
@@ -1143,7 +1150,7 @@ void ExerciseProductionPixel(Report& report,
   CompareProduction(report, "ENB lens and bloom bindings",
                     RenderProduction(warp, renderer, optical_globals,
                                      optical_textures),
-                    Float4{0.5F, 0.5F, 0.5F, 1.0F});
+                    Float4{0.6F, 0.65F, 0.7F, 1.0F});
 
   const Float4 invalid_runtime_pixel = RenderProduction(
       warp, renderer, globals, textures);
@@ -1214,18 +1221,22 @@ void ExerciseProductionPixel(Report& report,
         report, std::string{"non-finite UI parameter "} + parameter,
         RenderProduction(warp, renderer, invalid_parameter_globals, textures));
   }
+  // The environment controls live in the prepass-owned
+  // TruthEnvironmentParameters.fxh; the main effect must not reflect them.
   for (const char* parameter : {
-           "TruthSkyReplacementStrength", "TruthSkyDepthThreshold",
-           "TruthSkyDepthFeather", "TruthSkyRadianceScale",
-           "TruthWeatherDensity", "TruthCloudCoverage", "TruthCloudDensity",
-           "TruthFogDensity", "TruthAuroraActivity", "TruthAuroraMask",
-           "TruthSkyWindX", "TruthSkyWindY"}) {
-    ReflectedBuffer invalid_parameter_globals = valid_runtime_globals;
-    SetVariable(invalid_parameter_globals, parameter, nan);
-    ExpectFiniteBounded(
-        report, std::string{"prepass-owned parameter isolation "} + parameter,
-        RenderProduction(warp, renderer, invalid_parameter_globals,
-                         textures));
+           "TruthProceduralSkyEnabled", "TruthSkyReplacementStrength",
+           "TruthSkyDepthThreshold", "TruthSkyDepthFeather",
+           "TruthSkyRadianceScale", "TruthWeatherDensity",
+           "TruthCloudCoverage", "TruthCloudDensity", "TruthFogDensity",
+           "TruthAuroraActivity", "TruthAuroraMask", "TruthSkyWindX",
+           "TruthSkyWindY", "TruthAuroraWorldOrigin"}) {
+    auto* variable = defaults.reflection->GetVariableByName(parameter);
+    D3D11_SHADER_VARIABLE_DESC description{};
+    const bool absent = variable == nullptr
+        || FAILED(variable->GetDesc(&description));
+    report.Expect(absent,
+                  std::string{"prepass-owned parameter leaked into the main "
+                              "effect: "} + parameter);
   }
 }
 

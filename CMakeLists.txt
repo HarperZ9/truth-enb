@@ -677,10 +677,12 @@ if(BUILD_TESTING)
       "-DTRUTH_SECOND_DEFINE=TRUTH_STAGE_BUDGET_WITNESS=1"
       "-DTRUTH_OUTPUT=${CMAKE_CURRENT_BINARY_DIR}/shaders/$<CONFIG>/TruthBudgetBalancedPrepass.fxo"
       "-DTRUTH_LISTING=${CMAKE_CURRENT_BINARY_DIR}/shaders/$<CONFIG>/TruthBudgetBalancedPrepass.asm"
-      # IEEE-strict compilation reports 2,917 slots for the complete Balanced
-      # HDR prepass. Keep only 21 slots of headroom so environment and
-      # screen-space correctness cannot hide a material shader-cost regression.
-      "-DTRUTH_MAXIMUM_INSTRUCTION_SLOTS=2938"
+      # IEEE-strict compilation reports 2,975 slots for the complete Balanced
+      # HDR prepass after the stage-boundary hardening (204ad5c) and the
+      # public-package parameter split (2eca112). Keep only 21 slots of
+      # headroom so environment and screen-space correctness cannot hide a
+      # material shader-cost regression.
+      "-DTRUTH_MAXIMUM_INSTRUCTION_SLOTS=2996"
       "-DTRUTH_BASELINE_INSTRUCTION_SLOTS=6499"
       "-DTRUTH_BASELINE_REVISION=12776780d4ed3d6ff71b09694dd666f3d07b5cf2"
       "-DTRUTH_QUALITY=balanced-prepass"

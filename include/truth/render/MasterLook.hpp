@@ -12,6 +12,9 @@ inline constexpr float kMinimumDeltaSecondsExclusive = 0.0F;
 inline constexpr float kMaximumDeltaSeconds = 1.0F;
 inline constexpr float kMinimumExposureEv = -16.0F;
 inline constexpr float kMaximumExposureEv = 16.0F;
+// Auto-exposure may darken across the full range, but the brightening target is
+// capped so dark scenes stay dark instead of metering up toward middle gray.
+inline constexpr float kMaximumBrightenEv = 3.0F;
 inline constexpr float kBrightenRateEvPerSecond = 3.0F;
 inline constexpr float kDarkenRateEvPerSecond = 1.5F;
 inline constexpr float kMiddleGray = 0.18F;

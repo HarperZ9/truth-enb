@@ -5,6 +5,9 @@ static const float TruthMiddleGray = 0.18;
 static const float TruthLuminanceFloor = 0.0001;
 static const float TruthMinimumExposureEv = -16.0;
 static const float TruthMaximumExposureEv = 16.0;
+// Auto-exposure may darken across the full range, but the brightening target is
+// capped so dark scenes stay dark instead of metering up toward middle gray.
+static const float TruthMaximumBrightenEv = 3.0;
 static const float TruthBrightenRateEvPerSecond = 3.0;
 static const float TruthDarkenRateEvPerSecond = 1.5;
 static const float TruthFilmicLinearWhite = 4.0;
@@ -37,7 +40,7 @@ float TruthTargetExposureEv(TruthAtmosphereSample sample)
     float metered_luminance = max(TruthUnifiedLuminance(sample), TruthLuminanceFloor);
     return clamp(log2(TruthMiddleGray / metered_luminance),
                  TruthMinimumExposureEv,
-                 TruthMaximumExposureEv);
+                 TruthMaximumBrightenEv);
 }
 
 float TruthAdaptExposureEv(float exposure_ev, float target_exposure_ev, float delta_seconds)

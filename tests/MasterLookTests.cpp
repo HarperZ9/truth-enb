@@ -88,15 +88,30 @@ void FirstSampleInitializesDeterministically(TestContext& context) {
 }
 
 void BrighteningUsesItsOwnBound(TestContext& context) {
-  MasterLookState state{0.0F, 0.0F, 3U, StateValidity::valid};
-  const AtmosphereSample sample{0.01125F, 0.01125F, 0.0F, 0.5F, false};
+  MasterLookState state{-1.0F, 0.0F, 3U, StateValidity::valid};
+  const AtmosphereSample sample{0.045F, 0.045F, 0.0F, 0.5F, false};
 
   const auto result = Update(state, sample);
 
   context.expect(result.status == UpdateStatus::updated, "brightening was not a continuous update");
-  context.expect(Near(state.target_exposure_ev, 4.0F), "brightening target was unexpected");
-  context.expect(Near(state.exposure_ev, 1.5F), "brightening exceeded or missed the 3 EV/s bound");
+  context.expect(Near(state.target_exposure_ev, 2.0F), "brightening target was unexpected");
+  context.expect(Near(state.exposure_ev, 0.5F), "brightening exceeded or missed the 3 EV/s bound");
   context.expect(state.history_epoch == 3U, "continuous brightening changed epoch");
+}
+
+void BrighteningTargetIsCappedAsymmetrically(TestContext& context) {
+  const AtmosphereSample dark{0.001125F, 0.001125F, 0.0F, 0.5F, false};
+  const AtmosphereSample bright{20000.0F, 20000.0F, 0.0F, 0.5F, false};
+
+  context.expect(Near(TargetExposureEv(dark), 3.0F), "dark target was not capped at the brighten bound");
+  context.expect(Near(TargetExposureEv(bright), -16.0F), "bright target lost the full darkening range");
+
+  MasterLookState state{0.0F, 0.0F, 5U, StateValidity::valid};
+  const auto result = Update(state, dark);
+
+  context.expect(result.status == UpdateStatus::updated, "capped brightening was not a continuous update");
+  context.expect(Near(state.target_exposure_ev, 3.0F), "capped target was not stored");
+  context.expect(Near(state.exposure_ev, 1.5F), "approach to the capped target ignored the rate bound");
 }
 
 void DarkeningUsesItsOwnBound(TestContext& context) {
@@ -230,6 +245,7 @@ constexpr TestCase kTests[] = {
     {"stable codes are explicit", &StableCodesAreExplicit},
     {"first sample initializes deterministically", &FirstSampleInitializesDeterministically},
     {"brightening uses its own bound", &BrighteningUsesItsOwnBound},
+    {"brightening target is capped asymmetrically", &BrighteningTargetIsCappedAsymmetrically},
     {"darkening uses its own bound", &DarkeningUsesItsOwnBound},
     {"discontinuity snaps and advances epoch", &DiscontinuitySnapsAndAdvancesEpoch},
     {"discontinuous first sample also advances epoch", &DiscontinuousFirstSampleAlsoAdvancesEpoch},

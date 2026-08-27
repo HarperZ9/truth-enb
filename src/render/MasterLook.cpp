@@ -75,7 +75,7 @@ float TargetExposureEv(const AtmosphereSample& sample) noexcept {
   const float metered_luminance = std::max(UnifiedLuminance(sample), kLuminanceFloor);
   return std::clamp(std::log2(kMiddleGray / metered_luminance),
                     kMinimumExposureEv,
-                    kMaximumExposureEv);
+                    kMaximumBrightenEv);
 }
 
 float FilmicToneCurve(const float linear_value) noexcept {

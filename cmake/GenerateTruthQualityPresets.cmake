@@ -463,9 +463,14 @@ endfunction()
 
 function(write_truth_stage_ini output_dir stage_file host_vignette_strength host_grain_shape)
   string(TOUPPER "${stage_file}" stage_section)
+  # ENB's per-stage technique dropdown defaults to index 0, its internal
+  # DEFAULT shader; index 1 is the first technique11 declared in the stage
+  # file. Without this key an installed preset renders ENB's built-in path
+  # instead of Truth.
   string(CONCAT stage_contents
     "; Generated Truth ENB stage settings.\n"
-    "[${stage_section}]\n")
+    "[${stage_section}]\n"
+    "TECHNIQUE=1\n")
 
   if(stage_file STREQUAL "enbeffectprepass.fx")
     string(APPEND stage_contents

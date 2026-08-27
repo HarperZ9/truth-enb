@@ -84,7 +84,9 @@ mod, choose exactly one overlay from
 `Presets/<host>/<tier>/ROOT/` and merge that overlay over the common `Root/`
 directory. Do not combine overlays: each one supplies all nine exact ENB UIName
 configuration files, its metadata, and the quality include that selects the
-real shader tier.
+real shader tier. The nine stage files also carry `TECHNIQUE=1`, which selects
+the Truth technique in every ENB stage. Without an overlay, ENB falls back to
+its built-in DEFAULT shader in each stage and none of the Truth passes render.
 
 Choose the host that owns the shader pipeline:
 

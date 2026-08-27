@@ -316,6 +316,9 @@ function(truth_validate_public_text root relative installed)
       "Root/enbseries/truth/TruthQualityPresetOverride.fxh")
     truth_require_package_text("${contents}" "#define TRUTH_QUALITY_TIER 1"
       "Truth base quality override")
+  elseif(relative MATCHES "^Presets/.*/ROOT/enbseries/[a-z]+\\.fx\\.ini$")
+    truth_require_package_text("${contents}" "TECHNIQUE=1\n"
+      "Truth preset stage INI ${relative}")
   endif()
 endfunction()
 

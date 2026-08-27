@@ -475,7 +475,10 @@ endif()
 
 function(require_truth_stage_ini_contract stage_file contents context)
   string(TOUPPER "${stage_file}" stage_section)
-  require_truth_ini_contains("${contents}" "[${stage_section}]" "${context}")
+  # TECHNIQUE=1 must sit directly under the section header, matching both the
+  # generator and ENB's own save format; index 1 activates the first declared
+  # Truth technique instead of ENB's internal DEFAULT shader.
+  require_truth_ini_contains("${contents}" "[${stage_section}]\nTECHNIQUE=1\n" "${context}")
   foreach(forbidden_text IN ITEMS
       "[TRUTH QUALITY]"
       "[TRUTH HOST]"

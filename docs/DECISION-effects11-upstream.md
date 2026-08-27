@@ -1,6 +1,6 @@
 # Upstream contribution to Community Shaders
 
-**Status:** first PR raised 2026-08-15, awaiting response.
+**Status:** accepted. Merged upstream 2026-08-19.
 
 This records what was offered to Community Shaders, why, and what the answer
 implies for the larger sky-feature work in W3. It is the cheap experiment that
@@ -46,5 +46,39 @@ they know their review standards better than the plan does.
 
 ## Response
 
-Not yet received. This section gets the date, the outcome, and any maintainer
-comments that bear on W3 when it arrives.
+Accepted, without changes. doodlum approved on 2026-08-18 and the PR merged to
+`dev` on 2026-08-19, four days after it was raised. The single data-only commit
+landed as submitted. Neither the maintainer review nor the repository's
+automated review left an actionable comment.
+
+Per the pre-registered interpretation above, this is the accepted outcome. It
+is evidence that outside contributions land and that the maintainers will carry
+preset-specific data. W3 Task 1 opens the Discord conversation about the sky
+feature with this merged PR in hand. Truth and Elder presets now receive
+correct default behaviour under Effects 11 from the next Community Shaders
+release, independent of Truth's own Effects 11 preset variant.
+
+## New evidence, 2026-08-27
+
+Effects 11's Nexus page now returns "removed by a member of staff". Secondary
+coverage attributes the removal to a claim from the ENBSeries author and to
+Nexus declining to host the file under legal uncertainty; on 2026-08-05 the
+ENBSeries licence added clauses against "technical extraction, unfair
+competition, and unauthorized brand exploitation" that assert protection over
+the ENB preset ini structure. None of this is confirmed by a first-party
+statement from either project, and the enforceability of the licence clauses is
+publicly disputed.
+
+What is confirmed directly: the Community Shaders repository still carries and
+actively develops Effects 11, the official Effects 11 page now lives on ModPub
+(`mod.pub/skyrim-se/415-effects-11`, updated 2026-08-24), and preset-side
+Effects 11 ports by other authors remain live on Nexus. So the host is alive,
+its distribution moved off Nexus, and preset support for it appears tolerated
+there.
+
+Bearing on this decision: the dual-target work stands as shipped, and any
+Truth documentation that points users at Effects 11 should point at ModPub.
+Whether to proceed with the sky-feature contribution while Community Shaders
+is in an unresolved dispute with the ENBSeries author is a judgment call that
+belongs to the operator, not to this record. The technical gate remains
+passed.

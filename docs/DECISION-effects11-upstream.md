@@ -82,3 +82,14 @@ Whether to proceed with the sky-feature contribution while Community Shaders
 is in an unresolved dispute with the ENBSeries author is a judgment call that
 belongs to the operator, not to this record. The technical gate remains
 passed.
+
+## Operator ruling, 2026-08-27
+
+The operator has made the judgment call reserved above: **W3 does not run.**
+No sky-feature contribution goes to Community Shaders and no new Effects
+11-facing work starts while the dispute with the ENBSeries author stands
+unresolved. The refusal is scoped to new contribution, not to compatibility
+already shipped. Truth keeps its dual-host support as built, the Effects 11
+preset variant stays in the public package, and PR #2663 remains merged
+upstream as data-only protection for users who run that host. If the dispute
+resolves, reopening W3 is a fresh operator decision, not a default.

@@ -1,6 +1,6 @@
 # Upstream contribution to Community Shaders
 
-**Status:** first PR raised 2026-08-15, awaiting response.
+**Status:** accepted. Merged upstream 2026-08-19.
 
 This records what was offered to Community Shaders, why, and what the answer
 implies for the larger sky-feature work in W3. It is the cheap experiment that
@@ -46,5 +46,14 @@ they know their review standards better than the plan does.
 
 ## Response
 
-Not yet received. This section gets the date, the outcome, and any maintainer
-comments that bear on W3 when it arrives.
+Accepted, without changes. doodlum approved on 2026-08-18 and the PR merged to
+`dev` on 2026-08-19, four days after it was raised. The single data-only commit
+landed as submitted. Neither the maintainer review nor the repository's
+automated review left an actionable comment.
+
+Per the pre-registered interpretation above, this is the accepted outcome. It
+is evidence that outside contributions land and that the maintainers will carry
+preset-specific data. W3 Task 1 opens the Discord conversation about the sky
+feature with this merged PR in hand. Truth and Elder presets now receive
+correct default behaviour under Effects 11 from the next Community Shaders
+release, independent of Truth's own Effects 11 preset variant.

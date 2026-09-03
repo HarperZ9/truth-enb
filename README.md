@@ -1,11 +1,15 @@
 # Truth ENB
 
+<img src="docs/art/truth-enb-header.svg" alt="Truth ENB, an ENB preset for Skyrim with a native runtime that feeds it the camera. Resolve the camera, or draw nothing that pretends to be one.">
+
 Truth ENB contains a Truth-owned rendering vertical slice: a production
 ENBSeries effect, a small native camera bridge, and C++23 CPU references for
 the original atmosphere, cloud, aurora, exposure, and tone systems.
 
 This repository was authored as a clean implementation. It does not import or
 depend on recovered or peer shader source.
+
+<img src="docs/art/preset-table.svg" alt="A table of twelve rows: what the preset declares, how many of it there are, and where each number is read from. There are five quality tiers, zero through four, and ten constants resolve per tier. Aurora samples run one, two, four, seven and ten across those tiers. The stage compile matrix is nine effects by five tiers, so forty-five compilations, and six negative fixtures have to fail alongside them. The runtime publishes seven hidden float4 parameter keys under two protocol versions, 1.0 and 1.1, where 1.1 adds the celestial vector. A camera frame has nineteen refusal codes and the session machine has seven states. The balanced prepass is refused above 2,996 instruction slots. Forty-one CTest targets are declared across three CMake files. No reference image digest is pinned anywhere in the tree, so the WARP render is checked against itself rather than against a known picture.">
 
 ## What is included
 
@@ -120,6 +124,8 @@ archive is a release candidate, not evidence of those unrun checks.
 
 ## Runtime boundary
 
+<img src="docs/art/camera-to-shader.svg" alt="Eight stages carrying a camera frame from the game runtime into the shader: runtime pick, address library, camera locator, sample, validate, baseline, publish, shader gate. SelectRuntime maps the executable version to Special Edition or Anniversary Edition, and an unsupported family never writes anything. The Address Library file is parsed with sixteen named refusals covering truncation, wrong format, runtime mismatch, duplicate ids, trailing data and overflow. Each family carries its own world root camera relocation id, 35601 for Special Edition and 36609 for Anniversary Edition. Sampling reads the world-to-camera matrix at offset 0x110 and the frustum and viewport at offset 0x150, against static assertions that pin the ABI layout. Validation has nineteen refusal codes, including a non-finite matrix, a non-affine transform, a singular view, a degenerate frustum and a camera outside range. Before the first live write the runtime reads all seven parameter keys and keeps them as a baseline. Publishing writes four inverse view projection rows, the camera world position, the celestial vector and a status word carrying the protocol version, a valid flag, a folded generation counter and the world scale. The shader gate re-checks the status word for finiteness, for version 1.0 or 1.1, for a valid flag above one half and for a world scale inside its bounds, and the celestial path additionally requires version 1.1 and a unit-length sun direction. Three outcomes: the world-space path enabled, the screen-space path only when the defaults still hold, and no write at all on an unsupported runtime.">
+
 The intended runtime peers are ENBSeries and Address Library. The native
 bridge reads the Address Library database directly; Truth does not require
 SKSE, CommonLib, ENB Helper, a peer shader package, or a preset-overlay tool.
@@ -141,6 +147,8 @@ contract, strict 45-permutation, and WARP reference tests cover environment
 composition, sky/interior ownership, and all five tiers.
 
 ## Build and test
+
+<img src="docs/art/tier-to-shader.svg" alt="Eight stages taking a quality tier to a compiled shader: tier, preset override, command line, knobs, stage build, negative cases, prepass budget, package manifest. The tier is an integer from zero through four and anything outside that range is a compile error rather than a clamp. The installed preset carries an override header that defines the tier only while it is still undefined, so a command-line define stays authoritative and preset assembly can replace that one file to ship a different tier. Ten constants resolve per tier: cloud primary steps, cloud light steps, aurora samples, ambient occlusion directions and steps, depth of field rings, bloom radius, lens ghosts, screen-space reflection steps, and whether volume clouds are used at all. Tiers zero and one set cloud steps to zero and volume clouds off; tiers two, three and four turn them on. Aurora samples run one, two, four, seven and ten across the five tiers. Nine ENB stage effects are compiled once per tier for forty-five builds: prepass, depth of field, bloom, adaptation, lens, effect, postpass, sun sprite and underwater. Six negative fixtures edit a stage source and each one has to fail to compile, covering full-frame history, object motion, foreign scratch reads, cross-effect alpha packing and two non-adaptation ownership cases. The balanced prepass is compiled under IEEE-strict rules and refused above 2,996 instruction slots, against a pinned baseline of 6,499 and the revision that set it. The release package manifest is built and checked for determinism last. Three outcomes: every stage compiles at every tier, a compiled shader is not a rendered one, and a tier outside the range is refused.">
 
 From the repository root:
 

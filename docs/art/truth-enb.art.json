@@ -1,0 +1,87 @@
+{
+  "header": {
+    "name": "truth-enb",
+    "role": "an ENB preset for Skyrim with a native runtime that feeds it the camera",
+    "tagline": "Resolve the camera, or draw nothing that pretends to be one.",
+    "words": ["resolve", "publish", "compile", "refuse", "restore"]
+  },
+  "flows": [
+    {
+      "file": "camera-to-shader.svg",
+      "kicker": "a world-space sky needs the camera matrix, and a wrong one is worse than none",
+      "title": "How a camera frame reaches the shader, or fails to",
+      "footnote": "The runtime writes seven hidden float4 parameters into ENBEFFECT.FX and nothing else. Every one of them is read back and kept as a baseline before the first live write, so a quiesce or a shutdown can put the preset back the way it was found. The shader does not trust the write: it re-checks finiteness, the protocol version, and the world scale on its own, and the parameter defaults leave the world-space path switched off.",
+      "alt": "Eight stages carrying a camera frame from the game runtime into the shader: runtime pick, address library, camera locator, sample, validate, baseline, publish, shader gate. SelectRuntime maps the executable version to Special Edition or Anniversary Edition, and an unsupported family never writes anything. The Address Library file is parsed with sixteen named refusals covering truncation, wrong format, runtime mismatch, duplicate ids, trailing data and overflow. Each family carries its own world root camera relocation id, 35601 for Special Edition and 36609 for Anniversary Edition. Sampling reads the world-to-camera matrix at offset 0x110 and the frustum and viewport at offset 0x150, against static assertions that pin the ABI layout. Validation has nineteen refusal codes, including a non-finite matrix, a non-affine transform, a singular view, a degenerate frustum and a camera outside range. Before the first live write the runtime reads all seven parameter keys and keeps them as a baseline. Publishing writes four inverse view projection rows, the camera world position, the celestial vector and a status word carrying the protocol version, a valid flag, a folded generation counter and the world scale. The shader gate re-checks the status word for finiteness, for version 1.0 or 1.1, for a valid flag above one half and for a world scale inside its bounds, and the celestial path additionally requires version 1.1 and a unit-length sun direction. Three outcomes: the world-space path enabled, the screen-space path only when the defaults still hold, and no write at all on an unsupported runtime.",
+      "stages": [
+        { "title": "Runtime pick", "note": "Special or Anniversary, or none." },
+        { "title": "Address library", "note": "Sixteen ways to refuse the file." },
+        { "title": "Camera locator", "note": "One relocation id per family." },
+        { "title": "Sample", "note": "World to camera, frustum, viewport." },
+        { "title": "Validate", "note": "Nineteen ways a frame is refused." },
+        { "title": "Baseline", "note": "Read seven keys before writing." },
+        { "title": "Publish", "note": "Seven float4 writes, or none." },
+        { "title": "Shader gate", "note": "Finite, versioned, inside scale." }
+      ],
+      "returns": [
+        { "from": 2, "to": 0, "label": "AN UNSUPPORTED RUNTIME NEVER WRITES" },
+        { "from": 7, "to": 5, "label": "QUIESCE RESTORES THE BASELINE" }
+      ],
+      "outcomes": [
+        { "label": "WORLD SPACE ON", "note": "the gate opened, rows are live", "tone": "verified" },
+        { "label": "SCREEN SPACE ONLY", "note": "defaults keep the path closed", "tone": "drift" },
+        { "label": "NO WRITE", "note": "no supported runtime family", "tone": "none" }
+      ]
+    },
+    {
+      "file": "tier-to-shader.svg",
+      "kicker": "a preset that only compiles at the tier its author used is a preset that ships broken",
+      "title": "How a quality tier becomes a compiled stage, or refuses to",
+      "footnote": "Nine ENB stages are compiled once per tier, so forty-five builds have to succeed before anything ships. Six deliberately broken edits are compiled alongside them and each one has to fail, which is what stops the matrix from passing because the compiler stopped reading. The instruction ceiling is the one number that can drift quietly, so it is pinned with the revision that set it.",
+      "alt": "Eight stages taking a quality tier to a compiled shader: tier, preset override, command line, knobs, stage build, negative cases, prepass budget, package manifest. The tier is an integer from zero through four and anything outside that range is a compile error rather than a clamp. The installed preset carries an override header that defines the tier only while it is still undefined, so a command-line define stays authoritative and preset assembly can replace that one file to ship a different tier. Ten constants resolve per tier: cloud primary steps, cloud light steps, aurora samples, ambient occlusion directions and steps, depth of field rings, bloom radius, lens ghosts, screen-space reflection steps, and whether volume clouds are used at all. Tiers zero and one set cloud steps to zero and volume clouds off; tiers two, three and four turn them on. Aurora samples run one, two, four, seven and ten across the five tiers. Nine ENB stage effects are compiled once per tier for forty-five builds: prepass, depth of field, bloom, adaptation, lens, effect, postpass, sun sprite and underwater. Six negative fixtures edit a stage source and each one has to fail to compile, covering full-frame history, object motion, foreign scratch reads, cross-effect alpha packing and two non-adaptation ownership cases. The balanced prepass is compiled under IEEE-strict rules and refused above 2,996 instruction slots, against a pinned baseline of 6,499 and the revision that set it. The release package manifest is built and checked for determinism last. Three outcomes: every stage compiles at every tier, a compiled shader is not a rendered one, and a tier outside the range is refused.",
+      "stages": [
+        { "title": "Tier", "note": "Zero through four. Nothing else." },
+        { "title": "Preset override", "note": "Defines the tier if nothing has." },
+        { "title": "Command line", "note": "A define here outranks the preset." },
+        { "title": "Knobs", "note": "Ten constants resolve per tier." },
+        { "title": "Stage build", "note": "Nine stages, once per tier." },
+        { "title": "Negative cases", "note": "Six edits that must not compile." },
+        { "title": "Prepass budget", "note": "A slot ceiling, pinned to a commit." },
+        { "title": "Package manifest", "note": "Built, hashed, checked for drift." }
+      ],
+      "returns": [
+        { "from": 2, "to": 0, "label": "THE COMMAND LINE OUTRANKS THE PRESET" },
+        { "from": 6, "to": 4, "label": "A BUDGET OVERRUN FAILS THE BUILD" }
+      ],
+      "outcomes": [
+        { "label": "COMPILES", "note": "every stage, at every tier", "tone": "verified" },
+        { "label": "NOT A RENDER", "note": "compiled is not looked at", "tone": "drift" },
+        { "label": "REFUSED", "note": "a tier outside the range", "tone": "none" }
+      ]
+    }
+  ],
+  "cards": [
+    {
+      "file": "preset-table.svg",
+      "kicker": "counts, not adjectives",
+      "title": "What the preset declares, and where each number is read from",
+      "source": "shaders, include, src, runtime and tools, on this checkout",
+      "heads": ["the slice declares", "how many", "where the number comes from"],
+      "alt": "A table of twelve rows: what the preset declares, how many of it there are, and where each number is read from. There are five quality tiers, zero through four, and ten constants resolve per tier. Aurora samples run one, two, four, seven and ten across those tiers. The stage compile matrix is nine effects by five tiers, so forty-five compilations, and six negative fixtures have to fail alongside them. The runtime publishes seven hidden float4 parameter keys under two protocol versions, 1.0 and 1.1, where 1.1 adds the celestial vector. A camera frame has nineteen refusal codes and the session machine has seven states. The balanced prepass is refused above 2,996 instruction slots. Forty-one CTest targets are declared across three CMake files. No reference image digest is pinned anywhere in the tree, so the WARP render is checked against itself rather than against a known picture.",
+      "footnote": "Every count here was read from the header, shader or CMake file that declares it rather than typed in, and tools/check_repo_facts.py reads those same files. The marked row is the honest null: the WARP reference render is checked for identical bytes twice in a row, which proves determinism and says nothing about whether the picture is right.",
+      "fields": [
+        { "key": "quality tiers", "value": "five of them", "note": "TRUTH_QUALITY_TIER in TruthQuality.fxh, guarded by an #error outside [0,4]. The default is tier one, the balanced preset." },
+        { "key": "tier knobs", "value": "ten per tier", "note": "Cloud primary and light steps, aurora samples, ambient occlusion directions and steps, depth of field rings, bloom radius, lens ghosts, reflection steps, volume clouds on or off." },
+        { "key": "aurora samples", "value": "1, 2, 4, 7, 10", "note": "AuroraSampleCount in AuroraCurtain.hpp, matching the shader constants tier for tier. The C++ enum keeps three compatibility aliases for older callers." },
+        { "key": "compile matrix", "value": "45 compilations", "note": "Nine ENB stage effects by five tiers in CheckTruthStageMatrix.cmake, each one built with the exact x64 fxc the test locates." },
+        { "key": "negative fixtures", "value": "six must fail", "note": "Edited stage sources that have to be rejected: full-frame history, object motion, foreign scratch reads, cross-effect alpha packing, and two ownership cases." },
+        { "key": "shader parameters", "value": "seven float4 keys", "note": "kShaderParameterKeys in RuntimeController.hpp. Four matrix rows, the camera world position, the celestial vector and a status word. All seven are hidden from the editor." },
+        { "key": "protocol versions", "value": "1.0 and 1.1", "note": "TruthRuntimeReady accepts either. TruthRuntimeCelestialReady needs 1.1 or higher, so an older runtime loses the sun vector rather than the whole path." },
+        { "key": "camera refusals", "value": "nineteen codes", "note": "CameraFrameDiagnostic in CameraFrame.hpp, from a null camera through a singular view projection to a camera outside its coordinate range." },
+        { "key": "session states", "value": "seven of them", "note": "RuntimeSessionState in RuntimeController.hpp: cold, awaiting post load, active, save quiesced, reset quiesced, stopped and failed." },
+        { "key": "prepass ceiling", "value": "2,996 slots", "note": "TRUTH_MAXIMUM_INSTRUCTION_SLOTS for the balanced HDR prepass, against a pinned baseline of 6,499 slots and the revision that set it." },
+        { "key": "ctest targets", "value": "41 declared", "note": "Across the top-level, runtime and sky-mesh CMake files. Twelve of them make up the release gate that has to pass before a package is built, and two check this card against the source." },
+        { "key": "pinned image digest", "value": "none in the tree", "note": "The WARP reference render is compared against a second run of itself, for identical bytes and an identical digest. Nothing pins what the picture should look like.", "tone": "drift" }
+      ]
+    }
+  ]
+}

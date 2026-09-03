@@ -265,6 +265,23 @@ if(WIN32 AND TRUTH_BUILD_RUNTIME)
 endif()
 
 if(BUILD_TESTING)
+  # The artwork gates are standard library Python and read the same shaders,
+  # headers and CMake scripts the build compiles, so they are added when an
+  # interpreter is present and skipped silently when one is not. A drawing that
+  # no longer matches the source it describes is a failing test here rather
+  # than a stale file nobody opens.
+  find_package(Python3 COMPONENTS Interpreter QUIET)
+  if(Python3_Interpreter_FOUND)
+    add_test(NAME truth_repo_facts
+      COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tools/check_repo_facts.py")
+    add_test(NAME truth_repo_art
+      COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tools/check_repo_art.py")
+    set_tests_properties(truth_repo_facts truth_repo_art PROPERTIES
+      WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+      LABELS "documentation;artwork"
+    )
+  endif()
+
   set(TRUTH_FXC_EXECUTABLE
     "C:/Program Files (x86)/Windows Kits/10/bin/10.0.26100.0/x64/fxc.exe"
   )

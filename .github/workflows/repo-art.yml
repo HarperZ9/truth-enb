@@ -1,0 +1,24 @@
+name: repo-art
+
+# The shader matrix and the WARP tests need FXC, MSVC and a graphics device, so
+# the C++ build is not run here. These two gates are standard library Python and
+# read the same shaders, headers and CMake scripts the build compiles, so they
+# run on any runner and catch a drawing that has drifted from its source.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  art:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: The card still matches the source it describes
+        run: python tools/check_repo_facts.py
+      - name: The artwork still matches its spec
+        run: python tools/check_repo_art.py
